@@ -16,6 +16,7 @@ class KestEntry(BaseModel):
     labels: Dict[str, str] = Field(default_factory=dict)
     added_taint: List[str] = Field(default_factory=list)
     accumulated_taint: List[str] = Field(default_factory=list)
+    trust_score: float = Field(default=0.0)
 
 
 class PassportOriginPolicies(BaseModel):

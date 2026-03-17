@@ -10,7 +10,8 @@
 
 - **Data Lineage as a DAG**: Every execution step is recorded in a Directed Acyclic Graph (DAG) for non-repudiable audit trails.
 - **Taint Tracking**: Data is automatically marked with "taints" as it flows through untrusted or sensitive processing nodes.
-- **OPA Policy Enforcement**: Native integration with Open Policy Agent (Rego) to enforce security constraints at runtime based on the data's entire history.
+- **Trust Scores**: Numeric data quality indicators propagate alongside data, dynamically updating at processing boundaries via `trust_score_updater` lambdas.
+- **OPA Policy Enforcement**: Native integration with Open Policy Agent (Rego) to enforce security constraints at runtime based on the data's entire history and current trust score.
 - **Implicit Tracking**: Secure-by-default behavior. Any data crossing a `@verified` boundary is automatically tracked, even if it enters the system as a raw primitive.
 - **Cryptographic Integrity**: Recursive DAG hashing ($H_{bind}$) ensures that any modification to historical data or node identities invalidates the final signature.
 
@@ -138,8 +139,32 @@ For data entering from external or untrusted sources, use `originate` to define 
 data = originate(
     {"raw": "payload"},
     taint=["untrusted_source"],
-    labels={"env": "prod"}
+    labels={"env": "prod"},
+    trust_score=0.4
 )
+```
+
+### 3. Trust Scores & Validation
+
+In addition to discrete taints, Kest models data quality dynamically using Trust Scores. A function can specify exactly how it modifies the running trust score of the DAG pipeline by assigning a lambda to `trust_score_updater`.
+
+```python
+# Upgrades the maximum trust score of all parents by 0.3
+@verified(trust_score_updater=lambda scores: max(scores) + 0.3 if scores else 0.8)
+def validate_and_clean(data: dict) -> dict:
+    cleaned = data.copy()
+    cleaned["validated"] = True
+    return cleaned
+```
+
+By default (if no updater is provided), Kest inherently propagates the **minimum** trust score of all parents, guaranteeing that combining dirty data with clean data results in dirty data, unless explicitly washed and upgraded.
+
+Policies can then easily block low-fidelity data:
+
+```rego
+allow {
+    input.trust_score >= 0.70
+}
 ```
 
 ## Documentation

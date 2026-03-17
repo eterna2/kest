@@ -24,6 +24,7 @@ def kest_verified(
     added_taint: Optional[List[str]] = None,
     env_collectors: Optional[List[EnvironmentCollector]] = None,
     telemetry_exporters: Optional[List[TelemetryExporter]] = None,
+    trust_score_updater: Optional[Callable[[List[float]], float]] = None,
     logger: Optional[logging.Logger] = None,
 ) -> Callable[[Callable[..., R]], Callable[..., KestData[R]]]:
     """
@@ -79,6 +80,7 @@ def kest_verified(
             parent_accumulated_taints = []
             parent_ids = []
             parent_hashes = []
+            parent_trust_scores = []
 
             # We need a base passport to merge into. Pick the first one found, or create implicit.
             passport = None
@@ -117,6 +119,7 @@ def kest_verified(
                 parent_ids.append(p_id)
                 parent_hashes.append(p_entry.content_hash)
                 parent_accumulated_taints.extend(p_entry.accumulated_taint)
+                parent_trust_scores.append(p_entry.trust_score)
 
                 # Merge history branches
                 if w.passport != passport:
@@ -126,6 +129,15 @@ def kest_verified(
 
             # Current node's taints: union of parent accumulated taints + explicitly added taints
             current_tag_accumulated = list(set(parent_accumulated_taints + added_taint))
+
+            # Trust Score Synthesis
+            if trust_score_updater:
+                current_trust_score = trust_score_updater(parent_trust_scores)
+            else:
+                if parent_trust_scores:
+                    current_trust_score = min(parent_trust_scores)
+                else:
+                    current_trust_score = 0.0
 
             import typing
 
@@ -163,6 +175,7 @@ def kest_verified(
                     "policy_refs": (
                         passport.origin.policies.curated_refs if passport.origin else []
                     ),
+                    "trust_score": current_trust_score,
                 }
                 if logger:
                     logger.debug(
@@ -191,6 +204,7 @@ def kest_verified(
                 environment=env_data,
                 added_taint=added_taint,
                 accumulated_taint=current_tag_accumulated,
+                trust_score=current_trust_score,
             )
             passport.history[entry_id] = entry
 
