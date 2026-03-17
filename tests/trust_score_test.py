@@ -3,10 +3,14 @@ import pytest
 from kest import config, originate, verified
 from kest.core.policy import _HAS_REGORUS, LocalOpaEngine
 
-# Setup the Global Policy Engine for testing
-if _HAS_REGORUS:
-    config.policy_engine = LocalOpaEngine()
-    policy = """
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_policy():
+    if _HAS_REGORUS:
+        engine = LocalOpaEngine()
+        config.policy_engine = engine
+
+        policy = """
 package kest.trust
 default allow = false
 
@@ -14,7 +18,7 @@ allow {
     input.trust_score >= 0.5
 }
 """
-    config.policy_engine.add_policy("trust_access", policy)
+        engine.add_policy("trust_access", policy)
 
 
 @verified()
