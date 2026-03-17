@@ -20,7 +20,7 @@ def originate(
     policy_refs: Optional[List[str]] = None,
     taint: Optional[List[str]] = None,
     labels: Optional[Dict[str, str]] = None,
-    trust_score: float = 0.0,
+    trust_score: float = 1.0,
 ) -> KestData[T]:
     """
     Wraps raw data in a KestData struct and initializes the Passport DAG lineage.

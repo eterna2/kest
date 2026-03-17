@@ -148,16 +148,20 @@ data = originate(
 
 In addition to discrete taints, Kest models data quality dynamically using Trust Scores. A function can specify exactly how it modifies the running trust score of the DAG pipeline by assigning a lambda to `trust_score_updater`.
 
+By default, every computation node has an inherent `node_trust_score` of 1.0 (perfectly trusted). If no `trust_score_updater` is defined, the output data is assigned the minimum trust score of ALL parents AND the node itself (`min([node_trust_score] + parent_trust_scores)`). This guarantees that dirty data remains dirty, and untrusted nodes taint clean data.
+
 ```python
-# Upgrades the maximum trust score of all parents by 0.3
-@verified(trust_score_updater=lambda scores: max(scores) + 0.3 if scores else 0.8)
+# The validation process is highly trusted (0.9), and specifically 
+# upgrades the maximum trust score of all parents by 0.3
+@verified(
+    node_trust_score=0.9, 
+    trust_score_updater=lambda node, parents: max([node] + parents) + 0.3 if parents else node
+)
 def validate_and_clean(data: dict) -> dict:
     cleaned = data.copy()
     cleaned["validated"] = True
     return cleaned
 ```
-
-By default (if no updater is provided), Kest inherently propagates the **minimum** trust score of all parents, guaranteeing that combining dirty data with clean data results in dirty data, unless explicitly washed and upgraded.
 
 Policies can then easily block low-fidelity data:
 

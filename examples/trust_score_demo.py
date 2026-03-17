@@ -20,12 +20,22 @@ allow {
     config.policy_engine.add_policy("trust_access", policy)
 
     # Define our processing nodes
-    @verified(trust_score_updater=lambda scores: min(scores) if scores else 0.5)
+    @verified(
+        node_trust_score=0.9,
+        trust_score_updater=lambda node, parents: (
+            min([node] + parents) if parents else node
+        ),
+    )
     def fetch_data(source: str) -> dict:
         print(f"-> Fetching raw data from {source}...")
         return {"source": source, "content": "raw_user_data"}
 
-    @verified(trust_score_updater=lambda scores: max(scores) + 0.3 if scores else 0.8)
+    @verified(
+        node_trust_score=0.8,
+        trust_score_updater=lambda node, parents: (
+            max([node] + parents) + 0.3 if parents else node
+        ),
+    )
     def validate_and_clean(data: dict) -> dict:
         print("-> Cleaning and validating data. Trust score upgrading...")
         cleaned = data.copy()
@@ -54,7 +64,7 @@ allow {
         )
         clean_data = validate_and_clean(raw_data)
 
-        # Current Trust Score should be 0.5 + 0.3 = 0.8
+        # Current Trust Score should be max(0.8, 0.5) + 0.3 = 1.1
         report = generate_report(clean_data)
 
         assert report.passport is not None

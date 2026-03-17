@@ -22,7 +22,12 @@ def process_data(data: dict) -> dict:
     return data
 
 
-@verified(trust_score_updater=lambda scores: max(scores) + 0.2 if scores else 0.8)
+@verified(
+    node_trust_score=0.9,
+    trust_score_updater=lambda node_score, parent_scores: (
+        max([node_score] + parent_scores) + 0.2 if parent_scores else node_score
+    ),
+)
 def upgrade_trust(data: dict) -> dict:
     return data
 
@@ -59,11 +64,11 @@ def test_trust_score_upgrades():
     # Upgrade the trust score
     upgraded = upgrade_trust(low_trust_data)
 
-    # 0.4 + 0.2 = 0.6
+    # max([0.9, 0.4]) + 0.2 = 1.1
     assert upgraded.passport is not None
     leaf_entry_id = list(upgraded.passport.history.keys())[-1]
     # Use pytest.approx due to float math
-    assert upgraded.passport.history[leaf_entry_id].trust_score == pytest.approx(0.6)
+    assert upgraded.passport.history[leaf_entry_id].trust_score == pytest.approx(1.1)
 
     # Attempt to sink it (should succeed because 0.6 >= 0.5)
     result = high_trust_sink(upgraded)
@@ -71,11 +76,11 @@ def test_trust_score_upgrades():
 
 
 def test_trust_score_default_propagation_multiple_parents():
-    # Test min logic without OPA enforcement (just testing the decorator synthesis)
+    # Test min logic without OPA enforcement
     d1 = originate({"a": 1}, trust_score=0.9)
     d2 = originate({"b": 2}, trust_score=0.3)
 
-    @verified()
+    @verified(node_trust_score=0.8)
     def merge(a: dict, b: dict) -> dict:
         return {"merged": True}
 
@@ -83,5 +88,5 @@ def test_trust_score_default_propagation_multiple_parents():
     assert res.passport is not None
     leaf_entry_id = list(res.passport.history.keys())[-1]
 
-    # Needs to be min(0.9, 0.3) = 0.3
+    # Needs to be min([0.8, 0.9, 0.3]) = 0.3
     assert res.passport.history[leaf_entry_id].trust_score == 0.3

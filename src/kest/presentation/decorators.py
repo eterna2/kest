@@ -24,7 +24,8 @@ def kest_verified(
     added_taint: Optional[List[str]] = None,
     env_collectors: Optional[List[EnvironmentCollector]] = None,
     telemetry_exporters: Optional[List[TelemetryExporter]] = None,
-    trust_score_updater: Optional[Callable[[List[float]], float]] = None,
+    node_trust_score: float = 1.0,
+    trust_score_updater: Optional[Callable[[float, List[float]], float]] = None,
     logger: Optional[logging.Logger] = None,
 ) -> Callable[[Callable[..., R]], Callable[..., KestData[R]]]:
     """
@@ -132,12 +133,11 @@ def kest_verified(
 
             # Trust Score Synthesis
             if trust_score_updater:
-                current_trust_score = trust_score_updater(parent_trust_scores)
+                current_trust_score = trust_score_updater(
+                    node_trust_score, parent_trust_scores
+                )
             else:
-                if parent_trust_scores:
-                    current_trust_score = min(parent_trust_scores)
-                else:
-                    current_trust_score = 0.0
+                current_trust_score = min([node_trust_score] + parent_trust_scores)
 
             import typing
 
