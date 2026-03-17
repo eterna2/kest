@@ -1,0 +1,81 @@
+[project]
+name = "kest"
+version = "0.1.0"
+description = "Attested Data Lineage specification and reference implementation"
+authors = [
+  { name = "Eterna2", email = "eterna2net@gmail.com" },
+]
+readme = "README.md"
+requires-python = ">=3.10"
+keywords = [
+    "lineage",
+    "provenance",
+    "security",
+    "opa",
+    "open policy agent",
+    "rego",
+    "dag",
+    "taint tracking",
+    "audit",
+    "compliance",
+    "cryptography",
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+dependencies = [
+    "pydantic>=2.0.0",
+    "cryptography>=41.0.0",
+]
+
+[project.optional-dependencies]
+opa = [
+    "lakera-regorus>=0.1.0",
+]
+opa-client = [
+    "opa-python-client>=1.0.0",
+]
+
+
+
+[project.scripts]
+kest = "kest.cli.viz:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kest"]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "pytest>=8.0.0",
+    "pytest-cov>=4.1.0",
+    "ruff~=0.15.0",
+    "pre-commit>=3.6.0",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+addopts = "-v"
+testpaths = ["src", "tests"]
+python_files = ["*_test.py", "test_*.py"]
