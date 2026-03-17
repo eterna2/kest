@@ -1,6 +1,6 @@
 [project]
 name = "kest"
-version = "0.1.0"
+version = "0.2.0"
 description = "Attested Data Lineage specification and reference implementation"
 authors = [
   { name = "Eterna2", email = "eterna2net@gmail.com" },

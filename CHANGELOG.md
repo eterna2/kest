@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.0] - 2026-03-18
+
+### Added
+- **Trust Scores**: Introduced numeric data quality evaluation (`trust_score`) on the `KestEntry` model.
+- **Dynamic Trust Propagators**: Added `trust_score_updater` to the `@kest_verified` decorator, allowing node-specific synthesis of parent trust scores (e.g. upgrades/degrades via custom lambda functions). Defaults to propagating the lowest (minimum) trust score from the parents.
+- **Policy Enforcement**: Integrated `trust_score` directly into the OPA payload context to allow dynamic runtime blocking on minimum trust thresholds.
+- **Trust Origination**: Added `trust_score` parameter to the `originate` helper function to jump-start external data with specific trust baselines.
+
 ## [0.1.0] - 2026-03-18
 
 ### Added

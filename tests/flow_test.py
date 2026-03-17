@@ -3,10 +3,14 @@ import pytest
 from kest import config, originate, verified
 from kest.core.policy import _HAS_REGORUS, LocalOpaEngine
 
-# Setup the Global Policy Engine for testing
-if _HAS_REGORUS:
-    config.policy_engine = LocalOpaEngine()
-    policy = """
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_policy():
+    if _HAS_REGORUS:
+        engine = LocalOpaEngine()
+        config.policy_engine = engine
+
+        policy = """
 package kest.policy
 default allow = false
 
@@ -24,7 +28,7 @@ has_pii { input.taints[_] == "pii_data" }
 has_internet { input.taints[_] == "internet_data" }
 has_stripped { input.taints[_] == "pii_stripped" }
 """
-    config.policy_engine.add_policy("data_access", policy)
+        engine.add_policy("data_access", policy)
 
 
 # Shared Mock verified functions
