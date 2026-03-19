@@ -1,9 +1,9 @@
-import base64
 import hashlib
 import json
+from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Tuple
 
-from cryptography.exceptions import InvalidSignature
+import jwt
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from kest.core.models import KestPassport
@@ -37,41 +37,46 @@ def generate_keypair() -> Tuple[ed25519.Ed25519PrivateKey, ed25519.Ed25519Public
     return priv, pub
 
 
-def _serialize_for_signature(passport: KestPassport) -> bytes:
-    """
-    Strips out the `signature` field and generates a strictly deterministic
-    JSON payload suitable for cryptographic signing and verification.
-    """
-    # model_dump with `mode="json"` converts inner Enums/timestamps cleanly
-    data = passport.model_dump(exclude={"signature"}, mode="json")
-    return json.dumps(data, sort_keys=True, separators=(",", ":")).encode("utf-8")
-
-
 def sign_passport(
-    private_key: ed25519.Ed25519PrivateKey, passport: KestPassport
-) -> KestPassport:
-    """Signs the passport payload using the Ed25519 private key."""
-    payload = _serialize_for_signature(passport)
-    sig_bytes = private_key.sign(payload)
-    sig_base64 = base64.b64encode(sig_bytes).decode("utf-8")
+    private_key: ed25519.Ed25519PrivateKey, passport: KestPassport, kid: str
+) -> str:
+    """Signs the passport payload using EdDSA and returns a JWS string."""
+    payload = passport.model_dump(mode="json")
 
-    # Clone the passport to avoid mutating inputs
-    signed_passport = passport.model_copy()
-    signed_passport.signature = sig_base64
-    return signed_passport
+    # jwt.encode supports cryptography key objects directly
+    token = jwt.encode(payload, private_key, algorithm="EdDSA", headers={"kid": kid})
+    return token
 
 
 def verify_signature(
-    public_key: ed25519.Ed25519PublicKey, passport: KestPassport
-) -> bool:
-    """Strictly validates the Ed25519 signature of the passport structure."""
-    if not passport.signature:
-        return False
-
-    payload = _serialize_for_signature(passport)
+    public_key: ed25519.Ed25519PublicKey, jws_token: str
+) -> KestPassport:
+    """
+    Strictly validates the EdDSA signature of the JWS token.
+    Returns the parsed KestPassport if valid, raises ValueError otherwise.
+    """
     try:
-        sig_bytes = base64.b64decode(passport.signature)
-        public_key.verify(sig_bytes, payload)
-        return True
-    except (InvalidSignature, ValueError):
-        return False
+        decoded_payload = jwt.decode(jws_token, public_key, algorithms=["EdDSA"])
+        return KestPassport.model_validate(decoded_payload)
+    except jwt.InvalidTokenError as e:
+        raise ValueError(f"Invalid signature or token: {e}")
+
+
+class KeyRegistry(ABC):
+    """Abstract interface for JWS Key Discovery mechanisms."""
+
+    @abstractmethod
+    def get_public_key(self, kid: str) -> ed25519.Ed25519PublicKey:
+        pass
+
+
+class LocalJWKStore(KeyRegistry):
+    """Local, in-memory implementation of KeyRegistry for dev/testing."""
+
+    def __init__(self, keys: Dict[str, ed25519.Ed25519PublicKey]):
+        self._keys = keys
+
+    def get_public_key(self, kid: str) -> ed25519.Ed25519PublicKey:
+        if kid not in self._keys:
+            raise KeyError(f"Key ID '{kid}' not found in local registry.")
+        return self._keys[kid]

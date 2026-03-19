@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-19
+
+### Added
+- **Specification Overview**: Kest specification updated to v0.3.0, including AI cognition lineage tracking and specific AI use cases.
+- **Improved OPA Policies**: Enhanced OPA policy enforcement for functions like `strip_pii`, requiring specific input taints (e.g., `pii_data`) prior to execution.
+- **Relocated Originate**: Relocated `originate` function to `kest.core.helpers` to cleanly separate it from presentation decorators.
+- **Mock OPA Engine**: Implemented `MockWorkaroundEngine` for local fallback evaluations when a standard OPA engine is unavailable.
+
 ## [0.2.0] - 2026-03-18
 
 ### Added

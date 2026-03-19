@@ -1,0 +1,12 @@
+site_name: Kest (Key + Trust) AI Lineage
+theme:
+  name: material
+  palette:
+    scheme: slate
+    primary: indigo
+    accent: deep purple
+
+nav:
+  - Home: index.md
+  - Specification: design/kest_spec_v0.3.0.md
+  - Implementation: design/kest_impl_guide_v0.3.0.md

@@ -1,10 +1,16 @@
+import base64
+import json
+
+import pytest
+
 from kest.core.crypto import (
+    LocalJWKStore,
     compute_dag_hash,
     generate_keypair,
     sign_passport,
     verify_signature,
 )
-from kest.core.models import KestPassport, PassportOrigin
+from kest.core.models import KestPassport, PassportOrigin, PassportOriginPolicies
 
 
 def test_compute_dag_hash_deterministic_sorting():
@@ -23,38 +29,74 @@ def test_compute_dag_hash_deterministic_sorting():
 
 
 def test_sign_and_verify_passport():
-    """Verify Ed25519 signatures work on passport objects."""
+    """Verify EdDSA JWS signatures work on passport objects."""
     private_key, public_key = generate_keypair()
 
     passport = KestPassport(
-        origin=PassportOrigin(user_id="test", session_id="test", policies={}),
+        origin=PassportOrigin(
+            user_id="test", session_id="test", policies=PassportOriginPolicies()
+        ),
         history={},
-        signature="",
-        public_key_id="test_key",
     )
 
-    # Sign it (mutates signature field or returns a new instance)
-    signed_passport = sign_passport(private_key, passport)
-    assert signed_passport.signature != ""
+    kid = "spiffe://kest.internal/worker-1"
+
+    # Sign it
+    jws_token = sign_passport(private_key, passport, kid=kid)
+    assert isinstance(jws_token, str)
+    assert len(jws_token.split(".")) == 3
 
     # Verify it
-    assert verify_signature(public_key, signed_passport) is True
+    verified_passport = verify_signature(public_key, jws_token)
+    assert verified_passport.origin.user_id == "test"
 
 
 def test_verify_signature_failure():
-    """Verify tampered passport fails signature authentication."""
+    """Verify tampered passport fails JWS authentication."""
     private_key, public_key = generate_keypair()
 
     passport = KestPassport(
-        origin=PassportOrigin(user_id="test", session_id="test", policies={}),
+        origin=PassportOrigin(
+            user_id="test", session_id="test", policies=PassportOriginPolicies()
+        ),
         history={},
-        signature="",
-        public_key_id="test_key",
     )
 
-    signed = sign_passport(private_key, passport)
+    jws_token = sign_passport(private_key, passport, kid="test_key")
 
-    # Tamper with the passport
-    signed.origin.user_id = "hacker"
+    # Tamper with the token (modify payload)
+    header, payload, sig = jws_token.split(".")
 
-    assert verify_signature(public_key, signed) is False
+    # Decode, tamper, re-encode payload
+    # Pad payload for correct base64 decoding
+    padding_needed = 4 - (len(payload) % 4)
+    if padding_needed and padding_needed != 4:
+        payload += "=" * padding_needed
+
+    decoded_payload = json.loads(base64.urlsafe_b64decode(payload))
+    decoded_payload["origin"]["user_id"] = "hacker"
+
+    tampered_payload = (
+        base64.urlsafe_b64encode(json.dumps(decoded_payload).encode())
+        .decode()
+        .rstrip("=")
+    )
+
+    tampered_token = f"{header}.{tampered_payload}.{sig}"
+
+    with pytest.raises(ValueError, match="Invalid signature or token"):
+        verify_signature(public_key, tampered_token)
+
+
+def test_local_jwk_store():
+    """Verify LocalJWKStore securely manages key discovery."""
+    _, pub_key1 = generate_keypair()
+    _, pub_key2 = generate_keypair()
+
+    store = LocalJWKStore(keys={"key1": pub_key1, "key2": pub_key2})
+
+    assert store.get_public_key("key1") == pub_key1
+    assert store.get_public_key("key2") == pub_key2
+
+    with pytest.raises(KeyError):
+        store.get_public_key("unknown")

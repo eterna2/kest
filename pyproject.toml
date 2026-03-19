@@ -1,6 +1,6 @@
 [project]
 name = "kest"
-version = "0.2.0"
+version = "0.3.0"
 description = "Attested Data Lineage specification and reference implementation"
 authors = [
   { name = "Eterna2", email = "eterna2net@gmail.com" },
@@ -36,6 +36,10 @@ classifiers = [
 dependencies = [
     "pydantic>=2.0.0",
     "cryptography>=41.0.0",
+    "pyjwt>=2.12.1",
+    "uuid-utils>=0.14.1",
+    "fsspec>=2026.2.0",
+    "opentelemetry-api>=1.40.0",
 ]
 
 [project.optional-dependencies]
@@ -59,12 +63,17 @@ build-backend = "hatchling.build"
 packages = ["src/kest"]
 
 [dependency-groups]
+docs = [
+    "mkdocs>=1.5.0",
+    "mkdocs-material>=9.5.0"
+]
 dev = [
     "ipykernel>=7.2.0",
     "pytest>=8.0.0",
     "pytest-cov>=4.1.0",
     "ruff~=0.15.0",
     "pre-commit>=3.6.0",
+    "pytest-asyncio>=1.3.0",
 ]
 
 [tool.ruff]

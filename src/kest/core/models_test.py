@@ -1,7 +1,13 @@
 import pytest
 from pydantic import ValidationError
 
-from kest.core.models import KestEntry, KestPassport, PassportOrigin
+from kest.core.models import (
+    KestEntry,
+    KestNodeType,
+    KestPassport,
+    PassportOrigin,
+    PassportOriginPolicies,
+)
 
 
 def test_kest_entry_serialization():
@@ -17,19 +23,23 @@ def test_kest_entry_serialization():
         labels={"pii": "true"},
         added_taint=["user_input"],
         accumulated_taint=["user_input", "external_api"],
+        node_type=KestNodeType.CRITIC,
+        cognition={"confidence_score": 0.85},
     )
     data = entry.model_dump(mode="json")
 
     assert data["entry_id"] == "test-uuid"
     assert data["timestamp_ms"] == 1710685938000
     assert data["accumulated_taint"] == ["user_input", "external_api"]
+    assert data["node_type"] == KestNodeType.CRITIC.value
+    assert data["cognition"]["confidence_score"] == 0.85
 
 
 def test_kest_entry_validation_failure():
     """Ensure KestEntry strictly enforces its schema requirements."""
     with pytest.raises(ValidationError):
         # Missing required fields like timestamp_ms and content_hash
-        KestEntry(entry_id="test-uuid")
+        KestEntry(entry_id="test-uuid")  # type: ignore
 
 
 def test_kest_passport_build():
@@ -50,14 +60,12 @@ def test_kest_passport_build():
     origin = PassportOrigin(
         user_id="user-456",
         session_id="sess-789",
-        policies={"curated_refs": ["policy://strict"]},
+        policies=PassportOriginPolicies(curated_refs=["policy://strict"]),
     )
 
     passport = KestPassport(
         origin=origin,
         history={"node-1": entry},
-        signature="base64-sig",
-        public_key_id="kms/key",
     )
 
     dump = passport.model_dump(mode="json")

@@ -1,6 +1,9 @@
 import json
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict
+
+logger = logging.getLogger(__name__)
 
 try:
     import lakera_regorus
@@ -29,22 +32,34 @@ class OpaEngine(ABC):
 
 
 class LocalOpaEngine(OpaEngine):
-    """Wrapper around Microsoft's Regorus engine (via lakera_regorus) for evaluating Kest policies locally."""
+    """Wrapper around Microsoft's Regorus engine (via lakera_regorus) for evaluating Kest policies locally.
+    Gracefully falls back to a RemoteOpaClient locally if lakera wheels are unsupported."""
 
     def __init__(self):
-        if not _HAS_REGORUS:
-            raise ImportError(
-                "OpaEngine requires 'lakera-regorus'. Install with `pip install kest[opa]` or `uv add kest --extra opa`."
+        if _HAS_REGORUS:
+            self.mode = "lakera"
+            self._engine = lakera_regorus.Engine()  # type: ignore
+            self._compiled = False
+        else:
+            self.mode = "fallback"
+            logger.warning(
+                "lakera-regorus wheel unsupported for this Python version/OS. "
+                "Falling back to LocalOpaEngine via RemoteOpaClient on localhost:8181."
             )
-        self._engine = lakera_regorus.Engine()  # type: ignore
-        self._compiled = False
+            self._remote_fallback = RemoteOpaClient(host="localhost", port=8181)
 
     def add_policy(self, name: str, rego_code: str) -> None:
         """Compiles and registers inline Rego policy code."""
+        if self.mode == "fallback":
+            logger.warning(
+                f"Inline policies cannot be added dynamically in fallback mode. Skipping {name}."
+            )
+            return
+
         if not name.endswith(".rego"):
             name += ".rego"
         try:
-            self._engine.add_policy(name, rego_code)
+            self._engine.add_policy(name, rego_code)  # type: ignore
             self._compiled = True
         except Exception as e:
             raise ValueError(f"Failed to compile Rego policy '{name}': {e}")
@@ -54,18 +69,18 @@ class LocalOpaEngine(OpaEngine):
         Evaluates the supplied JSON-serializable payload against the active policies.
         `rule_path` corresponds to a boolean Rego rule (e.g., "data.kest.policy.allow").
         """
-        if not self._compiled:
+        if self.mode == "fallback":
+            return self._remote_fallback.evaluate(payload, rule_path)
+
+        if not getattr(self, "_compiled", False):
             raise RuntimeError("No policies have been loaded into the OpaEngine.")
 
         try:
-            # Serialize the payload to JSON to pass efficiently to Regorus
             input_json = json.dumps(payload)
-            self._engine.set_input_json(input_json)
+            self._engine.set_input_json(input_json)  # type: ignore
 
-            result_dict = self._engine.eval_query(rule_path)
+            result_dict = self._engine.eval_query(rule_path)  # type: ignore
 
-            # Parse the Regorus output format
-            # {'result': [{'expressions': [{'value': True, ...}]}]}
             results = result_dict.get("result", [])
             if not results:
                 return False
@@ -83,11 +98,12 @@ class LocalOpaEngine(OpaEngine):
 class RemoteOpaClient(OpaEngine):
     """Wrapper around opa-python-client for evaluating Kest policies via a remote OPA server."""
 
-    def __init__(self, host: str, port: int = 8181, version: str = "v1"):
+    def __init__(self, host: str = "localhost", port: int = 8181, version: str = "v1"):
         if not _HAS_OPA_CLIENT:
             raise ImportError(
-                "RemoteOpaClient requires 'opa-python-client'. Install with `pip install kest[opa-client]` or `uv add kest --extra opa-client`."
+                "RemoteOpaClient requires 'opa-python-client'. Install with `pip install kest[opa-client]`."
             )
+        assert OpaClient is not None
         self._client = OpaClient(host=host, port=port, version=version)
 
     def evaluate(self, payload: Dict[str, Any], rule_path: str) -> bool:
@@ -116,7 +132,7 @@ class RemoteOpaClient(OpaEngine):
             # The opa-python-client check_policy_rule method signature:
             # check_policy_rule(input_data, package_path, rule_name)
 
-            result = self._client.check_policy_rule(
+            result = self._client.check_policy_rule(  # type: ignore
                 input_data=payload, package_path=package_path, rule_name=rule_name
             )
 
