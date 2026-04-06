@@ -81,11 +81,21 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   );
 }
 
+// Custom anchor component to prefix basePath for internal links in markdown content.
+// MDX renders markdown links as raw <a> tags, not Next.js <Link> components,
+// so they don't automatically receive the basePath prefix.
+function Anchor(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
+  const { href, ...rest } = props;
+  const resolvedHref = typeof href === 'string' && href.startsWith('/') && !href.startsWith('//') ? prefixPath(href) : href;
+  return <a href={resolvedHref} {...rest} />;
+}
+
 export default async function MarkdownContent({ content, currentDir }: { content: string; currentDir?: string }) {
   const { content: renderedContent } = await compileContent(content, {
     pre: Pre,
     figure: Figure,
     img: Img,
+    a: Anchor,
   }, currentDir);
 
   return (
@@ -94,4 +104,3 @@ export default async function MarkdownContent({ content, currentDir }: { content
     </div>
   );
 }
-
