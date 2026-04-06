@@ -1,0 +1,49 @@
+# Kest (Key + Trust) AI Lineage
+
+> Distributed Zero Trust architecture solving the Secret Zero problem via Cryptographic Merkle DAGs, SPIFFE, and OPA/Cedar.
+
+This `llms.txt` provides AI agents and LLMs with a consolidated overview of the Kest toolkit.
+
+## Architecture Summary
+- **Workload Identity (SPIFFE/SPIRE)**: Replaces static API keys with dynamically rotated X509-SVIDs.
+- **Policy Sidecars (OPA/Cedar)**: Continuous authorization using ABAC (Attribute-Based Access Control) policies at every hop.
+- **Cryptographic Lineage**: Merkle DAGs over OpenTelemetry baggage. Every hop is signed via JWS (RFC 8785 canonicalization) using the Workload's private key.
+- **Trust Scoring (CARTA)**: Pessimistic trust aggregation. A node's trust is the product of its own score and the lowest trust score of its parents.
+
+## Documentation Links
+- [High-Level Overview](design/overview.md)
+- [The Secret Zero Problem](design/secret_zero.md)
+- [Cryptographic Lineage (Merkle DAG)](design/merkle_dag.md)
+- [Audit Entry Specification](design/audit_entry.md)
+- [ABAC Policy Enforcement](design/abac_policy.md)
+- [Handling Edge Cases](design/edge_cases.md)
+- [Developer Getting Started](developer/getting_started.md)
+- [Securing Execution (Decorators)](developer/decorators.md)
+- [Distributed Propagation (Middleware)](developer/middleware.md)
+- [Trust & CARTA](developer/trust_model.md)
+- [Workload Identity (SPIRE)](infra/spire.md)
+- [Policy Sidecars (OPA/Cedar)](infra/sidecars.md)
+- [Audit Aggregation (OTel)](infra/otel.md)
+
+## Core Concepts for Agents
+
+1. **kest-core-rs**: The pure Rust engine performing deterministic JSON canonicalization (RFC 8785) and Merkle hash verification.
+2. **kest-core-python**: Python wrapper using PyO3. Provides `@kest_verified` for function protection.
+3. **Context Propagation**: Uses standard `opentelemetry.baggage` (`kest.passport` and `kest.lineage_root`). If a passport exceeds 4KB, Kest transparently uses a Claim Check pattern.
+4. **Evaluating Trust**: Policies shouldn't just check the immediate caller. OPA/Cedar policies evaluate the full `KestEntry` DAG.
+
+## Quick Python Example
+```python
+from kest.core import configure, kest_verified
+from kest.core.identity import SPIREProvider
+from kest.core.engine import OPASidecarEngine
+
+configure(
+    identity=SPIREProvider(socket_path="/var/run/spire/agent/public/api.sock"),
+    engine=OPASidecarEngine(url="http://localhost:8181")
+)
+
+@kest_verified(policy="allow_internal")
+def execute_secure_task(data: dict):
+    return {"status": "ok"}
+```

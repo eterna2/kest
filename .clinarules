@@ -1,0 +1,3 @@
+Please strictly follow the development and architectural rules in AGENTS.md and .agents/skills/principles.md. 
+Always use `uv` and `ruff` for code management. 
+Refer to `libs/` for library development and `showcase/` for demonstrations.

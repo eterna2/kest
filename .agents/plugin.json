@@ -1,0 +1,13 @@
+{
+  "name": "Kest Agent Plugin",
+  "description": "Standardized development and architectural rules for the Kest toolkit.",
+  "version": "1.0.0",
+  "skills": [
+    "moon",
+    "testing",
+    "architecture",
+    "chub-sync",
+    "principles",
+    "proto"
+  ]
+}

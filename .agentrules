@@ -1,0 +1,16 @@
+# Kest Agent Rules
+
+This repository follows standardized architectural and development principles that MUST be adhered to by all AI coding assistants (Gemini, Cursor, Cline, Windsurf, etc.).
+
+## 📖 Primary Sources of Truth
+1. [AGENTS.md](file:///home/eterna2/github/kest/AGENTS.md): High-level strategy and developer guidelines.
+2. [.agents/rules/](file:///home/eterna2/github/kest/.agents/rules/): Modular rules for Toolchains, Workflows, and more.
+3. [.agents/skills/principles.md](file:///home/eterna2/github/kest/.agents/skills/principles.md): Immutable architectural and design principles.
+
+## 🧭 Multi-IDE Compatibility
+We use the following files to ensure AI agents from different IDEs always reference our local rules:
+- `.cursorrules`: Rules for the Cursor IDE.
+- `.clinarules`: Rules for the Cline agent.
+- `.windsurfrules`: Rules for the Windsurf IDE.
+
+All of the above simply point to `AGENTS.md` and the `.agents/` directory to maintain a single source of truth.

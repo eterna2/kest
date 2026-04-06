@@ -1,0 +1,181 @@
+#!/usr/bin/env bash
+# .github/scripts/gen-pages-index.sh
+#
+# Generates the root index.html for the gh-pages branch.
+# Must be run from the root of a checked-out gh-pages branch.
+# Scans the directory tree to enumerate all deployed versions and preview URLs.
+#
+# Usage:  bash .github/scripts/gen-pages-index.sh <repo-owner> <repo-name>
+#
+# Outputs: ./index.html  (overwrites in place)
+
+set -euo pipefail
+
+OWNER="${1:-}"
+REPO="${2:-kest}"
+BASE_URL="https://${OWNER}.github.io/${REPO}"
+
+# Collect version folders (v0.3.0, v1.0.0, etc.) sorted descending
+mapfile -t VERSIONS < <(find . -maxdepth 1 -type d -name 'v*.*.*' | sed 's|^\./||' | sort -rV)
+
+# Collect preview folders (preview/<slug>/)
+mapfile -t PREVIEWS < <(find ./preview -maxdepth 1 -mindepth 1 -type d 2>/dev/null | sed 's|^\./preview/||' | sort)
+
+# Build version list HTML
+VERSION_ROWS=""
+for v in "${VERSIONS[@]}"; do
+  if [ "$v" = "${VERSIONS[0]}" ]; then
+    BADGE='<span class="badge latest">latest</span>'
+  else
+    BADGE=""
+  fi
+  VERSION_ROWS+="<li><a href=\"${BASE_URL}/${v}/\">${v}</a>${BADGE}</li>"$'\n'
+done
+[ -z "$VERSION_ROWS" ] && VERSION_ROWS='<li class="empty">No versioned releases yet.</li>'
+
+# Build preview list HTML
+PREVIEW_ROWS=""
+for p in "${PREVIEWS[@]}"; do
+  PREVIEW_ROWS+="<li><a href=\"${BASE_URL}/preview/${p}/\">preview/${p}</a></li>"$'\n'
+done
+[ -z "$PREVIEW_ROWS" ] && PREVIEW_ROWS='<li class="empty">No active PR previews.</li>'
+
+cat > index.html <<HTML
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Kest Zero Trust Toolkit — documentation index" />
+  <title>Kest Docs</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --accent:    #58a6ff;
+      --accent2:   #3fb950;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --radius:    10px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+
+    header { text-align: center; margin-bottom: 3rem; }
+    .logo  { font-size: 2.5rem; font-weight: 700; letter-spacing: -1px; }
+    .logo span { color: var(--accent); }
+    .tagline { color: var(--muted); margin-top: .5rem; font-size: .95rem; }
+
+    .cta {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      margin-top: 1.5rem;
+      padding: .75rem 2rem;
+      background: var(--accent);
+      color: #0d1117;
+      font-weight: 600;
+      border-radius: 6px;
+      text-decoration: none;
+      transition: opacity .15s;
+    }
+    .cta:hover { opacity: .85; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.25rem;
+      width: 100%;
+      max-width: 820px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: .8rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .card ul { list-style: none; }
+    .card li {
+      padding: .4rem 0;
+      border-bottom: 1px solid var(--border);
+      font-size: .92rem;
+    }
+    .card li:last-child { border-bottom: none; }
+    .card a { color: var(--accent); text-decoration: none; }
+    .card a:hover { text-decoration: underline; }
+    .empty { color: var(--muted); font-style: italic; }
+
+    .badge {
+      font-size: .65rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      padding: 2px 6px;
+      border-radius: 999px;
+      margin-left: .5rem;
+      vertical-align: middle;
+    }
+    .badge.latest { background: var(--accent2); color: #0d1117; }
+
+    footer {
+      margin-top: 3rem;
+      color: var(--muted);
+      font-size: .8rem;
+      text-align: center;
+    }
+    footer a { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">ke<span>st</span></div>
+    <p class="tagline">Zero Trust Toolkit — Documentation</p>
+    <a class="cta" href="${BASE_URL}/stable/">
+      View Latest Docs &rarr;
+    </a>
+  </header>
+
+  <div class="grid">
+    <div class="card">
+      <h2>📦 Versioned Releases</h2>
+      <ul>
+        ${VERSION_ROWS}
+      </ul>
+    </div>
+
+    <div class="card">
+      <h2>🔍 PR Previews</h2>
+      <ul>
+        ${PREVIEW_ROWS}
+      </ul>
+    </div>
+  </div>
+
+  <footer>
+    <p>Generated automatically &bull; <a href="https://github.com/${OWNER}/${REPO}">GitHub</a></p>
+  </footer>
+</body>
+</html>
+HTML
+
+echo "✅  index.html written (${#VERSIONS[@]} versions, ${#PREVIEWS[@]} previews)"

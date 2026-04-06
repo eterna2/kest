@@ -1,0 +1,6 @@
+lab_audit.json
+lineage_roots.json
+last_hash_*.txt
+test.sock
+.venv/
+uv.lock

@@ -1,0 +1,38 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+language: "python"
+layer: "application"
+stack: "backend"
+
+# kest-lab consumes the core library — the dependency flows lab → core, not core → lab.
+dependsOn:
+  - "kest-core-python"
+
+tasks:
+  sync:
+    command: "uv sync --group test"
+    description: "Install lab dependencies from pyproject.toml (includes editable kest-core)"
+    deps:
+      - "kest-core-python:install"
+  up-server:
+    script: "docker compose up -d spire-server"
+  bootstrap:
+    script: "chmod +x bootstrap.sh && ./bootstrap.sh"
+    deps:
+      - "up-server"
+  down:
+    script: "docker compose down --remove-orphans"
+  up:
+    script: "docker compose up -d"
+    deps:
+      - "bootstrap"
+      - "kest-core-python:check"
+  test-live:
+    script: "docker compose exec hop1 sh -c 'until /app/.venv/bin/python -m pytest --version 2>/dev/null; do echo \"Waiting for hop1 to be ready...\" && sleep 2; done && /app/.venv/bin/python -m pytest /app/tests/'"
+    deps:
+      - "up"
+  spire-healthcheck:
+    script: "docker compose exec spire-agent bin/spire-agent healthcheck"
+  fetch-bundle:
+    script: "docker compose exec hop1 sh -c 'apt-get update && apt-get install -y curl && curl --unix-socket /var/run/spire/agent/public/api.sock http://localhost/bundle'"
+  logs-otel:
+    script: "docker compose logs -f otel-collector"

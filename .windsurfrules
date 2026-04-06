@@ -1,0 +1,3 @@
+Refer to AGENTS.md and .agents/skills/principles.md for structural and development instructions.
+Always use `moon` for task orchestration, `uv` for python, and `bun` for typescript.
+Repository is a toolkit, so follow lib/showcase boundaries.

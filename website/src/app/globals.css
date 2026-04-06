@@ -1,0 +1,619 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@300;400;500;600&family=Fira+Code:wght@400;500&display=swap');
+
+:root {
+  /* Colors - Obsidian Lens Palette (DESIGN.md §2) */
+  --background: #0c1324;
+  --surface: #0c1324;
+  --surface-dim: #0c1324;
+  --surface-bright: #33394c;
+  
+  /* Surface Hierarchy (DESIGN.md §2: architectural stack) */
+  --surface-container-lowest: #070d1f;   /* Level 1: Submerged — code blocks, wells */
+  --surface-container-low: #151b2d;
+  --surface-container: #191f31;
+  --surface-container-high: #23293c;     /* Level 2: Elevated — cards, modules */
+  --surface-container-highest: #2e3447;
+  
+  --primary: #c3c0ff;
+  --primary-container: #4f46e5;
+  --on-primary: #1d00a5;
+  --on-primary-container: #dad7ff;
+  
+  --secondary: #c3c0ff;
+  --secondary-container: #413f82;
+  --on-secondary: #2a276a;
+  
+  --on-surface: #dce1fb;
+  --on-surface-variant: #c7c4d8;
+  
+  --outline: #918fa1;
+  --outline-variant: #464555;
+  /* Ghost Border: §2 — outline-variant at 15% opacity ONLY */
+  --outline-variant-ghost: rgba(70, 69, 85, 0.15);
+
+  /* Typography (DESIGN.md §3) */
+  --font-display: 'Manrope', sans-serif;
+  --font-body: 'Inter', sans-serif;
+  --font-mono: 'Fira Code', monospace;
+
+  /* Elevation & Shadows (DESIGN.md §4) */
+  --shadow-l1: 0px 4px 8px rgba(0, 0, 0, 0.2);
+  --shadow-l2: 0px 8px 16px rgba(0, 0, 0, 0.3);
+  --shadow-l3: 0px 12px 24px rgba(0, 0, 0, 0.35);
+  /* Deep Space Shadow: 4% on-surface tint injected (DESIGN.md §4) */
+  --shadow-l4: 0px 24px 48px rgba(3, 4, 10, 0.4);
+
+  /* Radii (DESIGN.md §5, §6: no 90° corners, sm = 0.125rem min) */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
+  --radius-full: 9999px;
+}
+
+/* ========================================
+   Base & Reset
+   ======================================== */
+
+body {
+  background-color: var(--background);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  line-height: 1.6;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* Typography (DESIGN.md §3: Editorial Authority) */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  margin-top: 0;
+  color: var(--on-surface);
+  font-weight: 800;
+}
+
+/* Link Overrides (DESIGN.md §6: no standard blue links) */
+a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+/* ========================================
+   Signature Gradient Text (DESIGN.md §2 & §3)
+   gradient: primary-container → primary at 135°
+   ======================================== */
+
+.gradient-text {
+  background: linear-gradient(135deg, var(--primary-container), var(--primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ========================================
+   Glassmorphism (DESIGN.md §2: Glass & Gradient Rule)
+   60% opacity + blur(20px) — mandatory for sidebars/nav
+   ======================================== */
+
+.glass {
+  background-color: rgba(12, 19, 36, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.glass-sidebar {
+  background-color: rgba(12, 19, 36, 0.6);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* ========================================
+   Ghost Border Fallback (DESIGN.md §2 & §4)
+   outline-variant at 15% — ONLY when visual separator is unavoidable
+   ======================================== */
+
+.ghost-border {
+  border: 1px solid var(--outline-variant-ghost);
+}
+
+/* ========================================
+   Kest Glow Interaction (DESIGN.md §7)
+   Radial gradient following cursor, 5% opacity (NOT 8%)
+   ======================================== */
+
+.kest-glow {
+  position: relative;
+  overflow: hidden;
+}
+
+.kest-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at var(--glow-x, 50%) var(--glow-y, 50%), rgba(195, 192, 255, 0.05) 0%, transparent 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.kest-glow:hover::after {
+  opacity: 1;
+}
+
+/* ========================================
+   Active Pill for Navigation (DESIGN.md §5 Sidebars)
+   Vertical 2px primary pill, 4px left of text. NOT a box.
+   ======================================== */
+
+.active-pill {
+  position: relative;
+  color: var(--primary) !important;
+  font-weight: 600;
+  background-color: rgba(195, 192, 255, 0.05);
+}
+
+.active-pill::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 16px;
+  background-color: var(--primary);
+  border-radius: var(--radius-full);
+}
+
+/* ========================================
+   Buttons (DESIGN.md §5)
+   ======================================== */
+
+/* Primary: gradient from primary-container → primary, no border, large padding */
+.btn-premium {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, var(--primary-container), var(--primary));
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-l2);
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn-premium:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-l4);
+  filter: brightness(1.1);
+}
+
+.btn-premium:active {
+  transform: scale(0.98);
+}
+
+/* Secondary: surface-container-highest bg + Ghost Border (DESIGN.md §5) */
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface-container-highest);
+  color: var(--on-surface);
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--outline-variant-ghost);
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.3s ease;
+}
+
+.btn-secondary:hover {
+  background-color: var(--surface-bright);
+  border-color: rgba(70, 69, 85, 0.3);
+}
+
+/* Tertiary: pure primary text, underline on hover only (DESIGN.md §5) */
+.btn-tertiary {
+  display: inline-flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-family: var(--font-body);
+  font-weight: 500;
+  padding: 0.5rem 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: text-decoration-color 0.2s ease;
+}
+
+.btn-tertiary:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+/* General btn reset */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-display);
+}
+
+/* ========================================
+   Bento Cards (DESIGN.md §2 & §4)
+   Tonal shifting for structure — NO direct borders
+   ======================================== */
+
+.bento-card {
+  background-color: var(--surface-container-high);
+  border-radius: var(--radius-xl);
+  padding: 2.5rem;
+  border: 1px solid var(--outline-variant-ghost);
+  transition: all 0.4s ease;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+.bento-card:hover {
+  background-color: var(--surface-container-highest);
+  border-color: rgba(195, 192, 255, 0.15);
+  transform: translateY(-4px);
+}
+
+/* ========================================
+   Chips / Tags (DESIGN.md §5)
+   surface-container-high, label-sm, radius-full
+   ======================================== */
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.75rem;
+  background-color: var(--surface-container-high);
+  color: var(--on-surface-variant);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+}
+
+.chip-primary {
+  background-color: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ========================================
+   Input Fields (DESIGN.md §5)
+   surface-container-low bg. On focus: ghost border → 40% primary
+   ======================================== */
+
+input[type="text"],
+input[type="search"],
+input[type="email"] {
+  background-color: var(--surface-container-low);
+  border: 1px solid var(--outline-variant-ghost);
+  border-radius: var(--radius-md);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+input[type="text"]:focus,
+input[type="search"]:focus,
+input[type="email"]:focus {
+  border-color: rgba(195, 192, 255, 0.4);
+}
+
+/* ========================================
+   Markdown / Content Styles (DESIGN.md §5 Code Blocks)
+   ======================================== */
+
+.md-body {
+  font-family: var(--font-body);
+  color: var(--on-surface-variant);
+  font-size: 1.05rem;
+  line-height: 1.8;
+}
+
+.md-body h1 { font-size: 2.5rem; margin-bottom: 2rem; color: var(--on-surface); }
+.md-body h2 { font-size: 1.75rem; margin-top: 4rem; margin-bottom: 1.5rem; color: var(--on-surface); }
+.md-body h3 { font-size: 1.35rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--on-surface); }
+.md-body h4 { font-size: 1.15rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--on-surface); }
+
+.md-body p { margin-bottom: 1.5rem; }
+
+/* Inline code */
+.md-body code {
+  font-family: var(--font-mono);
+  background-color: var(--surface-container-lowest);
+  padding: 0.2em 0.4em;
+  border-radius: var(--radius-xs);
+  font-size: 0.88em;
+  color: var(--primary);
+}
+
+/* Code Blocks — DESIGN.md §5:
+   - surface-container-lowest bg
+   - NO border
+   - Glass header with language label + Copy
+   The glass header is handled by MarkdownContent component */
+.md-body pre {
+  background-color: var(--surface-container-lowest) !important;
+  border: none;
+  border-radius: var(--radius-md);
+  padding: 1.5rem;
+  margin: 2rem 0;
+  overflow-x: auto;
+}
+
+.md-body pre code {
+  background: transparent;
+  padding: 0;
+  color: inherit;
+}
+
+/* Code block wrapper — glass header (DESIGN.md §5) */
+.code-block-wrapper {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 2rem 0;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  background-color: rgba(25, 31, 49, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.code-block-header .lang-label {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--on-surface-variant);
+  opacity: 0.6;
+}
+
+.code-block-header .copy-btn {
+  background: none;
+  border: none;
+  color: var(--on-surface-variant);
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.7rem;
+  font-family: var(--font-body);
+  opacity: 0.5;
+  transition: opacity 0.2s, color 0.2s;
+  border-radius: var(--radius-sm);
+}
+
+.code-block-header .copy-btn:hover {
+  opacity: 1;
+  color: var(--primary);
+}
+
+.code-block-wrapper pre {
+  margin: 0;
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+}
+
+/* Blockquotes */
+.md-body blockquote {
+  border-left: 3px solid var(--primary-container);
+  background-color: var(--surface-container-low);
+  padding: 1rem 1.5rem;
+  margin: 2rem 0;
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  font-style: italic;
+}
+
+/* Lists */
+.md-body ul, .md-body ol {
+  padding-left: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.md-body li {
+  margin-bottom: 0.5rem;
+}
+
+/* Tables — DESIGN.MD §2: Tonal shifting, ghost borders */
+.md-body table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2rem 0;
+  font-size: 0.9rem;
+  background-color: var(--surface-container);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.md-body th {
+  text-align: left;
+  padding: 0.85rem 1.25rem;
+  background-color: var(--surface-container-high);
+  color: var(--on-surface);
+  font-weight: 700;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+}
+
+.md-body td {
+  padding: 0.75rem 1.25rem;
+  border-bottom: 1px solid var(--outline-variant-ghost);
+  color: var(--on-surface-variant);
+}
+
+.md-body tr:last-child td {
+  border-bottom: none;
+}
+
+.md-body tr:hover td {
+  background-color: rgba(195, 192, 255, 0.03);
+}
+
+/* Mermaid Diagrams */
+.mermaid-diagram {
+  margin: 2rem 0;
+}
+
+.mermaid-diagram svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ========================================
+   Responsive Utility Classes
+   (Replacing Tailwind classes used throughout components)
+   ======================================== */
+
+/* Display utilities */
+.hidden { display: none !important; }
+.flex { display: flex !important; }
+.block { display: block !important; }
+
+/* Responsive breakpoints */
+@media (min-width: 640px) {
+  .sm\:flex { display: flex !important; }
+  .sm\:hidden { display: none !important; }
+  .sm\:block { display: block !important; }
+}
+
+@media (min-width: 768px) {
+  .md\:flex { display: flex !important; }
+  .md\:hidden { display: none !important; }
+  .md\:block { display: block !important; }
+}
+
+@media (min-width: 1024px) {
+  .lg\:flex { display: flex !important; }
+  .lg\:hidden { display: none !important; }
+  .lg\:block { display: block !important; }
+  .lg\:ml-64 { margin-left: 256px !important; }
+}
+
+/* Layout utilities */
+.container {
+  width: 100%;
+  max-width: 1200px;
+}
+
+.mx-auto {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.pt-16 { padding-top: 4rem; }
+.pt-24 { padding-top: 6rem; }
+
+/* ========================================
+   Layout: Sidebar offset
+   (DESIGN.md §5: Sidebars use glass — offset handled here)
+   ======================================== */
+
+@media (min-width: 1024px) {
+  .layout-main {
+    margin-left: 256px;
+  }
+
+  .layout-footer {
+    margin-left: 256px;
+  }
+}
+
+/* Mobile bottom nav safe zone */
+@media (max-width: 767px) {
+  .layout-main {
+    padding-bottom: 80px;
+  }
+}
+
+/* Detail page layout: article + code sidebar */
+.detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3rem;
+  align-items: start;
+}
+
+@media (min-width: 1200px) {
+  .detail-layout {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+/* Code sidebar visibility */
+.code-sidebar {
+  display: none;
+}
+
+@media (min-width: 1200px) {
+  .code-sidebar {
+    display: flex;
+  }
+}
+
+/* Team grid responsive */
+.team-grid {
+  grid-template-columns: repeat(4, 1fr) !important;
+}
+
+@media (max-width: 1024px) {
+  .team-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+}
+
+@media (max-width: 600px) {
+  .team-grid {
+    grid-template-columns: 1fr !important;
+  }
+  .team-grid > *:first-child {
+    grid-column: span 1 !important;
+    grid-row: span 1 !important;
+  }
+}
+
+.team-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}

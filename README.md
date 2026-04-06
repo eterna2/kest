@@ -1,181 +1,320 @@
-# Kest: Attested Data Lineage
+# Kest: Zero Trust Execution Lineage
 
 [![PyPI version](https://img.shields.io/pypi/v/kest.svg)](https://pypi.org/project/kest/)
-[![Release](https://github.com/eterna2/kest/actions/workflows/release.yml/badge.svg)](https://github.com/eterna2/kest/actions/workflows/release.yml)
-[![codecov](https://codecov.io/gh/eterna2/kest/branch/main/graph/badge.svg)](https://codecov.io/gh/eterna2/kest)
+[![CI](https://github.com/eterna2/kest/actions/workflows/ci.yml/badge.svg)](https://github.com/eterna2/kest/actions/workflows/ci.yml)
+[![Coveralls](https://coveralls.io/repos/github/eterna2/kest/badge.svg?branch=main)](https://coveralls.io/github/eterna2/kest?branch=main)
 
-**Kest** is a high-integrity data lineage and security framework built for secure data pipelines and agentic workflows. It ensures that every piece of data carries a **Kest Passport**—a cryptographically verifiable record of its origin, the systems it traversed, and its accumulated risk profile (taints).
+**Kest** is a Zero Trust execution lineage framework for Python agentic workflows and data pipelines. Every function call decorated with `@kest_verified` produces a cryptographically signed audit entry that is chained into a tamper-evident **Merkle DAG Passport**. The Passport propagates automatically across distributed hops via OpenTelemetry baggage, giving you verifiable, non-repudiable lineage across any number of services.
 
-## Core Features
+> v0.3.0 is a complete rewrite. The signing and hashing primitives are implemented in Rust (via PyO3) for correctness and performance. See the [Changelog](CHANGELOG.md) for the full list of changes from v0.2.x.
 
-- **Data Lineage as a DAG**: Every execution step is recorded in a Directed Acyclic Graph (DAG) for non-repudiable audit trails.
-- **Taint Tracking**: Data is automatically marked with "taints" as it flows through untrusted or sensitive processing nodes.
-- **Trust Scores**: Numeric data quality indicators propagate alongside data, dynamically updating at processing boundaries via `trust_score_updater` lambdas.
-- **OPA Policy Enforcement**: Native integration with Open Policy Agent (Rego) to enforce security constraints at runtime based on the data's entire history and current trust score.
-- **Implicit Tracking**: Secure-by-default behavior. Any data crossing a `@verified` boundary is automatically tracked, even if it enters the system as a raw primitive.
-- **Cryptographic Integrity**: Recursive DAG hashing ($H_{bind}$) ensures that any modification to historical data or node identities invalidates the final signature.
+---
+
+## Key Features
+
+| Capability | Description |
+|---|---|
+| **Merkle DAG Lineage** | Every execution step is hashed and chained. Tampering with any node invalidates the entire chain. |
+| **CARTA Trust Scores** | Numeric trust propagates through the DAG. One untrusted node degrades all downstream scores. |
+| **Taint Propagation** | Risk labels (`added_taints` / `removed_taints`) accumulate across the chain. |
+| **Policy Enforcement** | Pluggable engines: OPA, Cedar, AWS AVP, or in-process Rego / Cedar — all before the function runs. |
+| **Multi-hop OBO** | `KestMiddleware` + `KestHttpxInterceptor` thread the Passport through HTTP service boundaries automatically. |
+| **Identity Flexibility** | SPIRE/SPIFFE, AWS STS, Bedrock Agents, OIDC JWTs, or a local Ed25519 ephemeral key. |
+| **Rust Core** | RFC 8785 canonicalization + ED25519 signing via PyO3. No Python-level signing primitives. |
+
+---
 
 ## Installation
 
-### Using `pip`
-
 ```bash
-pip install kest
-```
-
-To enable support for running OPA (Open Policy Agent) locally (via `lakera-regorus`):
-
-> [!NOTE]
-> The `kest[opa]` local evaluation extra currently only supports **Python 3.11** due to underlying upstream dependencies (`lakera-regorus`). For other Python versions, use the remote `opa-client` extra instead.
-
-```bash
-pip install kest[opa]
-```
-
-### Using `uv`
-
-```bash
+# Core (remote OPA / Cedar servers)
 uv add kest
+pip install kest
+
+# In-process Rego evaluation (regopy)
+uv add "kest[rego]"
+
+# In-process Cedar evaluation (cedarpy)
+uv add "kest[cedar]"
+
+# AWS Verified Permissions
+uv add "kest[aws]"
+
+# SPIRE/SPIFFE identity
+uv add "kest[spiffe]"
 ```
 
-To enable support for running OPA (Open Policy Agent) locally (via `lakera-regorus`):
-
-> [!NOTE]
-> The `kest[opa]` local evaluation extra currently only supports **Python 3.11** due to underlying upstream dependencies (`lakera-regorus`). For other Python versions, use the remote `opa-client` extra instead.
-
-```bash
-uv add kest --extra opa
-```
-
-To enable support for running OPA against a remote server (via `opa-python-client`):
-
-```bash
-uv add kest --extra opa-client
-```
+---
 
 ## Quick Start
 
 ```python
-from kest import verified, originate, config
-from kest.core.policy import LocalOpaEngine
+from kest.core import (
+    configure,
+    kest_verified,
+    CedarLocalEngine,
+    LocalEd25519Provider,
+)
 
-# 1. Setup a global policy engine
-config.policy_engine = LocalOpaEngine()
+# 1. One-time global configuration
+configure(
+    identity=LocalEd25519Provider(),   # auto-generates an ephemeral Ed25519 key
+    engine=CedarLocalEngine(
+        policies=[
+            """
+            permit(
+                principal,
+                action == Action::"invoke",
+                resource
+            );
+            """
+        ]
+    ),
+)
 
-policy = """
-package kest.policy
-default allow = false
+# 2. Decorate your functions
+@kest_verified(policy="invoke")
+def ingest_data(payload: dict) -> dict:
+    return {"ingested": payload}
 
-# Specific rule: only allow input that came from System A
-allow_system_a_only {
-    input.taints[_] == "system_a"
-}
+@kest_verified(policy="invoke", added_taints=["unverified"])
+def fetch_external(url: str) -> dict:
+    return {"source": url, "data": "..."}
 
-# Generic rule: must not mix unstructured internet data with unstripped PII
-allow_merge {
-    not unsafe_mix
-}
+@kest_verified(policy="invoke", removed_taints=["unverified"])
+def validate(data: dict) -> dict:
+    return {**data, "validated": True}
 
-unsafe_mix {
-    input.taints[_] == "pii_data"
-    input.taints[_] == "internet_data"
-    not input.taints[_] == "pii_stripped"
+# 3. Call them — lineage is automatic
+raw = ingest_data({"user": "alice", "amount": 100})
+external = fetch_external("https://api.example.com/prices")
+result = validate(external)
+
+# The result carries a full Passport: a list of JWS-signed KestEntry records
+# that form a cryptographically verifiable Merkle DAG.
+```
+
+### Using Rego In-Process
+
+```python
+from kest.core import configure, kest_verified, RegoLocalEngine, LocalEd25519Provider
+
+POLICY = """
+package kest.allow
+
+import future.keywords
+
+default allow := false
+
+allow if {
+    input.trust_score >= 70       # integer, 0-100
+    input.is_root == false
 }
 """
-config.policy_engine.add_policy("access", policy)
 
-# 2. Annotate your domain functions
-@verified(added_taint=["system_a"])
-def process_on_system_a(data: dict):
-    """Simulates processing on a specific approved system."""
-    return {"system": "System A", "processed_data": data}
+configure(
+    identity=LocalEd25519Provider(),
+    engine=RegoLocalEngine(policies={"kest/allow": POLICY}),
+)
 
-@verified(enforce_rules=["data.kest.policy.allow_system_a_only"])
-def secure_restricted_process(data: dict):
-    """A highly secure function that ONLY accepts data processed by System A."""
-    return {"status": "highly_secure", "data": data}
-
-@verified(added_taint=["internet_data"])
-def fetch_internet_data(query: str):
-    return {"source": "internet", "query": query}
-
-@verified(added_taint=["pii_stripped"])
-def strip_pii(data: dict):
-    safe_data = data.copy()
-    if "ssn" in safe_data:
-        safe_data["ssn"] = "***-**-****"
-    return safe_data
-
-@verified(enforce_rules=["data.kest.policy.allow_merge"])
-def merge_data(packet_a: dict, packet_b: dict):
-    return {"merged": True, "a": packet_a, "b": packet_b}
-
-# 3. Execute with tracking
-# Input is a raw dict; Kest implicitly originates a Passport
-raw_pii = originate({"user": "Alice", "ssn": "123-45-678"}, taint=["pii_data"])
-
-# Securely process PII and internet data
-safe_pii = strip_pii(raw_pii)
-internet_data = fetch_internet_data("news")
-
-# Lineage and taints are propagated dynamically across the DAG
-result = merge_data(safe_pii, internet_data)
-
-# Test System Origin Policy
-system_a_data = process_on_system_a(internet_data)
-restricted_result = secure_restricted_process(system_a_data)
-
-print(result.data) 
-# {'merged': True, ...}
-print(result.passport.history) 
-# Contains full DAG of 'originate' -> 'strip_pii', and 'fetch_internet_data' -> 'merge_data'
+@kest_verified(policy="kest/allow")
+def process(data: dict) -> dict:
+    return data
 ```
 
-### 2. Manual Origination
+### Trust Scores & Taint Propagation
 
-For data entering from external or untrusted sources, use `originate` to define the genesis node:
+Trust scores are **integers (0–100)**, not floats. The `DefaultTrustEvaluator` uses a weakest-link model: `score = (min(parent_scores) * self_score) // 100`.
 
 ```python
-data = originate(
-    {"raw": "payload"},
-    taint=["untrusted_source"],
-    labels={"env": "prod"},
-    trust_score=0.4
-)
-```
+# Quality gate: block any pipeline where trust has degraded below 80
+REGO_POLICY = """
+package kest.quality
 
-### 3. Trust Scores & Validation
+import future.keywords
 
-In addition to discrete taints, Kest models data quality dynamically using Trust Scores. A function can specify exactly how it modifies the running trust score of the DAG pipeline by assigning a lambda to `trust_score_updater`.
+default allow := false
 
-By default, every computation node has an inherent `node_trust_score` of 1.0 (perfectly trusted). If no `trust_score_updater` is defined, the output data is assigned the minimum trust score of ALL parents AND the node itself (`min([node_trust_score] + parent_trust_scores)`). This guarantees that dirty data remains dirty, and untrusted nodes taint clean data.
-
-```python
-# The validation process is highly trusted (0.9), and specifically 
-# upgrades the maximum trust score of all parents by 0.3
-@verified(
-    node_trust_score=0.9, 
-    trust_score_updater=lambda node, parents: max([node] + parents) + 0.3 if parents else node
-)
-def validate_and_clean(data: dict) -> dict:
-    cleaned = data.copy()
-    cleaned["validated"] = True
-    return cleaned
-```
-
-Policies can then easily block low-fidelity data:
-
-```rego
-allow {
-    input.trust_score >= 0.70
+allow if {
+    input.trust_score >= 80     # integer threshold
 }
+"""
+
+# Sanitizer: removes a taint and resets trust to 100
+@kest_verified(
+    policy="sanitizer_policy",
+    trust_override=100,
+    removed_taints=["unverified_input"],
+)
+async def input_scanner(data: dict) -> dict:
+    # After this hop, trust_score=100 and "unverified_input" is gone from taints
+    return {**data, "scanned": True}
 ```
+
+### Multi-hop Propagation (FastAPI)
+
+```python
+from fastapi import FastAPI
+from kest.core import KestMiddleware, KestHttpxInterceptor, configure, kest_verified
+
+app = FastAPI()
+app.add_middleware(KestMiddleware)   # extracts incoming Kest baggage
+
+client = httpx.AsyncClient(transport=KestHttpxInterceptor())  # injects outgoing Kest baggage
+
+@app.post("/process")
+@kest_verified(policy="invoke")
+async def process(body: dict):
+    # The Passport from the caller is automatically extended here.
+    result = await client.post("http://next-service/step", json=body)
+    return result.json()
+```
+
+---
+
+## Policy Engines
+
+### Remote Servers
+
+```python
+from kest.core import OPAPolicyEngine, CedarPolicyEngine
+
+# OPA (Open Policy Agent)
+engine = OPAPolicyEngine(url="http://opa:8181")
+
+# Remote Cedar service
+engine = CedarPolicyEngine(url="http://cedar:8080")
+```
+
+### In-Process (no network)
+
+```python
+from kest.core import CedarLocalEngine, RegoLocalEngine
+
+# Cedar (cedarpy) — requires: uv add "kest[cedar]"
+engine = CedarLocalEngine(policies=["permit(principal, action, resource);"])
+
+# Rego (regopy) — requires: uv add "kest[rego]"
+engine = RegoLocalEngine(policies={"pkg/name": "package pkg.name\ndefault allow = true"})
+```
+
+### AWS Verified Permissions
+
+```python
+from kest.core import AVPPolicyEngine
+
+engine = AVPPolicyEngine(policy_store_id="ps-abc123", region="us-east-1")
+```
+
+---
+
+## Identity Providers
+
+```python
+from kest.core import (
+    LocalEd25519Provider,   # ephemeral key (dev/test)
+    StaticIdentity,          # explicit workload ID + key
+    SPIREProvider,           # SPIRE SVID via Unix socket
+    AWSWorkloadIdentity,     # AWS STS GetCallerIdentity
+    BedrockAgentIdentity,    # AWS Bedrock Agent context
+    OIDCIdentity,            # Generic OIDC JWT
+)
+
+# Auto-detect: SPIRE → AWS → local ephemeral key
+from kest.core import get_default_identity
+identity = get_default_identity()
+```
+
+---
+
+## Bundled Access-Control Policies
+
+`kest.core.policies` ships ready-to-load Cedar and Rego files for classical formal models:
+
+| Model | Description |
+|---|---|
+| Bell-LaPadula | Mandatory read/write confidentiality (MLS) |
+| Biba | Integrity confinement (no read-down, no write-up) |
+| Brewer-Nash | Chinese Wall / conflict-of-interest separation |
+| Clark-Wilson | Integrity guards with constrained data items |
+| Goguen-Meseguer | Non-interference |
+| Financial | Transaction-limit and approval-tier enforcement |
+| Security | Clearance-level access control |
+
+```python
+from importlib.resources import files
+
+# Load a bundled policy
+policy_text = files("kest.core.policies").joinpath("bell_lapadula.rego").read_text()
+engine = RegoLocalEngine(policies={"kest/blp": policy_text})
+```
+
+---
+
+## Monorepo Structure
+
+```
+kest/
+├── libs/
+│   ├── kest-core/
+│   │   ├── python/      # Python library (kest package)
+│   │   └── rust/        # Rust core: canonicalization, signing, trust
+├── showcase/
+│   └── kest-lab/        # Docker Compose integration lab (SPIRE, OPA, Keycloak, Jaeger)
+└── website/             # Documentation site (Next.js)
+```
+
+---
+
+## Gateway Delegation Flow (Advanced)
+
+The most complete flow Kest supports is a **human → agent → gateway → task** delegation chain:
+
+```
+Alice → kest-agent (OBO exchange) → kest-gateway /authorise (scope check)
+      → task token (scope: task:process-data only)
+      → kest-gateway /execute-task → hop1 → hop2 → hop3
+```
+
+Every hop produces a signed `KestEntry`. At the end, you have **6 cryptographically linked audit entries** in a Merkle DAG, covering:
+
+| # | Service | Trust Score | Policy |
+|---|---|---|---|
+| 1 | kest-agent (OBO delegation) | 10 (internet) | `delegation_policy` |
+| 2 | kest-gateway /authorise | 100 (internal) | `gateway_policy` |
+| 3 | kest-gateway /execute-task | 100 | `task_policy` |
+| 4–6 | hop1, hop2, hop3 | 100 | `workload_user_policy` |
+
+See the full step-by-step walkthrough — with actual token payloads, policy context dicts, and decoded audit entries at every hop — in the **[Gateway E2E documentation](https://eterna2.github.io/kest/stable/examples/gateway_e2e)**.
+
+---
+
+## Running the Lab
+
+```bash
+# Start the full integration environment
+moon run kest-lab:up
+
+# Run live integration tests (inside the lab containers)
+moon run kest-lab:test-live
+
+# Stop the lab
+moon run kest-lab:down
+```
+
+---
 
 ## Documentation
 
-For the full technical specification, see [Kest v0.1.0 Specification](docs/design/kest_spec_v0.1.0.md).
-See the [Changelog](CHANGELOG.md) for a high-level overview of the initial release and version history.
+Full reference documentation is available at the project website:
+
+- **Stable**: `https://eterna2.github.io/kest/stable/`
+- **v0.3.0**: `https://eterna2.github.io/kest/v0.3.0/`
+
+See the [Changelog](CHANGELOG.md) for the complete version history.
+
+---
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributor Guide](CONTRIBUTING.md) for details on our development process, coding standards, and architectural principles.
+Please read the [AGENTS.md](AGENTS.md) for the mandatory toolchain, testing, and architectural rules that govern this repository. All contributions must pass `moon run kest-core-python:test` (unit) and `moon run kest-core-python:test-live` (live integration) before merging.

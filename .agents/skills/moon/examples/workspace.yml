@@ -1,0 +1,39 @@
+$schema: "https://moonrepo.dev/schemas/workspace.json"
+
+projects:
+  - "apps/*"
+  - "packages/*"
+  - "tools/*"
+
+vcs:
+  client: "git"
+  provider: "github"
+  defaultBranch: "main"
+  sync: true
+  hooks:
+    pre-commit:
+      - "moon run :lint --affected --status staged"
+    pre-push:
+      - "moon run :test --affected"
+
+pipeline:
+  archivableTargets:
+    - ":build"
+    - ":test"
+  cacheLifetime: "7 days"
+  autoCleanCache: true
+  concurrency: 4
+
+hasher:
+  optimization: "performance"
+  walkStrategy: "vcs"
+
+codeowners:
+  globalPaths:
+    "/*": ["@platform-team"]
+  sync: true
+
+constraints:
+  enforceProjectTypeRelationships: true
+
+telemetry: true

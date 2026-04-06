@@ -1,0 +1,24 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'rust'
+layer: 'library'
+stack: 'backend'
+
+tags: ['rust', 'kest-core', 'wasm']
+
+tasks:
+  check:
+    command: 'cargo check'
+    description: 'Check the codebase for errors'
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+      - '/Cargo.lock'
+
+  test:
+    command: 'cargo test'
+    description: 'Run unit tests'
+    inputs:
+      - 'src/**/*'
+      - 'Cargo.toml'
+      - '/Cargo.lock'
