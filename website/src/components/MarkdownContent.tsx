@@ -77,7 +77,22 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   const resolvedSrc = typeof src === 'string' && src.startsWith('/') ? prefixPath(src) : src;
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={resolvedSrc} alt={alt || ''} {...rest} style={{ maxWidth: '100%', height: 'auto', borderRadius: '12px', margin: '2rem 0' }} />
+    <img
+      src={resolvedSrc}
+      alt={alt || ''}
+      {...rest}
+      style={{
+        maxWidth: '100%',
+        height: 'auto',
+        // Cap height so landscape diagrams (stored as 1:1 with black padding)
+        // don't appear excessively tall on the page.
+        maxHeight: '520px',
+        display: 'block',
+        borderRadius: '12px',
+        margin: '2rem auto',
+        objectFit: 'contain',
+      }}
+    />
   );
 }
 
