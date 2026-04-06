@@ -21,17 +21,7 @@ At the end of this page you will see the actual token payloads, policy context d
 
 ## Architecture Overview
 
-![Gateway E2E delegation flow — Alice → Agent → Gateway → downstream hops, with a Merkle DAG of 6 signed audit entries](/examples/gateway_e2e_flow.png)
-
-```mermaid
-flowchart LR
-    A["🧑 Alice<br/>(human)"] -->|"1. User token<br/>(Keycloak ROPC)"| B["🤖 kest-agent<br/>/delegate<br/>audit #1"]
-    B -->|"2. OBO exchange<br/>sub=kest-agent<br/>act.sub=alice"| C["🔒 kest-gateway<br/>/authorise<br/>audit #2"]
-    C -->|"3. Narrow task token<br/>scope: task:process-data"| D["⚡ kest-gateway<br/>/execute-task<br/>audit #3"]
-    D -->|"OTel baggage"| E["hop1<br/>audit #4"]
-    E --> F["hop2<br/>audit #5"]
-    F --> G["hop3<br/>audit #6"]
-```
+![Gateway E2E delegation flow — Alice → Agent → Gateway → downstream hops](/examples/gateway_flow_diagram.png)
 
 
 **Six signed `KestEntry` records** are chained into one Merkle DAG:
@@ -358,21 +348,7 @@ hop2 and hop3 produce identical structure, each extending the chain via their `p
 
 After the full flow, the `kest.passport` baggage header carries all 6 JWS entries as a JSON array. Each entry's `parent_ids[0]` is the SHA-256 of the preceding signature — forming a cryptographically linked Merkle chain.
 
-```mermaid
-flowchart TD
-    E1["🔑 Entry #1<br/>kest-agent /delegate<br/>trust: 10"]
-    E2["🔑 Entry #2<br/>gateway /authorise<br/>trust: 100"]
-    E3["🔑 Entry #3<br/>gateway /execute-task<br/>trust: 100"]
-    E4["🔑 Entry #4<br/>hop1<br/>trust: 100"]
-    E5["🔑 Entry #5<br/>hop2<br/>trust: 100"]
-    E6["🔑 Entry #6<br/>hop3<br/>trust: 100"]
-
-    E1 -->|"SHA-256"| E2
-    E2 -->|"SHA-256"| E3
-    E3 -->|"SHA-256"| E4
-    E4 -->|"SHA-256"| E5
-    E5 -->|"SHA-256"| E6
-```
+![Merkle chain — 6 signed KestEntry records chained via SHA-256, trust scores from 10 to 100](/examples/merkle_chain_diagram.png)
 
 To verify this chain programmatically:
 
