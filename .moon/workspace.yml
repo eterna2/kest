@@ -1,0 +1,22 @@
+$schema: 'https://moonrepo.dev/schemas/workspace.json'
+
+projects:
+  kest-monorepo: '.'
+  kest-core-python: 'libs/kest-core/python'
+  kest-lab: 'showcase/kest-lab'
+  website: 'website'
+  kest-core-rs: 'libs/kest-core/rust'
+
+vcs:
+  client: 'git'
+  provider: 'github'
+  defaultBranch: 'main'
+  sync: true
+
+pipeline:
+  cacheLifetime: '7 days'
+  autoCleanCache: true
+
+defaultProject: 'website'
+
+telemetry: true

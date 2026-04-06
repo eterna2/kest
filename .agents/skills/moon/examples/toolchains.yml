@@ -1,0 +1,30 @@
+$schema: "https://moonrepo.dev/schemas/toolchains.json"
+
+# Common settings (v2.1)
+javascript:
+  packageManager: "pnpm"
+  inferTasksFromScripts: false
+  installDependencies: true
+  inheritAliases: true
+
+node:
+  version: "20.10.0"
+
+pnpm:
+  version: "8.12.0"
+
+rust:
+  version: "1.75.0"
+  bins:
+    - "cargo-nextest"
+    - "cargo-llvm-cov"
+
+python:
+  version: "3.12.0"
+
+typescript:
+  syncProjectReferences: true
+  routeOutDirToCache: true
+
+go:
+  version: "1.21.0"

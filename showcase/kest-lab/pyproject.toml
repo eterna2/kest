@@ -1,0 +1,40 @@
+[project]
+name = "kest-lab"
+version = "0.3.0"
+description = "Kest end-to-end integration lab: distributed multi-hop Zero Trust showcase"
+requires-python = ">=3.11"
+dependencies = [
+    # Web server
+    "fastapi>=0.111.0",
+    "uvicorn[standard]>=0.29.0",
+    # HTTP client (inter-hop calls + tests)
+    "httpx>=0.27.0",
+    # Cryptography (SVID signing, key generation)
+    "cryptography>=42.0.0",
+    # Workload Identity
+    "spiffe>=0.2.6",
+    # OpenTelemetry
+    "opentelemetry-api>=1.20.0",
+    "opentelemetry-sdk>=1.20.0",
+    "opentelemetry-exporter-otlp>=1.20.0",
+    # JWT verification (KestIdentityMiddleware)
+    "cachetools>=5.3",
+    "pyjwt[crypto]>=2.8.0",
+    # In-process Cedar policy evaluation (CedarLocalEngine)
+    "cedarpy>=0.1.0",
+    # Local kest-core library (resolved via [tool.uv.sources] below)
+    "kest",
+]
+
+[tool.uv.sources]
+kest = { path = "../../libs/kest-core/python", editable = true }
+
+[dependency-groups]
+test = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0", "pytest-cov>=5.0.0"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "live: marks tests as live integration tests mapping to actual running lab endpoints",
+]
+testpaths = ["tests"]

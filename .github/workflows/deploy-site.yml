@@ -1,0 +1,131 @@
+name: Deploy Site to GitHub Pages
+
+# Publishes the production website on every push to main (or manual trigger).
+# Three destinations on the gh-pages branch are updated:
+#
+#   stable/          — always the latest docs from main  (mutable)
+#   v<X.Y.Z>/        — version snapshot tied to kest-core (immutable-ish)
+#   index.html       — root splash page listing all versions & previews
+#
+# PR previews live under preview/<branch-slug>/ and are managed by preview-site.yml.
+#
+# Final URL structure:
+#   https://<org>.github.io/kest/              ← splash page
+#   https://<org>.github.io/kest/stable/       ← latest
+#   https://<org>.github.io/kest/v0.3.0/       ← specific version
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "website/**"
+      - "libs/kest-core/python/pyproject.toml"
+      - ".github/workflows/deploy-site.yml"
+      - ".github/scripts/gen-pages-index.sh"
+  workflow_dispatch:
+
+permissions:
+  contents: write   # push to gh-pages branch
+
+# Serialize production deploys — never run two at the same time.
+concurrency:
+  group: "deploy-production"
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      # ----------------------------------------------------------------
+      # Read the kest-core version for the versioned subfolder.
+      # ----------------------------------------------------------------
+      - name: Read kest-core version
+        id: version
+        run: |
+          VERSION=$(grep '^version' libs/kest-core/python/pyproject.toml \
+            | head -1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=v${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Kest-core version: v${VERSION}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install website dependencies
+        working-directory: website
+        run: bun install
+
+      # ----------------------------------------------------------------
+      # Build 1: stable/
+      # ----------------------------------------------------------------
+      - name: Build — stable
+        working-directory: website
+        env:
+          NEXT_PUBLIC_BASE_PATH: /kest/stable
+        run: bun run build
+
+      - name: Deploy — stable/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website/out
+          destination_dir: stable
+          keep_files: true
+          commit_message: "deploy(stable): ${{ github.sha }}"
+
+      # ----------------------------------------------------------------
+      # Build 2: v<X.Y.Z>/   (version snapshot)
+      # ----------------------------------------------------------------
+      - name: Build — ${{ steps.version.outputs.version }}
+        working-directory: website
+        env:
+          NEXT_PUBLIC_BASE_PATH: /kest/${{ steps.version.outputs.version }}
+        run: bun run build
+
+      - name: Deploy — ${{ steps.version.outputs.version }}/
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./website/out
+          destination_dir: ${{ steps.version.outputs.version }}
+          keep_files: true
+          commit_message: "deploy(${{ steps.version.outputs.version }}): ${{ github.sha }}"
+
+      # ----------------------------------------------------------------
+      # Regenerate root splash page (index.html)
+      # Checks out gh-pages, scans folders, writes index.html, pushes.
+      # ----------------------------------------------------------------
+      - name: Checkout gh-pages for index update
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages-branch
+
+      - name: Regenerate root index.html
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+        run: |
+          cp .github/scripts/gen-pages-index.sh gh-pages-branch/gen-pages-index.sh
+          chmod +x gh-pages-branch/gen-pages-index.sh
+          cd gh-pages-branch
+          bash gen-pages-index.sh "$OWNER" "$REPO"
+          rm gen-pages-index.sh
+
+      - name: Commit & push updated index.html
+        run: |
+          cd gh-pages-branch
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          if git diff --cached --quiet; then
+            echo "index.html unchanged — nothing to commit."
+          else
+            git commit -m "deploy(index): regenerate splash page [${{ steps.version.outputs.version }}]"
+            git push
+          fi

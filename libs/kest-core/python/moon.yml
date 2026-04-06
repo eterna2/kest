@@ -1,0 +1,57 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+
+language: 'python'
+layer: 'library'
+stack: 'backend'
+
+tags: ['python', 'kest-core']
+
+tasks:
+  check:
+    script: 'uv run maturin develop'
+    deps:
+      - 'install'
+    inputs:
+      - 'src/**/*.rs'
+      - 'Cargo.toml'
+      - 'pyproject.toml'
+    outputs:
+      - 'python/kest/core/_core*.so'
+      - 'python/kest/core/_core*.pyd'
+  test:
+    script: 'uv run pytest --cov=python/kest/core --cov-report=xml --cov-report=term-missing python/kest/core'
+    deps:
+      - 'check'
+    inputs:
+      - 'python/**/*.py'
+      - 'src/**/*.rs'
+  up:
+    script: "moon run kest-lab:up"
+  test-live:
+    script: "moon run kest-lab:test-live"
+    deps:
+      - "check"
+    inputs:
+      - 'python/**/*.py'
+      - 'src/**/*.rs'
+  typecheck:
+    script: 'uv run mypy --ignore-missing-imports python/'
+    deps:
+      - 'install'
+    inputs:
+      - 'python/**/*.py'
+  run-e2e:
+    script: 'uv run python examples/e2e/main.py'
+    deps:
+      - 'check'
+    inputs:
+      - 'examples/**/*.py'
+      - 'python/**/*.py'
+      - 'src/**/*.rs'
+  viz:
+    script: 'uv run kest-viz $path'
+    deps:
+      - 'check'
+    args:
+      - 'path'
+

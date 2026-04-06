@@ -1,0 +1,37 @@
+$schema: 'https://moonrepo.dev/schemas/project.json'
+layer: 'configuration'
+stack: 'systems'
+
+tasks:
+  sync-docs:
+    command: 'echo "No docs to sync"'
+    description: 'Fetch and sync LLM-optimized documentation from Context Hub (chub)'
+
+  serve-site:
+    command: 'npx moon run website:dev'
+    description: 'Serve the documentation site locally via dev server'
+
+  agent:
+    command: 'npx oh'
+    env:
+      OPENHARNESS_CONFIG_DIR: '${workspaceRoot}/.agents'
+    description: 'Run OpenHarness mapped to local skills'
+
+  install-awesome-skills:
+    command: 'npx --yes antigravity-awesome-skills --path .agents/skills/awesome'
+    description: 'Install 1300+ community agent skills locally (ignored by git)'
+
+  install-superpowers:
+    script: 'test -d .agents/superpowers || git clone --depth 1 https://github.com/obra/superpowers .agents/superpowers'
+    description: 'Install the Superpowers workflow library localy'
+
+  setup-gemini-cli:
+    script: 'bun install && npx antigravity-awesome-skills --gemini'
+    description: 'Setup Gemini CLI with project-specific skills'
+    deps:
+      - 'install-superpowers'
+      - 'install-awesome-skills'
+
+  gemini:
+    command: 'gemini'
+    description: 'Run Gemini CLI within the project context'

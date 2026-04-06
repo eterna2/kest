@@ -1,62 +1,55 @@
 # Contributing to Kest
 
-Thank you for your interest in contributing to Kest! This guide outlines the development environment, coding standards, and architectural principles we follow.
+Thank you for your interest in contributing to the Kest toolkit. This document outlines the **Ways of Working** and **High-Level Principles** that govern the entire monorepo.
 
-## Development Environment
+---
 
-We use `uv` for dependency management and environment isolation.
+## 1. Architectural Principles
 
-1.  **Clone the repository**:
-    ```bash
-    git clone https://github.com/eterna2/kest.git
-    cd kest
-    ```
+Our architecture is built on a foundation of transparency, simplicity, and portability. Every contribution MUST adhere to these non-negotiable principles:
 
-2.  **Sync dependencies**:
-    ```bash
-    uv sync --all-extras --dev
-    ```
+- **KISS (Keep It Simple, Stupid)**: Favor simple, readable logic over cleverness.
+- **Single Responsibility (SRP)**: Each component, function, or class should do exactly one thing well.
+- **Dependency Injection (DI)**: Rely on injecting dependencies (telemetry, storage, policy engines) rather than hardcoding them.
+- **Decoupling**: Separate domain logic from presentation or integration details (e.g., FastAPI, Keycloak).
+- **Test-Driven Development (TDD)**: Write tests BEFORE logic. All unit tests MUST be co-located with the source code.
 
-3.  **Install pre-commit hooks**:
-    ```bash
-    uv run pre-commit install
-    ```
+---
 
-## Coding Standards
+## 2. Ways of Working (Monorepo)
 
-- **Linter & Formatter**: We use `ruff` strictly. Code is validated on every commit via pre-commit hooks.
-  - Run manually: `uv run ruff check .` and `uv run ruff format .`
-- **Type Annotations**: All public APIs must be type-annotated.
-- **Imports**: Use `isort` styling (automatically handled by `ruff`).
+### Universal Task Runner
+We use **[Moonrepo](https://moonrepo.dev/)** as the universal task orchestrator. It ensures consistent commands across all languages.
 
-## Testing Philosophy (TDD)
+- **Sync/Install dependencies**: `moon run :install`
+- **Run Tests**: `moon run :test`
+- **Lint Code**: `moon run :lint`
+- **Format Code**: `moon run :format`
 
-We follow **Test-Driven Development (TDD)**:
-1. Write a failing test for the new feature or bug fix.
-2. Run `pytest` to ensure it fails.
-3. Implement the minimal logic required to pass the test.
-4. Refactor as needed while keeping tests green.
+### Global Repository Layout
+The toolkit is organized into specific partitions:
+- `libs/`: Highly reusable core logic, split by feature and language.
+- `showcase/`: E2E demonstrations and deployable environments (e.g., Docker, k3d).
+- `website/`: Documentation and project guides.
+- `.agents/`: Shared intelligence for AI agents (standards, skills, workflows).
 
-### Running Tests
-```bash
-uv run pytest
-```
+---
 
-### Test Co-location
-- Unit tests MUST be co-located with the code they test, using the `_test.py` suffix (e.g., `core/models.py` and `core/models_test.py`).
-- Integration and end-to-end tests reside in the `tests/` directory.
+## 3. Standards Registry
 
-## Architectural Principles
+While our principles are global, technical standards (linting, formatting, testing frameworks) vary by language. Refer to the specific guides below:
 
-1.  **KISS (Keep It Simple, Stupid)**: Favor simple, readable logic over over-engineered solutions.
-2.  **Single Responsibility (SRP)**: Each class/function should do one thing well.
-3.  **Dependency Injection (DI)**: Inject dependencies (e.g., `TelemetryExporter`, `OpaEngine`) rather than hardcoding instantiations.
-4.  **Decoupling**: Separate domain logic (`src/kest/core`) from presentation logic (`src/kest/presentation`).
+| Domain | Language/Tool | Standards Reference |
+| :--- | :--- | :--- |
+| **Core Libraries** | Python | [`libs/kest-core/python/CONTRIBUTING.md`](./libs/kest-core/python/CONTRIBUTING.md) |
+| **Documentation** | MkDocs | [`website/CONTRIBUTING.md`](./website/CONTRIBUTING.md) |
+| **Integrations** | TS (Future) | *Planned* |
 
-## Project Structure
+---
 
-- `src/kest/core/`: Pure Python logic, models, cryptography, and interfaces.
-- `src/kest/presentation/`: External APIs (e.g., `@verified` decorator).
-- `src/kest/cli/`: Optional CLI tools.
-- `examples/`: End-to-end flow demonstrations and notebooks.
-- `tests/`: Integration and regression tests.
+## 4. Human & AI Collaboration
+
+This repository is designed for seamless collaboration between human developers and AI coding assistants.
+
+- **AI Standards**: We maintain machine-readable standards in [`.agents/skills/`](./.agents/skills/). 
+- **Agent Skill-Set**: AI agents (Antigravity, Cursor, etc.) use these skills to ensure architectural consistency. Humans are encouraged to read these skills to understand the "Shared Brain" of the project.

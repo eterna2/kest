@@ -1,0 +1,59 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+
+language: "typescript"
+layer: "application"
+stack: "frontend"
+tags: ["react", "vite"]
+
+dependsOn:
+  - "shared-utils"
+  - id: "api-client"
+    scope: "production"
+
+fileGroups:
+  sources:
+    - "src/**/*"
+  tests:
+    - "tests/**/*"
+  configs:
+    - "*.config.{js,ts}"
+    - "tsconfig.json"
+
+tasks:
+  # Simple command for simple execution
+  build:
+    command: "vite build"
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+    outputs:
+      - "dist"
+    deps:
+      - "^:build"
+
+  # Persistent development server (auto-applies 'server' preset)
+  dev:
+    command: "vite dev"
+
+  # Shell script for complex operations
+  lint:
+    script: "eslint . --cache && prettier --check ."
+    inputs:
+      - "@group(sources)"
+      - "@group(configs)"
+
+  # Task with v2.1 affectedFiles filtering
+  test:
+    command: "vitest run"
+    inputs:
+      - "@group(sources)"
+      - "@group(tests)"
+    options:
+      affectedFiles:
+        filter: "@group(tests)"
+        passDotWhenNoResults: true
+
+  # Interactive utility
+  clean:
+    script: "rm -rf dist .turbo"
+    preset: "utility"

@@ -1,0 +1,3 @@
+Please follow the instructions in AGENTS.md and .agents/skills/principles.md.
+These are the repository's primary sources of truth for architectural and development standards.
+Do not deviate from the package manager (uv), linter (ruff), or monorepo structure (libs/showcase).

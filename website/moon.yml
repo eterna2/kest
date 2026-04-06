@@ -1,0 +1,28 @@
+$schema: "https://moonrepo.dev/schemas/project.json"
+language: "javascript"
+layer: "application"
+stack: "frontend"
+
+tags: ["nextjs", "website"]
+
+tasks:
+  build:
+    command: "bun run build"
+    inputs:
+      - "src/**/*"
+      - "public/**/*"
+      - "content/**/*"
+      - "next.config.ts"
+      - "package.json"
+    outputs:
+      - "out"
+
+  dev:
+    command: "bun run dev"
+    preset: "server"
+
+  start:
+    command: "bunx serve@latest out"
+    preset: "server"
+    deps:
+      - build

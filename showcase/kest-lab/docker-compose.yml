@@ -1,0 +1,169 @@
+services:
+  # --- SPIRE: Workload Identity ---
+  spire-server:
+    image: ghcr.io/spiffe/spire-server:1.11.0
+    volumes:
+      - ./spire/server:/run/spire/config
+      - spire-server-data:/opt/spire
+    command: ["-config", "/run/spire/config/server.conf"]
+    ports:
+      - "8081:8081"
+
+  spire-agent:
+    image: ghcr.io/spiffe/spire-agent:1.11.0
+    volumes:
+      - ./spire/agent:/run/spire/config
+      - spire-agent-data:/opt/spire
+      - ./spire/agent/public:/var/run/spire/agent/public
+    command: ["-config", "/run/spire/config/agent.conf", "-joinToken", "${JOIN_TOKEN:-unset}"]
+    user: 0:0
+    pid: host
+    privileged: true
+    environment:
+      - JOIN_TOKEN=${JOIN_TOKEN:-}
+    depends_on:
+      - spire-server
+
+  # --- Keycloak: Human Identity Provider ---
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    command: ["start-dev", "--import-realm", "--features=token-exchange"]
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+      - KC_HTTP_PORT=8080
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm-export.json
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/realms/kest-lab || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+
+  # --- OPA: Policy as Code (Rego) ---
+  opa:
+    image: openpolicyagent/opa:latest
+    command: ["run", "--server", "--log-level=debug", "--addr", ":8181", "/policies"]
+    volumes:
+      - ./opa/policies:/policies
+    ports:
+      - "8181:8181"
+
+  # --- Cedar Agent: Policy Enforcement ---
+  cedar-agent:
+    image: permitio/cedar-agent:latest
+    command: ["--addr", "0.0.0.0:8180"]
+    volumes:
+      - ./cedar/policies:/policies
+    ports:
+      - "8180:8180"
+
+  # --- OTel Collector: Audit Log Aggregation ---
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+
+  # --- Distributed Workloads ---
+  hop1: &workload-template
+    image: python:3.11-slim
+    volumes:
+      - ../../libs:/libs
+      - .:/app
+      - ./spire/agent/public:/var/run/spire/agent/public:ro
+      # Named volume shadows /app/.venv so uv sync writes here (container-managed)
+      # instead of bleeding root ownership back to the host bind-mount.
+      - kest-lab-venv:/app/.venv
+    working_dir: /app
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent/public/api.sock
+      - SERVICE_NAME=hop1
+      - NEXT_HOP_URL=http://hop2:8000
+      - PYTHONPATH=/libs/kest-core/python/python
+      - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+    command: ["sh", "-c", "pip install uv --quiet && (test -e /app/.venv/bin/python || uv sync --group test) && /app/.venv/bin/python app.py"]
+    ports:
+      - "8000:8000"
+    depends_on:
+      - spire-agent
+      - opa
+      - cedar-agent
+      - otel-collector
+      - keycloak
+
+  hop2:
+    <<: *workload-template
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent/public/api.sock
+      - SERVICE_NAME=hop2
+      - NEXT_HOP_URL=http://hop3:8000
+      - PYTHONPATH=/libs/kest-core/python/python
+      - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+    ports: []
+
+  hop3:
+    <<: *workload-template
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent/public/api.sock
+      - SERVICE_NAME=hop3
+      - NEXT_HOP_URL=none
+      - PYTHONPATH=/libs/kest-core/python/python
+      - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+    ports: []
+
+  # --- Mocked Agent: OBO Delegation Showcase ---
+  kest-agent:
+    <<: *workload-template
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent/public/api.sock
+      - SERVICE_NAME=kest-agent
+      - HOP1_URL=http://hop1:8000
+      - PYTHONPATH=/libs/kest-core/python/python
+      - KEYCLOAK_URL=http://keycloak:8080
+      - KEYCLOAK_REALM=kest-lab
+      - KEYCLOAK_CLIENT_ID=kest-agent
+      - KEYCLOAK_CLIENT_SECRET=kest-agent-secret
+      - GATEWAY_URL=http://kest-gateway:8002
+    command: ["sh", "-c", "pip install uv --quiet && (test -e /app/.venv/bin/python || uv sync --group test) && /app/.venv/bin/python agent.py"]
+    ports:
+      - "8001:8001"
+    depends_on:
+      - hop1
+      - keycloak
+
+  # --- Scope-Delegated Gateway: OBO scope enforcement + task token minting ---
+  kest-gateway:
+    <<: *workload-template
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent/public/api.sock
+      - SERVICE_NAME=kest-gateway
+      - HOP1_URL=http://hop1:8000
+      - PYTHONPATH=/libs/kest-core/python/python
+      - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+      - TASK_TOKEN_TTL=300
+    command: ["sh", "-c", "pip install uv --quiet && (test -e /app/.venv/bin/python || uv sync --group test) && /app/.venv/bin/python gateway.py"]
+    ports:
+      - "8002:8002"
+    depends_on:
+      - hop1
+      - keycloak
+      - otel-collector
+
+volumes:
+  spire-server-data:
+  spire-agent-data:
+  # Isolated venv volume: prevents uv sync (running as root inside container)
+  # from chowning the host-side .venv directory to root via bind-mount bleed.
+  kest-lab-venv:
