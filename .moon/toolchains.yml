@@ -17,6 +17,6 @@ rust:
 unstable_python:
   version: "3.11.15"
   packageManager: 'uv'
-  plugin: "https://github.com/moonrepo/plugins/releases/latest/download/python_toolchain.wasm"
+  plugin: "github://moonrepo/plugins/python_toolchain"
 
 unstable_uv: {}
