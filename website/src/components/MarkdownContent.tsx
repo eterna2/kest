@@ -1,4 +1,5 @@
 import { compileContent } from '@/lib/mdx';
+import { prefixPath } from '@/lib/utils';
 import CopyButton from './CopyButton';
 import Mermaid from './Mermaid';
 
@@ -70,10 +71,21 @@ function Figure({ children, ...props }: React.ComponentPropsWithoutRef<'figure'>
   return <figure {...props}>{children}</figure>;
 }
 
+// Custom img component to prefix basePath for static images in markdown content
+function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
+  const { src, alt, ...rest } = props;
+  const resolvedSrc = typeof src === 'string' && src.startsWith('/') ? prefixPath(src) : src;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={resolvedSrc} alt={alt || ''} {...rest} style={{ maxWidth: '100%', height: 'auto', borderRadius: '12px', margin: '2rem 0' }} />
+  );
+}
+
 export default async function MarkdownContent({ content }: { content: string }) {
   const { content: renderedContent } = await compileContent(content, {
     pre: Pre,
     figure: Figure,
+    img: Img,
   });
 
   return (
@@ -82,3 +94,4 @@ export default async function MarkdownContent({ content }: { content: string }) 
     </div>
   );
 }
+
