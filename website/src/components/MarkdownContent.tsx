@@ -81,12 +81,12 @@ function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   );
 }
 
-export default async function MarkdownContent({ content }: { content: string }) {
+export default async function MarkdownContent({ content, currentDir }: { content: string; currentDir?: string }) {
   const { content: renderedContent } = await compileContent(content, {
     pre: Pre,
     figure: Figure,
     img: Img,
-  });
+  }, currentDir);
 
   return (
     <div className="md-body">

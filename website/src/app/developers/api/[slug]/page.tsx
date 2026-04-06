@@ -36,7 +36,7 @@ export default async function APIPage({ params }: { params: Promise<{ slug: stri
           </div>
           <p style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)', lineHeight: 1.6 }}>{post.meta.description}</p>
         </div>
-        <MarkdownContent content={post.content} />
+        <MarkdownContent content={post.content} currentDir="reference" />
       </article>
 
       <CodeSidebar title={sidebarTitle}>

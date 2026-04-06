@@ -43,7 +43,7 @@ allow if {
           <p style={{ fontSize: '1.1rem', color: 'var(--on-surface-variant)', lineHeight: 1.6, margin: '1rem 0 0' }}>{post.meta.description}</p>
         </div>
         
-        <MarkdownContent content={post.content} />
+        <MarkdownContent content={post.content} currentDir="policies" />
       </article>
 
       <CodeSidebar title={sidebarTitle}>

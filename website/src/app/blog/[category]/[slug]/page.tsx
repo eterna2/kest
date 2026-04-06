@@ -37,7 +37,7 @@ export default async function BlogPostPage({ params }: { params: Promise<{ categ
           <div style={{ width: '4px', height: '4px', borderRadius: '50%', backgroundColor: 'var(--primary)' }} />
           <span>Ref: KST-{slug}</span>
        </div>
-       <MarkdownContent content={post.content} />
+       <MarkdownContent content={post.content} currentDir={category} />
     </div>
   );
 }

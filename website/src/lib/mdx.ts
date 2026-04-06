@@ -5,6 +5,7 @@ import { compileMDX } from 'next-mdx-remote/rsc';
 import rehypePrettyCode from 'rehype-pretty-code';
 import rehypeSlug from 'rehype-slug';
 import remarkGfm from 'remark-gfm';
+import remarkRewriteLinks from './remark-rewrite-links';
 
 const CONTENT_PATH = path.join(process.cwd(), 'content');
 
@@ -23,7 +24,7 @@ export function getPost(dir: string, slug: string) {
   const title = data.title || content.match(/^#\s+(.+)$/m)?.[1] || slug.replace(/_/g, ' ');
   const desc = data.description || content.split('\n').find((l: string) => l.trim() && !l.startsWith('#'))?.substring(0, 160) || '';
   
-  return { meta: { ...data, title, description: desc }, content, slug };
+  return { meta: { ...data, title, description: desc }, content, slug, dir };
 }
 
 export function getAllPosts(dir: string) {
@@ -43,17 +44,29 @@ export function getAllPosts(dir: string) {
  * with syntax highlighting via rehype-pretty-code (shiki) and
  * heading anchors via rehype-slug.
  *
+ * @param source - The raw markdown string.
+ * @param components - Optional MDX component overrides.
+ * @param currentDir - The content directory of the source file (e.g. 'developer', 'design').
+ *                     Used by remarkRewriteLinks to resolve relative .md links.
+ *
  * Per DESIGN.md §5 Code Blocks:
  * - surface-container-lowest background
  * - Glass header bar with language label
  * - No border
  */
-export async function compileContent(source: string, components?: Record<string, React.ComponentType<any>>) {
+export async function compileContent(
+  source: string,
+  components?: Record<string, React.ComponentType<any>>,
+  currentDir?: string,
+) {
   const { content, frontmatter } = await compileMDX({
     source,
     options: {
       mdxOptions: {
-        remarkPlugins: [remarkGfm],
+        remarkPlugins: [
+          remarkGfm,
+          [remarkRewriteLinks, { currentDir }],
+        ],
         rehypePlugins: [
           rehypeSlug,
           [

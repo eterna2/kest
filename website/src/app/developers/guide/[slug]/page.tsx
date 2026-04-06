@@ -54,7 +54,7 @@ export default async function GuidePage({
             {post.meta.description}
           </p>
         </div>
-        <MarkdownContent content={post.content} />
+        <MarkdownContent content={post.content} currentDir="developer" />
       </article>
     </div>
   );
