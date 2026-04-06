@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Terminal, Code, Shield, BookOpen, Cpu, ArrowRight } from 'lucide-react';
 import BentoCard from '@/components/BentoCard';
 import { getAllPosts } from '@/lib/mdx';
+import { prefixPath } from '@/lib/utils';
 
 export default function Home() {
   // Pull real guide data instead of hardcoded content
@@ -63,7 +64,7 @@ export default function Home() {
           boxShadow: 'var(--shadow-l4)'
         }}>
           <Image 
-            src="/hero.png" 
+            src={prefixPath('/hero.png')} 
             alt="Kest — cryptographic lineage visualization" 
             fill 
             style={{ objectFit: 'cover' }}

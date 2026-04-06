@@ -1,4 +1,5 @@
 import Image from 'next/image';
+import { prefixPath } from '@/lib/utils';
 
 interface Member {
   name: string;
@@ -181,7 +182,7 @@ function MemberCard({ member, featured = false }: { member: Member; featured?: b
         backgroundColor: 'rgba(0,0,0,0.15)',
       }}>
         <Image
-          src={member.avatar}
+          src={prefixPath(member.avatar)}
           alt={`${member.name} portrait`}
           fill
           style={{ objectFit: 'cover', objectPosition: 'center top' }}
