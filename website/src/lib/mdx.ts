@@ -24,7 +24,11 @@ export function getPost(dir: string, slug: string) {
   const title = data.title || content.match(/^#\s+(.+)$/m)?.[1] || slug.replace(/_/g, ' ');
   const desc = data.description || content.split('\n').find((l: string) => l.trim() && !l.startsWith('#'))?.substring(0, 160) || '';
   
-  return { meta: { ...data, title, description: desc }, content, slug, dir };
+  // Strip the leading H1 from content since page components render it
+  // separately from meta.title. This prevents duplicate headings.
+  const strippedContent = content.replace(/^#\s+.+\n+/, '');
+
+  return { meta: { ...data, title, description: desc }, content: strippedContent, slug, dir };
 }
 
 export function getAllPosts(dir: string) {
