@@ -1,12 +1,13 @@
-import { getPost, getFiles } from '@/lib/mdx';
+import { getPost, getAllPosts } from '@/lib/mdx';
 import MarkdownContent from '@/components/MarkdownContent';
 import CodeSidebar from '@/components/CodeSidebar';
+import PageNavigation from '@/components/PageNavigation';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { TerminalSquare } from 'lucide-react';
 
 export function generateStaticParams() {
-  return getFiles('reference').map((f) => ({ slug: f.replace(/\.md$/, '') }));
+  return getAllPosts('reference').map((p) => ({ slug: p.slug }));
 }
 
 export default async function APIPage({ params }: { params: Promise<{ slug: string }> }) {
@@ -16,6 +17,11 @@ export default async function APIPage({ params }: { params: Promise<{ slug: stri
   if (!post) {
     return notFound();
   }
+
+  const allPosts = getAllPosts('reference');
+  const currentIndex = allPosts.findIndex((p) => p.slug === slug);
+  const prev = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+  const next = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
 
   const meta = post.meta as any;
   const sidebarTitle = meta.sidebarTitle || `${slug}.py`;
@@ -37,6 +43,11 @@ export default async function APIPage({ params }: { params: Promise<{ slug: stri
           <p style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)', lineHeight: 1.6 }}>{post.meta.description}</p>
         </div>
         <MarkdownContent content={post.content} currentDir="reference" />
+        <PageNavigation
+          prev={prev ? { slug: prev.slug, title: prev.meta.title } : null}
+          next={next ? { slug: next.slug, title: next.meta.title } : null}
+          basePath="/developers/api"
+        />
       </article>
 
       <CodeSidebar title={sidebarTitle}>

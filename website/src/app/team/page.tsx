@@ -139,7 +139,7 @@ const alumni: Member[] = [
   {
     name: 'TANGYUAN',
     role: 'Former Kitten-in-Residence',
-    desc: 'White cat with black ears. Arrived as the tiniest fluffball. Left as a stocky warlord now ruling a completely different household with an iron paw.',
+    desc: 'Young white kitten with black ears and three distinct spots on his flank. A tiny fluffball who melted hearts before growing into his territorial duties elsewhere.',
     avatar: '/team/tangyuan.png',
     tag: 'ALUMNI',
     color: 'rgba(34, 197, 94, 0.06)',
