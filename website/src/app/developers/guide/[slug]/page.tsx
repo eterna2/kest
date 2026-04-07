@@ -1,10 +1,11 @@
-import { getPost, getFiles } from "@/lib/mdx";
+import { getPost, getAllPosts } from "@/lib/mdx";
 import MarkdownContent from "@/components/MarkdownContent";
+import PageNavigation from "@/components/PageNavigation";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 
 export function generateStaticParams() {
-  return getFiles("developer").map((f) => ({ slug: f.replace(/\.md$/, "") }));
+  return getAllPosts("developer").map((p) => ({ slug: p.slug }));
 }
 
 export default async function GuidePage({
@@ -18,6 +19,11 @@ export default async function GuidePage({
   if (!post) {
     return notFound();
   }
+
+  const allPosts = getAllPosts("developer");
+  const currentIndex = allPosts.findIndex((p) => p.slug === slug);
+  const prev = currentIndex > 0 ? allPosts[currentIndex - 1] : null;
+  const next = currentIndex < allPosts.length - 1 ? allPosts[currentIndex + 1] : null;
 
   return (
     <div className="detail-layout">
@@ -55,6 +61,11 @@ export default async function GuidePage({
           </p>
         </div>
         <MarkdownContent content={post.content} currentDir="developer" />
+        <PageNavigation
+          prev={prev ? { slug: prev.slug, title: prev.meta.title } : null}
+          next={next ? { slug: next.slug, title: next.meta.title } : null}
+          basePath="/developers/guide"
+        />
       </article>
     </div>
   );
