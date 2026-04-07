@@ -1,0 +1,5 @@
+:HL["/kest/preview/fix-website-docs-pipeline/_next/static/chunks/0g~ij44kf0unu.css","style"]
+:HL["/kest/preview/fix-website-docs-pipeline/examples/gateway_flow_diagram.png","image"]
+:HL["/kest/preview/fix-website-docs-pipeline/examples/scope_narrowing.png","image"]
+:HL["/kest/preview/fix-website-docs-pipeline/examples/merkle_chain_diagram.png","image"]
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"blog","param":null,"prefetchHints":0,"slots":{"children":{"name":"category","param":{"type":"d","key":"examples","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"slug","param":{"type":"d","key":"02_gateway_e2e","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}}}},"staleTime":300,"buildId":"IJEI8r8jcLfdYLqqmMaId"}
