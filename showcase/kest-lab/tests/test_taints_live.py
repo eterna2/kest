@@ -33,8 +33,9 @@ def otel_recorder():
 @pytest.mark.asyncio
 async def test_live_taints_and_override(otel_recorder):
     """
-    Test the application of taints and trust score overrides
+    F-TT-01, F-TT-02: Test the compounding/removal of taints and trust score overrides
     using the live OPA Sidecar instance in the kest-lab network.
+    F-AE-01: Asserts the generated entry contains mandatory schema fields.
     """
     engine = OPAPolicyEngine(url="http://opa:8181")
     configure(
@@ -73,24 +74,31 @@ async def test_live_taints_and_override(otel_recorder):
         span1 = next(s for s in spans if s.name == "kest.verified.func_entry")
         span2 = next(s for s in spans if s.name == "kest.verified.func_sanitizer")
 
+        def extract_payload(sig):
+            parts = sig.split(".")
+            assert len(parts) == 3, "Invalid JWS format"
+            p_b64 = parts[1]
+            p_b64 += "=" * ((4 - len(p_b64) % 4) % 4)
+            return json.loads(base64.urlsafe_b64decode(p_b64).decode())
+
         # Verify taints in signatures
         sig1 = span1.attributes["kest.signature"]
-        payload1 = json.loads(
-            base64.urlsafe_b64decode(sig1.split(".")[1] + "==").decode()
-        )
+        payload1 = extract_payload(sig1)
         assert set(payload1["added_taints"]) == {"malicious_input", "untrusted_source"}
         assert set(payload1["taints"]) == {
             "malicious_input",
             "untrusted_source",
         }
+        assert payload1.get("schema_version") == "0.3.0"
+        assert isinstance(payload1.get("policy_context"), dict)
 
         sig2 = span2.attributes["kest.signature"]
-        payload2 = json.loads(
-            base64.urlsafe_b64decode(sig2.split(".")[1] + "==").decode()
-        )
+        payload2 = extract_payload(sig2)
         assert set(payload2["removed_taints"]) == {"malicious_input"}
         assert set(payload2["taints"]) == {"untrusted_source"}
         assert span2.attributes["kest.trust_score"] == 100
+        assert payload2.get("schema_version") == "0.3.0"
+        assert isinstance(payload2.get("policy_context"), dict)
 
     finally:
         otel_context.detach(token)

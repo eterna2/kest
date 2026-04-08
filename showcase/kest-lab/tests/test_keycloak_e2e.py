@@ -16,6 +16,7 @@ import httpx
 from conftest import (
     get_keycloak_token,
     decode_jwt_payload,
+    requires_keycloak,
 )
 
 HOP1_URL = "http://hop1:8000"
@@ -48,6 +49,7 @@ def any_identity_matches(payloads: list[dict], **expected) -> bool:
     return False
 
 
+@requires_keycloak
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_direct_user_flow_alice(wait_for_audit):
@@ -88,6 +90,7 @@ async def test_direct_user_flow_alice(wait_for_audit):
     )
 
 
+@requires_keycloak
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_direct_user_flow_bob_admin(wait_for_audit):
@@ -113,6 +116,7 @@ async def test_direct_user_flow_bob_admin(wait_for_audit):
     )
 
 
+@requires_keycloak
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_obo_agent_flow(wait_for_audit):
@@ -147,6 +151,7 @@ async def test_obo_agent_flow(wait_for_audit):
     )
 
 
+@requires_keycloak
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_invalid_jwt_rejected():
@@ -166,6 +171,7 @@ async def test_invalid_jwt_rejected():
     )
 
 
+@requires_keycloak
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_no_jwt_rejected():

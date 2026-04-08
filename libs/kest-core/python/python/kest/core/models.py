@@ -3,7 +3,7 @@ import json
 import base64
 import hashlib
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TypedDict
 from abc import ABC, abstractmethod
 
 
@@ -170,6 +170,13 @@ class DefaultTrustEvaluator(TrustEvaluator):
         return (min_parent * self_score) // 100
 
 
+class PolicyDeviation(TypedDict):
+    policy: str
+    tier: str
+    reason: Optional[str]
+    approver: Optional[str]
+
+
 class BaggageManager:
     """
     Handles the hybrid propagation of lineage data in OpenTelemetry (OTel) Baggage.
@@ -222,20 +229,18 @@ class BaggageManager:
         claim_id = baggage_func("kest.claim_check")
         if claim_id:
             if not cache:
-                print(
-                    f"[Kest.Baggage] Warning: claim_check {claim_id} found but no cache configured for retrieval."
+                raise RuntimeError(
+                    f"[F-GC-01] Kest lineage claim_check {claim_id} found but no cache "
+                    "backend configured for retrieval. Failing closed."
                 )
-                return Passport()
 
             cached = cache.get(f"kest.claim.{claim_id}")
             if cached:
-                print(
-                    f"[Kest.Baggage] Successfully retrieved lineage from cache via claim_check {claim_id}"
-                )
                 return Passport.deserialize(cached)
             else:
-                print(
-                    f"[Kest.Baggage] Error: claim_check {claim_id} present but record NOT FOUND in cache."
+                raise RuntimeError(
+                    f"[F-GC-02] Kest lineage claim_check {claim_id} present but record "
+                    "NOT FOUND in cache (TTL expired or cache evicted). Failing closed."
                 )
 
         raw_passport = baggage_func("kest.passport")

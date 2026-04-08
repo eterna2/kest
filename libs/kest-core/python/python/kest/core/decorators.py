@@ -24,7 +24,7 @@ tracer = trace.get_tracer(__name__)
 
 
 # SHARED LAB FILE: To ensure Merkle chain links in the lab where OTel propagation is failing
-_LAB_AUDIT_FILE = "/app/lab_audit.json"
+_LAB_AUDIT_FILE = "/workspace/app/lab_audit.json"
 
 
 def _append_lab_audit(signature: str):
@@ -62,7 +62,7 @@ def _update_lab_chain(service_name: str, sig_hash: str):
     """
     try:
         # Use separate files to avoid JSON concurrency issues
-        path = f"/app/last_hash_{service_name}.txt"
+        path = f"/workspace/app/last_hash_{service_name}.txt"
         with open(path, "w") as f:
             f.write(sig_hash)
     except Exception:
@@ -89,7 +89,7 @@ def _get_lab_parent(service_name: str) -> str:
         )
         if not target:
             return "0"
-        path = f"/app/last_hash_{target}.txt"
+        path = f"/workspace/app/last_hash_{target}.txt"
         if not os.path.exists(path):
             return "0"
         with open(path, "r") as f:
@@ -132,6 +132,16 @@ def get_active_cache() -> Optional[Any]:
     import kest.core
 
     return getattr(kest.core, "_active_cache", None)
+
+
+def get_active_enterprise_policies() -> List[str]:
+    import kest.core
+    return getattr(kest.core, "_active_enterprise_policies", [])
+
+
+def get_active_deviations() -> List[Any]:
+    import kest.core
+    return getattr(kest.core, "_active_deviations", [])
 
 
 def kest_verified(
@@ -177,8 +187,9 @@ def kest_verified(
     Raises:
         PermissionError: If authorization fails or no identity/engine is configured.
     """
-    # Normalize policy to a list
-    policies = [policy] if isinstance(policy, str) else policy
+    # Normalize policy to a list and deduplicate (F-PE-07/08 strict logical AND)
+    _raw_policies = [policy] if isinstance(policy, str) else policy
+    policies = list(dict.fromkeys(_raw_policies))
 
     def decorator(func):
         import inspect
@@ -259,11 +270,11 @@ def kest_verified(
                 removed_taints=removed_taints or [],
                 taints=list(accumulated_taints) if accumulated_taints else [],
                 policy_context={
-                    "enterprise_policies": [],
+                    "enterprise_policies": get_active_enterprise_policies(),
                     "platform_policies": [],
                     "app_policies": [],
                     "function_policies": list(policies),
-                    "deviations": [],
+                    "deviations": get_active_deviations(),
                 },
             )
 

@@ -73,15 +73,17 @@ services:
 
   # --- Distributed Workloads ---
   hop1: &workload-template
-    image: python:3.11-slim
+    build:
+      context: .
+      dockerfile: Dockerfile
     volumes:
       - ../../libs:/libs
-      - .:/app
+      - .:/workspace/app
       - ./spire/agent/public:/var/run/spire/agent/public:ro
-      # Named volume shadows /app/.venv so uv sync writes here (container-managed)
+      # Named volume shadows /workspace/app/.venv so uv sync writes here (container-managed)
       # instead of bleeding root ownership back to the host bind-mount.
-      - kest-lab-venv:/app/.venv
-    working_dir: /app
+      - kest-lab-venv:/workspace/app/.venv
+    working_dir: /workspace/app
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - SPIFFE_ENDPOINT_SOCKET=unix:///var/run/spire/agent/public/api.sock
@@ -89,7 +91,7 @@ services:
       - NEXT_HOP_URL=http://hop2:8000
       - PYTHONPATH=/libs/kest-core/python/python
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
-    command: ["sh", "-c", "pip install uv --quiet && (test -e /app/.venv/bin/python || uv sync --group test) && /app/.venv/bin/python app.py"]
+    command: ["sh", "-c", "pip install uv --quiet && uv sync --group test && /workspace/app/.venv/bin/python app.py"]
     ports:
       - "8000:8000"
     depends_on:
@@ -135,7 +137,7 @@ services:
       - KEYCLOAK_CLIENT_ID=kest-agent
       - KEYCLOAK_CLIENT_SECRET=kest-agent-secret
       - GATEWAY_URL=http://kest-gateway:8002
-    command: ["sh", "-c", "pip install uv --quiet && (test -e /app/.venv/bin/python || uv sync --group test) && /app/.venv/bin/python agent.py"]
+    command: ["sh", "-c", "pip install uv --quiet && uv sync --group test && /workspace/app/.venv/bin/python agent.py"]
     ports:
       - "8001:8001"
     depends_on:
@@ -153,7 +155,7 @@ services:
       - PYTHONPATH=/libs/kest-core/python/python
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
       - TASK_TOKEN_TTL=300
-    command: ["sh", "-c", "pip install uv --quiet && (test -e /app/.venv/bin/python || uv sync --group test) && /app/.venv/bin/python gateway.py"]
+    command: ["sh", "-c", "pip install uv --quiet && uv sync --group test && /workspace/app/.venv/bin/python gateway.py"]
     ports:
       - "8002:8002"
     depends_on:

@@ -70,7 +70,7 @@ def test_full_claim_check_lifecycle():
 
 def test_claim_check_failure_no_cache():
     """
-    Verify fail-secure behavior when cache is missing for a claim check.
+    F-GC-01: Verify fail-secure behavior when cache is missing for a claim check.
     """
     configure(
         engine=MockPolicyEngine(),
@@ -83,7 +83,31 @@ def test_claim_check_failure_no_cache():
     token = otel_context.attach(ctx)
 
     try:
-        p = BaggageManager.unpack(baggage.get_baggage, cache=None)
-        assert len(p.entries) == 0  # Returns empty passport rather than crashing
+        import pytest
+        with pytest.raises(RuntimeError, match="no cache backend configured for retrieval"):
+            BaggageManager.unpack(baggage.get_baggage, cache=None)
+    finally:
+        otel_context.detach(token)
+
+def test_claim_check_expired_ttl_fails_closed():
+    """
+    F-GC-02: If the Cache TTL expires... the claim check fails. 
+    The implementation MUST fail securely.
+    """
+    shared_cache = SimpleCache()
+    configure(
+        engine=MockPolicyEngine(),
+        identity=MockIdentityProvider(),
+        cache=shared_cache,
+        clear=True,
+    )
+    
+    ctx = baggage.set_baggage("kest.claim_check", "some-expired-id")
+    token = otel_context.attach(ctx)
+
+    try:
+        import pytest
+        with pytest.raises(RuntimeError, match="NOT FOUND in cache"):
+            BaggageManager.unpack(baggage.get_baggage, cache=shared_cache)
     finally:
         otel_context.detach(token)
