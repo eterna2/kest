@@ -39,6 +39,7 @@ from kest.core.models import (
     DefaultTrustEvaluator,
     PassportVerifier,
     BaggageManager,
+    register_origin_trust,
 )
 from kest.core.ext import KestMiddleware, KestHttpxInterceptor
 
@@ -115,4 +116,5 @@ __all__ = [
     "DefaultTrustEvaluator",
     "PassportVerifier",
     "BaggageManager",
+    "register_origin_trust",
 ]

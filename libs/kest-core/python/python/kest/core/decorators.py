@@ -1,5 +1,6 @@
 import functools
 import uuid
+import time
 import hashlib
 import os
 import json
@@ -20,6 +21,35 @@ from kest.core.engine import PolicyEngine
 from kest.core._core import KestEntry, sign_entry
 
 tracer = trace.get_tracer(__name__)
+
+
+def _uuid7() -> str:
+    """
+    Generate a UUID v7 (draft RFC 9562) using the current Unix timestamp in ms.
+
+    UUID v7 is time-ordered; the 48 most-significant bits encode the Unix epoch
+    timestamp in milliseconds. The version nibble is 0b0111 (7).
+    F-AE-04 mandates UUID v7 for every entry_id.
+
+    Returns:
+        str: A UUID v7 string in the standard xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx format.
+    """
+    ts_ms = int(time.time() * 1000)  # 48-bit Unix epoch ms
+    rand = int.from_bytes(os.urandom(10), "big") & 0x3FFFFFFFFFFFFFFF  # 62 random bits
+
+    # Layout (128 bits total):
+    #   Bits 0-47  : timestamp_ms (48 bits)
+    #   Bits 48-51 : version = 0b0111 (4 bits)
+    #   Bits 52-63 : random (12 bits)
+    #   Bits 64-65 : variant = 0b10 (2 bits)
+    #   Bits 66-127: random (62 bits)
+    rand_high = (rand >> 62) & 0x0FFF  # 12 bits for bits 52-63
+    rand_low = rand & 0x3FFFFFFFFFFFFFFF  # 62 bits for bits 66-127
+
+    hi = (ts_ms << 16) | (0x7 << 12) | rand_high
+    lo = (0b10 << 62) | rand_low
+
+    return str(uuid.UUID(int=(hi << 64) | lo))
 
 # SHARED LAB FILE: To ensure Merkle chain links in the lab where OTel propagation is failing
 _LAB_AUDIT_FILE = "/app/lab_audit.json"
@@ -256,6 +286,13 @@ def kest_verified(
                 added_taints=added_taints or [],
                 removed_taints=removed_taints or [],
                 taints=list(accumulated_taints) if accumulated_taints else [],
+                policy_context={
+                    "enterprise_policies": [],
+                    "platform_policies": [],
+                    "app_policies": [],
+                    "function_policies": list(policies),
+                    "deviations": [],
+                },
             )
 
             signature = sign_entry(entry, active_id)
@@ -325,10 +362,13 @@ def kest_verified(
 
             is_root = (not passport.entries) and (parent_hash == "0")
             evaluator = trust_evaluator or DefaultTrustEvaluator()
-            current_node_trust = 100
+            # F-TS-02/F-TS-03: self_score is the node's own origin trust.
+            # For root nodes, this IS the final trust score (no parents to inherit from).
+            # For non-root nodes, evaluator attenuates self_score through parent chain.
+            self_score = ORIGIN_TRUST_MAP.get(origin, 100) if origin else 100
+            current_node_trust = self_score if is_root else 100
             if is_root:
-                if origin:
-                    current_node_trust = ORIGIN_TRUST_MAP.get(origin, 0)
+                current_node_trust = self_score
             parent_taints = set()
             if not is_root:
                 parent_scores = []
@@ -345,7 +385,7 @@ def kest_verified(
                     except Exception:
                         pass
                 if trust_override is None:
-                    current_node_trust = evaluator.calculate(100, parent_scores)
+                    current_node_trust = evaluator.calculate(self_score, parent_scores)
 
             if trust_override is not None:
                 current_node_trust = trust_override
@@ -358,7 +398,7 @@ def kest_verified(
                 current_accumulated.difference_update(removed_taints)
 
             principal = active_id.get_identity()
-            entry_id = str(uuid.uuid4())
+            entry_id = _uuid7()
 
             with tracer.start_as_current_span(
                 f"kest.verified.{func.__name__}",
@@ -386,7 +426,6 @@ def kest_verified(
                 mapped_context, mapped_labels = _build_mapped_context(args, kwargs)
                 ctx_to_eval.update(mapped_context)
 
-                print(f"EVAL CONTEXT: {ctx_to_eval}", flush=True)
                 allowed = active_eng.evaluate(
                     entry_id=entry_id,
                     policy_names=policies,
@@ -448,10 +487,11 @@ def kest_verified(
 
             is_root = (not passport.entries) and (parent_hash == "0")
             evaluator = trust_evaluator or DefaultTrustEvaluator()
-            current_node_trust = 100
+            # F-TS-02/F-TS-03: self_score is the node's own origin trust.
+            self_score = ORIGIN_TRUST_MAP.get(origin, 100) if origin else 100
+            current_node_trust = self_score if is_root else 100
             if is_root:
-                if origin:
-                    current_node_trust = ORIGIN_TRUST_MAP.get(origin, 0)
+                current_node_trust = self_score
             parent_taints = set()
             if not is_root:
                 parent_scores = []
@@ -468,7 +508,7 @@ def kest_verified(
                     except Exception:
                         pass
                 if trust_override is None:
-                    current_node_trust = evaluator.calculate(100, parent_scores)
+                    current_node_trust = evaluator.calculate(self_score, parent_scores)
 
             if trust_override is not None:
                 current_node_trust = trust_override
@@ -481,7 +521,7 @@ def kest_verified(
                 current_accumulated.difference_update(removed_taints)
 
             principal = active_id.get_identity()
-            entry_id = str(uuid.uuid4())
+            entry_id = _uuid7()
 
             with tracer.start_as_current_span(
                 f"kest.verified.{func.__name__}",
@@ -509,7 +549,6 @@ def kest_verified(
                 mapped_context, mapped_labels = _build_mapped_context(args, kwargs)
                 ctx_to_eval.update(mapped_context)
 
-                print(f"EVAL CONTEXT: {ctx_to_eval}", flush=True)
                 allowed = active_eng.evaluate(
                     entry_id=entry_id,
                     policy_names=policies,

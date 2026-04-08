@@ -23,8 +23,17 @@ def test_merkle_chain_propagation():
 
     passport_final = step1()
     assert passport_final is not None
-    # Serialized list: ["sig1", "sig2"]
-    assert passport_final.count("mock-sig") == 2
+
+    # Passport must be a JSON array of 2 JWS compact strings (header.payload.sig).
+    import json
+    entries = json.loads(passport_final)
+    assert len(entries) == 2, f"Expected 2 passport entries, got {len(entries)}"
+    for entry in entries:
+        parts = entry.split(".")
+        assert len(parts) == 3, (
+            f"Each passport entry must be a valid JWS compact serialization "
+            f"(header.payload.sig), got {len(parts)} parts"
+        )
 
 
 def test_fail_closed_no_engine():
