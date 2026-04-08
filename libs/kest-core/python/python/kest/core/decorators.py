@@ -1,6 +1,5 @@
 import functools
-import uuid
-import time
+import uuid_utils
 import hashlib
 import os
 import json
@@ -23,33 +22,6 @@ from kest.core._core import KestEntry, sign_entry
 tracer = trace.get_tracer(__name__)
 
 
-def _uuid7() -> str:
-    """
-    Generate a UUID v7 (draft RFC 9562) using the current Unix timestamp in ms.
-
-    UUID v7 is time-ordered; the 48 most-significant bits encode the Unix epoch
-    timestamp in milliseconds. The version nibble is 0b0111 (7).
-    F-AE-04 mandates UUID v7 for every entry_id.
-
-    Returns:
-        str: A UUID v7 string in the standard xxxxxxxx-xxxx-7xxx-yxxx-xxxxxxxxxxxx format.
-    """
-    ts_ms = int(time.time() * 1000)  # 48-bit Unix epoch ms
-    rand = int.from_bytes(os.urandom(10), "big") & 0x3FFFFFFFFFFFFFFF  # 62 random bits
-
-    # Layout (128 bits total):
-    #   Bits 0-47  : timestamp_ms (48 bits)
-    #   Bits 48-51 : version = 0b0111 (4 bits)
-    #   Bits 52-63 : random (12 bits)
-    #   Bits 64-65 : variant = 0b10 (2 bits)
-    #   Bits 66-127: random (62 bits)
-    rand_high = (rand >> 62) & 0x0FFF  # 12 bits for bits 52-63
-    rand_low = rand & 0x3FFFFFFFFFFFFFFF  # 62 bits for bits 66-127
-
-    hi = (ts_ms << 16) | (0x7 << 12) | rand_high
-    lo = (0b10 << 62) | rand_low
-
-    return str(uuid.UUID(int=(hi << 64) | lo))
 
 # SHARED LAB FILE: To ensure Merkle chain links in the lab where OTel propagation is failing
 _LAB_AUDIT_FILE = "/app/lab_audit.json"
@@ -398,7 +370,7 @@ def kest_verified(
                 current_accumulated.difference_update(removed_taints)
 
             principal = active_id.get_identity()
-            entry_id = _uuid7()
+            entry_id = str(uuid_utils.uuid7())
 
             with tracer.start_as_current_span(
                 f"kest.verified.{func.__name__}",
@@ -521,7 +493,7 @@ def kest_verified(
                 current_accumulated.difference_update(removed_taints)
 
             principal = active_id.get_identity()
-            entry_id = _uuid7()
+            entry_id = str(uuid_utils.uuid7())
 
             with tracer.start_as_current_span(
                 f"kest.verified.{func.__name__}",
