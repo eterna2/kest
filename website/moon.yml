@@ -14,6 +14,8 @@ tasks:
       - "content/**/*"
       - "next.config.ts"
       - "package.json"
+      - "scripts/**/*"
+      - "../../spec/SPEC-v0.3.0.md"
     outputs:
       - "out"
 
