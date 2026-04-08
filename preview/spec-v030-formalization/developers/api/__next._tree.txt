@@ -1,2 +1,2 @@
 :HL["/kest/preview/spec-v030-formalization/_next/static/chunks/0g~ij44kf0unu.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"developers","param":null,"prefetchHints":0,"slots":{"children":{"name":"api","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"hbO33ee61_BsWQnUDzarY"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"developers","param":null,"prefetchHints":0,"slots":{"children":{"name":"api","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}},"staleTime":300,"buildId":"6tFwLz-S5Ga4dXQbcZrjk"}
