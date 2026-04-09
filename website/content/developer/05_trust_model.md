@@ -208,4 +208,9 @@ allow {
 
 ---
 
-*For the normative specification of trust propagation, see [Spec §7](../blog/design/kest_spec_v0.3.0). For the complete decorator parameters, see [Decorators Reference](decorators).*
+## Related Concepts
+- **[Design Principles](../concepts/design/principles)**: The philosophical foundation of Kest — P1 (Identity as Perimeter) and P3 (Continuous Verification).
+- **[ABAC Policy](../concepts/design/abac_policy)**: How trust scores and taints are used to make complex authorization decisions.
+- **[Merkle DAG Lineage](../concepts/design/merkle_dag)**: How the integrity of the trust score is preserved through cryptographic chaining.
+
+*For the normative specification of trust propagation, see [Spec §7](../concepts/design/kest_spec_v0.3.0). For the complete decorator parameters, see [Decorators Reference](decorators).*

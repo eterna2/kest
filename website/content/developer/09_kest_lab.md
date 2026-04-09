@@ -237,4 +237,10 @@ async def test_my_scenario():
 
 ---
 
-*For the full testing philosophy, see [Testing & Kest Lab](testing). For the spec edge cases this lab validates, see [Spec §11](../blog/design/kest_spec_v0.3.0).*
+## Related Concepts
+- **[Platform Identity](../concepts/infra/01_identity)**: The theoretical model of workload-to-workload attestation used in the lab.
+- **[Integration with SPIRE](../concepts/infra/02_spire)**: Detailed internals of how the lab's SPIRE agent issues SVIDs.
+- **[Merkle DAG Lineage](../concepts/design/03_merkle_dag)**: The data structure validated by the `test_3hop_chain` suite.
+- **[Audit Trails](../concepts/compliance/02_audit_trails)**: How lab-generated data can be used for zero-trust compliance.
+
+*For the full testing philosophy, see [Testing & Kest Lab](testing). For the spec edge cases this lab validates, see [Spec §11](../concepts/design/kest_spec_v0.3.0).*

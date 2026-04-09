@@ -7,10 +7,10 @@ import type { Link } from 'mdast';
  * `../design/merkle_dag.md`) to the correct website routes.
  *
  * Content directory → Website route mapping:
- *   content/design/*        → /blog/design/{slug}
- *   content/infra/*         → /blog/infra/{slug}
- *   content/compliance/*    → /blog/compliance/{slug}
- *   content/examples/*      → /blog/examples/{slug}
+ *   content/design/*        → /concepts/design/{slug}
+ *   content/infra/*         → /concepts/infra/{slug}
+ *   content/compliance/*    → /concepts/compliance/{slug}
+ *   content/examples/*      → /concepts/examples/{slug}
  *   content/developer/*     → /developers/guide/{slug}
  *   content/reference/*     → /developers/api/{slug}
  *   content/policies/*      → /developers/policy/{slug}
@@ -20,10 +20,10 @@ import type { Link } from 'mdast';
  */
 
 const DIR_TO_ROUTE: Record<string, string> = {
-  design: '/blog/design',
-  infra: '/blog/infra',
-  compliance: '/blog/compliance',
-  examples: '/blog/examples',
+  design: '/concepts/design',
+  infra: '/concepts/infra',
+  compliance: '/concepts/compliance',
+  examples: '/concepts/examples',
   developer: '/developers/guide',
   reference: '/developers/api',
   policies: '/developers/policy',

@@ -1,4 +1,4 @@
-# Identity auto-detection and execution Context
+# Platform Identity & Context Resolution
 
 Kest v0.3.0 introduced a modular identity system designed to solve the **Secret Zero** problem across a variety of runtime environments. 
 Because identity must be established before any data can be hashed or signed, Kest's `@kest_verified` decorators rely on the `IdentityProvider` interface to securely fetch context and perform cryptographic signing.

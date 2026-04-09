@@ -1,4 +1,4 @@
-# Why Kest?
+# Architecture Overview: Why Kest?
 
 Modern distributed systems are secured at the perimeter — firewalls, API gateways, and static API keys form the first and often the only line of defense. Once an attacker breaches this perimeter or compromises a single key, they move laterally through the network with impunity. Logs can be altered, dropped, or spoofed. Post-breach forensics becomes guesswork.
 

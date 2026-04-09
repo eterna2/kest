@@ -54,9 +54,9 @@ export default function TopNavBar({ onMenuClick, searchItems = [] }: TopNavBarPr
         fontWeight: 500,
         color: 'var(--on-surface-variant)'
       }} className="hidden md:flex">
-        <Link href="/blog" style={{ color: 'inherit', textDecoration: 'none' }}>Journal</Link>
+        <Link href="/concepts" style={{ color: 'inherit', textDecoration: 'none' }}>Concepts</Link>
         <Link href="/developers" style={{ color: 'inherit', textDecoration: 'none' }}>Portal</Link>
-        <Link href="/team" style={{ color: 'inherit', textDecoration: 'none' }}>Collective</Link>
+        <Link href="/team" style={{ color: 'inherit', textDecoration: 'none' }}>The Clowder</Link>
       </nav>
 
       {/* Action Area */}

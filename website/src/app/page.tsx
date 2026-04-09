@@ -131,7 +131,7 @@ export default function Home() {
           tag="Architecture"
           title="Design Specification"
           description="Deep-dive into the Secret Zero problem, Merkle DAG lineage, ABAC policy enforcement, and edge case handling."
-          href="/blog/design/overview"
+          href="/concepts/design/overview"
           icon={<Code size={24} />}
         />
       </section>
@@ -191,9 +191,9 @@ export default function Home() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
              {[
-               { title: 'Workload Identity (SPIFFE)', desc: 'Replace static API keys with dynamically rotated X509-SVIDs.', href: '/blog/infra/spire' },
-               { title: 'Cryptographic Lineage', desc: 'Merkle DAGs over OpenTelemetry baggage. Every hop is signed via JWS.', href: '/blog/design/merkle_dag' },
-               { title: 'Policy as Code (OPA/Cedar)', desc: 'Continuous authorization using ABAC policies at every hop.', href: '/blog/design/abac_policy' },
+               { title: 'Workload Identity (SPIFFE)', desc: 'Replace static API keys with dynamically rotated X509-SVIDs.', href: '/concepts/infra/spire' },
+               { title: 'Cryptographic Lineage', desc: 'Merkle DAGs over OpenTelemetry baggage. Every hop is signed via JWS.', href: '/concepts/design/merkle_dag' },
+               { title: 'Policy as Code (OPA/Cedar)', desc: 'Continuous authorization using ABAC policies at every hop.', href: '/concepts/design/abac_policy' },
              ].map((concept) => (
                 <Link key={concept.href} href={concept.href} style={{ textDecoration: 'none' }}>
                   <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>

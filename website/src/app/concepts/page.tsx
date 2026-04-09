@@ -25,12 +25,9 @@ const CATEGORIES = [
     dir: "infra",
   },
   {
-    label: "Governance",
+    label: "Assurance",
     icon: Shield,
     dir: "compliance",
-    extraFromDir: [
-      { dir: "examples", slugs: ["distributed_verification", "gateway_e2e"] },
-    ],
   },
 ];
 
@@ -49,15 +46,6 @@ function getCategoryPosts(cat: (typeof CATEGORIES)[number]): BlogPost[] {
     posts = posts.filter((p) => cat.slugs!.includes(p.slug));
   }
 
-  // Add extra posts from other directories
-  if (cat.extraFromDir) {
-    for (const extra of cat.extraFromDir) {
-      const extraPosts = getAllPosts(extra.dir)
-        .filter((p) => extra.slugs.includes(p.slug))
-        .map((p) => ({ ...p, sourceDir: extra.dir }));
-      posts = [...posts, ...extraPosts];
-    }
-  }
 
   return posts;
 }
@@ -87,7 +75,7 @@ export default function BlogIndex() {
             textTransform: "uppercase",
           }}
         >
-          Editorial Journal
+          Core Concepts
         </span>
         <h1
           style={{
@@ -97,7 +85,7 @@ export default function BlogIndex() {
             fontFamily: "var(--font-display)",
           }}
         >
-          Insights from the <span className="gradient-text">Observatory</span>
+          Kest Conceptual <span className="gradient-text">Architecture</span>
         </h1>
       </section>
 
@@ -176,7 +164,7 @@ export default function BlogIndex() {
               {featuredPost.meta.description}
             </p>
             <Link
-              href={`/blog/${featuredPost.sourceDir}/${featuredPost.slug}`}
+              href={`/concepts/${featuredPost.sourceDir}/${featuredPost.slug}`}
               className="btn-premium"
               style={{ width: "fit-content", marginTop: "1rem" }}
             >
@@ -238,7 +226,7 @@ export default function BlogIndex() {
               {cat.posts.map((post) => (
                 <Link
                   key={`${post.sourceDir}-${post.slug}`}
-                  href={`/blog/${post.sourceDir}/${post.slug}`}
+                  href={`/concepts/${post.sourceDir}/${post.slug}`}
                   style={{ textDecoration: "none" }}
                 >
                   <article

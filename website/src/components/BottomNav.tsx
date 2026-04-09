@@ -9,9 +9,9 @@ export default function BottomNav() {
 
   const navItems = [
     { label: 'Home', href: '/', icon: Home },
-    { label: 'Journal', href: '/blog', icon: Book },
+    { label: 'Concepts', href: '/concepts', icon: Book },
     { label: 'Portal', href: '/developers', icon: Terminal },
-    { label: 'Collective', href: '/team', icon: User },
+    { label: 'The Clowder', href: '/team', icon: User },
   ];
 
   return (

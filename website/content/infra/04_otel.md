@@ -1,4 +1,4 @@
-# Audit Aggregation (OTel)
+# OpenTelemetry Audit Aggregation
 
 Kest generates a non-fungible audit trail in the form of OpenTelemetry (OTel) spans. Each time an execution hop completes, Kest produces a span containing the cryptographic signature and the Merkle root of the execution lineage.
 

@@ -1,4 +1,4 @@
-# Design Principles
+# The Eight Immutable Design Principles
 
 Kest is governed by eight immutable, non-negotiable design principles. They are the constitution of the framework — every API, every data structure, and every edge-case decision traces back to one of these tenets. An implementation that violates any of them cannot call itself conformant.
 

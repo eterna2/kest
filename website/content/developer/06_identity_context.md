@@ -221,4 +221,4 @@ This is useful in containerized environments where the SPIRE Agent socket may no
 
 ---
 
-*For the policy evaluation context that receives these fields, see [Policy as Code](/blog/design/abac_policy). For the full interface specification, see [Spec §5.1](../blog/design/kest_spec_v0.3.0).*
+*For the policy evaluation context that receives these fields, see [Policy as Code](/concepts/design/abac_policy). For the full interface specification, see [Spec §5.1](../concepts/design/kest_spec_v0.3.0).*

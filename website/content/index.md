@@ -21,10 +21,10 @@ Modern distributed systems rely on firewalls, API gateways, and static secrets. 
 
 ## Navigate the Documentation
 
-### 📐 [Design Principles](/blog)
+### 📐 [Design Principles](/concepts)
 The eight immutable principles (P1–P8) that govern every design decision — from "Identity is the Perimeter" to "Fail-Secure by Default."
 
-### 📖 [Journal](/blog)
+### 📖 [Concepts](/concepts)
 Deep-dive articles on core concepts: the Secret Zero problem, Merkle DAG lineage, non-fungible audit, the 4-tier policy hierarchy, and edge case handling.
 
 ### 🔧 [Developer Guide](/developers/guide/getting_started)
@@ -33,7 +33,7 @@ Step-by-step: installation, `configure()`, `@kest_verified`, trust model, identi
 ### 🧪 [Testing & Kest Lab](/developers/guide/kest_lab)
 Unit testing with mocks, 17 integration tests, Docker Compose lab with SPIRE, OPA, Cedar, and Keycloak.
 
-### 📋 [Specification](/blog/design/kest_spec_v0.3.0)
+### 📋 [Specification](/concepts/design/kest_spec_v0.3.0)
 The full normative v0.3.0 specification — data models, interfaces, algorithms, edge cases, and conformance tests.
 
 ### 📚 [API Reference](/developers/api)

@@ -1,4 +1,4 @@
-# Identity is the Perimeter
+# Solving the Secret Zero Problem
 
 The **Secret Zero problem** is the Achilles' heel of traditional distributed security: to access a secret manager, a workload needs a secret — but where does that first secret come from?
 

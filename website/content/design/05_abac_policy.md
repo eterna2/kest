@@ -1,4 +1,4 @@
-# Policy as Code
+# Four-Tier ABAC Policy Architecture
 
 Kest implements a **four-tier policy hierarchy** where every execution must pass through multiple layers of authorization before the protected operation runs. Policies are evaluated as code — not manually reviewed access control lists — using Open Policy Agent (OPA) or Cedar as sidecar engines.
 
