@@ -9,11 +9,13 @@ const CATEGORIES = [
     icon: Layers,
     dir: "design",
     slugs: [
+      "principles",
       "overview",
+      "secret_zero",
       "merkle_dag",
       "audit_entry",
+      "abac_policy",
       "edge_cases",
-      "secret_zero",
       "kest_spec_v0.3.0",
     ],
   },
@@ -21,8 +23,6 @@ const CATEGORIES = [
     label: "Infrastructure",
     icon: Terminal,
     dir: "infra",
-    // All infra posts + abac_policy from design (deployment/runtime topic)
-    extraFromDir: [{ dir: "design", slugs: ["abac_policy"] }],
   },
   {
     label: "Governance",

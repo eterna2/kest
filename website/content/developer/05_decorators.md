@@ -1,66 +1,198 @@
 # Securing Execution (Decorators)
 
-The core of Kest's Zero Trust framework is applied through the `@kest_verified` decorator. This simple wrapper orchestrates complex identity verification, fine-grained policy checks, and cryptographic Merkle chain linkage.
+The `@kest_verified` decorator is the primary entry point for securing any Python function with Kest. It orchestrates identity verification, trust evaluation, policy enforcement, cryptographic signing, and Merkle chain linkage — all transparently.
 
-## Basic Usage
-
-The simplest form of protection requires only the name of the policy you wish to enforce.
+## Complete Parameter Reference
 
 ```python
-from kest.core import kest_verified
-
-@kest_verified(policy="process_payment")
-async def execute_payment(transaction_id: str, amount: float):
-    return {"status": "success", "id": transaction_id}
+@kest_verified(
+    policy: str | list[str],           # Policy name(s) for evaluation
+    engine: PolicyEngine | None,       # Override the global engine
+    identity: IdentityProvider | None, # Override the global identity
+    source_type: str = "internal",     # Data origin type (trust lookup)
+    trust_override: int | None = None, # Direct trust score (0-100)
+    added_taints: list[str] = [],      # Taint labels to add
+    removed_taints: list[str] = [],    # Taint labels to remove (sanitizer)
+    user: Any | Callable = None,       # User identity (value or callable)
+    agent: Any | Callable = None,      # Agent identity (value or callable)
+    task: Any | Callable = None,       # Task identifier (value or callable)
+    resource_attr: dict | Callable = None,  # Resource attributes for ABAC
+)
 ```
 
-### What Happens Automatically?
-When this function is called, Kest:
-1. Extracts the execution lineage from the incoming context (OTel Baggage).
-2. Sends the lineage and workload identity to the local OPA/Cedar sidecar to evaluate the `process_payment` policy.
-3. If the policy returns `True` (Allow), it executes the function.
-4. Generates a new JSON Web Signature (JWS) linking the current execution to the previous hop's hash.
-5. Updates the context lineage and exports an OpenTelemetry audit span.
+### Parameter Deep Dive
 
-## Multi-Policy Aggregation
-
-You can enforce multiple policies simultaneously. Kest evaluates them using strict **Logical AND**; if a single policy denies access, the function is blocked.
+#### `policy` — What rules to evaluate
 
 ```python
-@kest_verified(policy=["require_auth", "check_rate_limit", "verify_lineage"])
-def process_data(data):
-    pass
+# Single policy
+@kest_verified(policy="kest/allow_trusted")
+
+# Multiple policies (logical AND — all must pass)
+@kest_verified(policy=["kest/allow_trusted", "kest/check_budget"])
 ```
 
-## Overriding Global Configuration
+The policy name maps to a Rego package (OPA) or a Cedar policy name. Evaluation is delegated to the configured `PolicyEngine`.
 
-While Kest is typically configured globally during app startup, you can override the Policy Engine or Identity Provider on a per-function basis.
+#### `engine` / `identity` — Per-function overrides
+
+Override the global configuration for specific functions that require a different engine or identity:
 
 ```python
-from kest.core import OPASidecarEngine, CedarSidecarEngine
+cedar_engine = CedarPolicyEngine(host="localhost", port=8180)
 
-# A dedicated Cedar engine for high-performance sub-second checks
-fast_engine = CedarSidecarEngine(url="http://localhost:8180")
-
-@kest_verified(policy="fast_rule", engine=fast_engine)
-def high_throughput_task():
-    pass
+@kest_verified(
+    policy="process_payment",
+    engine=cedar_engine  # This function uses Cedar; others use OPA
+)
+def process_payment(amount: float):
+    ...
 ```
 
-## Bootstrapping Trust (Root Nodes)
+#### `source_type` — Where the data came from
 
-If a function is the *first* execution node in a chain (e.g., an API Gateway or initial job consumer), it establishes the foundational trust score.
-
-Use the `source_type` parameter to automatically bootstrap trust based on predefined heuristics.
+Maps to `ORIGIN_TRUST_MAP` for trust score lookup:
 
 ```python
-@kest_verified(policy="api_entry", source_type="internet")
-async def public_api_endpoint(request):
-    # This execution chain will start with a trust score of 0.1
-    pass
-
-@kest_verified(policy="internal_entry", source_type="system")
-def process_internal_queue(msg):
-    # This execution chain will start with a trust score of 1.0
-    pass
+@kest_verified(policy="allow", source_type="user_input")      # trust=40
+@kest_verified(policy="allow", source_type="system")           # trust=100
+@kest_verified(policy="allow", source_type="adversarial")      # trust=0
 ```
+
+#### `trust_override` — Explicit trust assignment
+
+Bypasses the normal propagation rules. Use for sanitizers:
+
+```python
+@kest_verified(
+    policy="allow",
+    source_type="user_input",
+    trust_override=80,           # Sanitized data is now trusted
+    removed_taints=["user_input"]
+)
+def sanitize(data: dict) -> dict:
+    return deep_validate(data)
+```
+
+#### `added_taints` / `removed_taints` — Risk tracking
+
+```python
+@kest_verified(
+    policy="allow",
+    added_taints=["contains_pii", "financial_data"],
+)
+def receive_payment_form(form: dict):
+    ...
+
+@kest_verified(
+    policy="allow",
+    removed_taints=["contains_pii"],  # PII has been redacted
+)
+def redact_and_forward(data: dict):
+    ...
+```
+
+#### `user`, `agent`, `task` — Identity context
+
+Accept values or **callables** for request-scoped resolution:
+
+```python
+from flask import g
+
+@kest_verified(
+    policy="kest/check_access",
+    user=lambda: g.current_user,    # Resolved at call time
+    agent="checkout-service",        # Static value
+    task=lambda: f"order-{g.request_id}",
+)
+def process_checkout():
+    ...
+```
+
+#### `resource_attr` — ABAC resource attributes
+
+```python
+@kest_verified(
+    policy="kest/data_access",
+    resource_attr=lambda: {
+        "document_id": request.args.get("doc_id"),
+        "sensitivity": lookup_sensitivity(request.args.get("doc_id")),
+    }
+)
+def read_document(doc_id: str):
+    ...
+```
+
+## The 13-Step Verification Lifecycle
+
+When a `@kest_verified` function is called, the decorator executes this precise sequence:
+
+```mermaid
+graph TD
+    A["1. Extract Passport from OTel context"] --> B["2. Resolve identity context"]
+    B --> C["3. Evaluate trust score"]
+    C --> D["4. Compute taint set"]
+    D --> E["5. Hash function inputs"]
+    E --> F["6. Build KestEntry payload"]
+    F --> G["7. Evaluate Enterprise policies"]
+    G --> H["8. Evaluate Platform policies"]
+    H --> I["9. Evaluate App policies"]
+    I --> J["10. Evaluate Function policies"]
+    J --> K["11. Canonicalize + Sign (JWS)"]
+    K --> L["12. Append to Passport"]
+    L --> M["13. Execute function + hash output"]
+```
+
+### Failure Points
+
+| Step | Failure | Result |
+|---|---|---|
+| 1 | Claim Check UUID missing from cache | Exception — halt |
+| 3 | Unknown source_type | Exception — halt |
+| 7–10 | Any policy denies | Authorization error — halt |
+| 11 | Identity provider unavailable | Exception — halt |
+
+**The function body never executes if any step before step 12 fails.** (Principle P4 — Fail-Secure)
+
+## Async Support
+
+`@kest_verified` works with both sync and async functions:
+
+```python
+@kest_verified(policy="kest/allow_trusted")
+async def async_process(data: dict):
+    result = await external_service.call(data)
+    return result
+```
+
+Each async task maintains its own Passport context via `contextvars.ContextVar`, preventing cross-contamination between concurrent tasks.
+
+## Return Value Transparency
+
+The decorator is transparent — it returns exactly what your function returns:
+
+```python
+@kest_verified(policy="allow", source_type="internal")
+def compute(x: int, y: int) -> int:
+    return x + y
+
+result = compute(3, 4)
+assert result == 7  # Decorator doesn't alter the return value
+```
+
+## Error Handling
+
+```python
+from kest.core.engine import PolicyDeniedError
+
+try:
+    result = protected_function()
+except PolicyDeniedError as e:
+    print(f"Policy {e.policy} denied: {e.reason}")
+except Exception as e:
+    print(f"Kest error: {e}")
+```
+
+---
+
+*For trust model details, see [Trust Model](trust_model). For policy authoring, see [Policy as Code](/blog/design/abac_policy).*

@@ -54,6 +54,7 @@ export function getPost(dir: string, slug: string) {
   const { data, content } = matter(raw);
 
   const title = data.title || content.match(/^#\s+(.+)$/m)?.[1] || slug.replace(/_/g, ' ');
+  const hasExplicitDescription = Boolean(data.description);
   const desc =
     data.description ||
     content
@@ -66,7 +67,12 @@ export function getPost(dir: string, slug: string) {
   // separately from meta.title. This prevents duplicate headings.
   const strippedContent = content.replace(/^#\s+.+\n+/, '');
 
-  return { meta: { ...data, title, description: desc }, content: strippedContent, slug, dir };
+  return {
+    meta: { ...data, title, description: desc, _fromFrontmatter: hasExplicitDescription },
+    content: strippedContent,
+    slug,
+    dir,
+  };
 }
 
 export function getAllPosts(dir: string) {

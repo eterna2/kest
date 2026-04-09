@@ -1,22 +1,57 @@
 # Introduction
 
-Kest (Key + Trust) is a distributed Zero Trust architecture designed to solve the **Secret Zero** problem and enforce high-fidelity execution lineage across polyglot microservices.
+**Kest** (Key + Trust) is a toolkit for **cryptographically verifiable execution lineage** in distributed systems. It ensures that every action in a microservice chain is authenticated via workload identity, authorized via policy-as-code, and immutably recorded in a tamper-evident Merkle chain.
 
-## The Problem
+## The Problem: Perimeter Security is Not Enough
 
-Modern distributed systems rely on perimeter security, API gateways, and static API keys. Once an attacker breaches the perimeter or compromises a key (the "Secret Zero" problem), they can laterally move through the network with impunity. Traditional logging solutions are fungible; logs can be altered, dropped, or spoofed by compromised nodes, rendering compliance and post-breach analysis difficult.
+Modern distributed systems rely on firewalls, API gateways, and static secrets. Once compromised:
 
-## The Kest Solution
+- **Lateral movement** — A stolen API key works anywhere in the network
+- **Log tampering** — Compromised nodes can alter or drop audit records
+- **Identity spoofing** — Tokens can be replayed or forged without detection
+- **No provenance** — You can't prove *how* a request arrived, only *who* sent it
 
-Kest combines **Workload Identity (SPIFFE)**, **Policy as Code (OPA/Cedar)**, and **Cryptographic Lineage (Merkle DAGs)** into a cohesive toolkit.
+## Three Pillars of Kest
 
-1.  **Identity, Not Keys**: Services do not use static API keys. They use short-lived, dynamically rotated X509-SVIDs provided by SPIRE.
-2.  **Cryptographic Lineage**: Every execution hop is cryptographically signed using RFC 8785 JSON Canonicalization and linked to its parent's signature hash. This creates a tamper-evident Merkle DAG of the request's journey.
-3.  **Continuous Verification**: At every hop, Policy Engines (OPA/Cedar sidecars) evaluate the *entire cryptographic lineage*, not just the immediate caller, enabling true Continuous Adaptive Risk and Trust Assessment (CARTA).
-4.  **Non-Fungible Audit Trails**: The verified lineage is exported as OpenTelemetry spans, creating an immutable, cryptographically verifiable audit log.
+| Pillar | What It Does | Key Standards |
+|---|---|---|
+| **Workload Identity** | Eliminate the Secret Zero problem with platform attestation | SPIFFE/SPIRE, X.509 SVIDs |
+| **Cryptographic Lineage** | Tamper-evident Merkle chain of signed audit entries | JWS (RFC 7515), JCS (RFC 8785) |
+| **Continuous Verification** | Full-lineage policy evaluation at every hop | OPA/Cedar, CARTA trust model |
 
-## Target Audiences
+## Navigate the Documentation
 
--   **Security & Crypto Engineers**: Dive into the [Architecture & Design](design/secret_zero.md) to understand how we mitigate replay attacks, clock skew, and ensure non-fungible logging.
--   **Platform & Infra Engineers**: Explore the [Platform & Infrastructure](infra/spire.md) section to learn how to deploy SPIRE, configure OPA/Cedar sidecars, and manage OTel collectors.
--   **Application Developers**: Check out the [Developer Guide](developer/getting_started.md) to see how simple it is to secure your functions using the `@kest_verified` decorator and our automatic HTTP transport middleware.
+### 📐 [Design Principles](/blog)
+The eight immutable principles (P1–P8) that govern every design decision — from "Identity is the Perimeter" to "Fail-Secure by Default."
+
+### 📖 [Journal](/blog)
+Deep-dive articles on core concepts: the Secret Zero problem, Merkle DAG lineage, non-fungible audit, the 4-tier policy hierarchy, and edge case handling.
+
+### 🔧 [Developer Guide](/developers/guide/getting_started)
+Step-by-step: installation, `configure()`, `@kest_verified`, trust model, identity providers, middleware, and the full 13-step verification lifecycle.
+
+### 🧪 [Testing & Kest Lab](/developers/guide/kest_lab)
+Unit testing with mocks, 17 integration tests, Docker Compose lab with SPIRE, OPA, Cedar, and Keycloak.
+
+### 📋 [Specification](/blog/design/kest_spec_v0.3.0)
+The full normative v0.3.0 specification — data models, interfaces, algorithms, edge cases, and conformance tests.
+
+### 📚 [API Reference](/developers/api)
+Language-agnostic interface specifications for PolicyEngine, IdentityProvider, TrustEvaluator, and all core models.
+
+## Quick Start
+
+```python
+from kest.core import configure, MockPolicyEngine, kest_verified
+
+# Configure once at startup
+configure(engine=MockPolicyEngine(allow=True))
+
+# Protect any function
+@kest_verified(policy="kest/allow_trusted", source_type="internal")
+def process_data(payload: dict):
+    return {"status": "processed"}
+
+# Call normally — Kest handles identity, signing, policy, and audit
+result = process_data({"key": "value"})
+```

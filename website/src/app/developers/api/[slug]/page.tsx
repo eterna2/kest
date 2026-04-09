@@ -42,7 +42,7 @@ export default async function APIPage({ params }: { params: Promise<{ slug: stri
           </div>
           <p style={{ fontSize: '1.2rem', color: 'var(--on-surface-variant)', lineHeight: 1.6 }}>{post.meta.description}</p>
         </div>
-        <MarkdownContent content={post.content} currentDir="reference" />
+        <MarkdownContent content={post.content} currentDir="reference" suppressFirstH1 />
         <PageNavigation
           prev={prev ? { slug: prev.slug, title: prev.meta.title } : null}
           next={next ? { slug: next.slug, title: next.meta.title } : null}

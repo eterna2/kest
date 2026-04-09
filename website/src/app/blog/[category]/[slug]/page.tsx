@@ -87,7 +87,7 @@ export default async function BlogPostPage({
         />
         <span>Ref: KST-{slug}</span>
       </div>
-      <MarkdownContent content={post!.content} currentDir={category} />
+      <MarkdownContent content={post!.content} currentDir={category} suppressFirstH1 />
       <PageNavigation
         prev={prev ? { slug: prev.slug, title: prev.meta.title } : null}
         next={next ? { slug: next.slug, title: next.meta.title } : null}

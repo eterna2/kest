@@ -2,93 +2,198 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { X, Info, BookOpen, Terminal, Layers } from 'lucide-react';
+import { useState } from 'react';
+import { X, Info, BookOpen, Terminal, Users, ChevronRight, Scroll } from 'lucide-react';
 
-export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
+interface NavChild {
+  label: string;
+  href: string;
+}
+
+interface NavSection {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  children?: NavChild[];
+}
+
+const NAV: NavSection[] = [
+  { label: 'Introduction', href: '/', icon: Info },
+  {
+    label: 'Journal',
+    href: '/blog',
+    icon: BookOpen,
+    children: [
+      { label: 'Design Principles',    href: '/blog/design/principles' },
+      { label: 'Why Kest?',            href: '/blog/design/overview' },
+      { label: 'Identity & Zero Trust',href: '/blog/design/secret_zero' },
+      { label: 'Merkle DAG Lineage',   href: '/blog/design/merkle_dag' },
+      { label: 'Audit Entry Schema',   href: '/blog/design/audit_entry' },
+      { label: 'Policy as Code',       href: '/blog/design/abac_policy' },
+      { label: 'Fail-Secure Edges',    href: '/blog/design/edge_cases' },
+    ],
+  },
+  { label: 'Specification', href: '/blog/design/kest_spec_v0.3.0', icon: Scroll },
+  {
+    label: 'Developer Portal',
+    href: '/developers',
+    icon: Terminal,
+    children: [
+      { label: 'Getting Started',      href: '/developers/guide/getting_started' },
+      { label: 'Trust Model',          href: '/developers/guide/trust_model' },
+      { label: 'Identity & Context',   href: '/developers/guide/identity_context' },
+      { label: 'Decorators Reference', href: '/developers/guide/decorators' },
+      { label: 'Middleware',           href: '/developers/guide/middleware' },
+      { label: 'Testing',              href: '/developers/guide/testing' },
+      { label: 'Kest Lab',             href: '/developers/guide/kest_lab' },
+    ],
+  },
+  { label: 'Collective', href: '/team', icon: Users },
+];
+
+export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
 
-  const navItems = [
-    { label: 'Introduction', href: '/', icon: Info },
-    { label: 'Journal', href: '/blog', icon: BookOpen },
-    { label: 'Portal', href: '/developers', icon: Terminal },
-    { label: 'Collective', href: '/team', icon: Layers },
-  ];
+  const initialOpen = NAV.reduce<Record<string, boolean>>((acc, s) => {
+    acc[s.href] =
+      s.href === pathname ||
+      (s.href !== '/' && pathname.startsWith(s.href));
+    return acc;
+  }, {});
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>(initialOpen);
+  const toggle = (href: string) => setOpenSections((p) => ({ ...p, [href]: !p[href] }));
 
   if (!isOpen) return null;
 
   return (
     <>
       {/* Backdrop */}
-      <div 
+      <div
         onClick={onClose}
         style={{
-          position: 'fixed',
-          inset: 0,
-          backgroundColor: 'rgba(0, 0, 0, 0.5)',
+          position: 'fixed', inset: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
           backdropFilter: 'blur(4px)',
-          zIndex: 140
+          zIndex: 140,
         }}
       />
-      
-      {/* Drawer — Glass Rule (DESIGN.md §2) */}
+
+      {/* Drawer */}
       <aside style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        bottom: 0,
+        position: 'fixed', top: 0, left: 0, bottom: 0,
         width: '280px',
-        /* Glass styling per DESIGN.md §2 */
-        backgroundColor: 'rgba(12, 19, 36, 0.85)',
+        backgroundColor: 'rgba(12, 19, 36, 0.92)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        /* Ghost border fallback (DESIGN.md §4) */
         borderRight: '1px solid var(--outline-variant-ghost)',
         zIndex: 150,
-        padding: '2rem 0',
         display: 'flex',
         flexDirection: 'column',
-        /* Deep Space Shadow (DESIGN.md §4) */
         boxShadow: 'var(--shadow-l4)',
-        animation: 'slideIn 0.3s ease-out'
+        animation: 'slideIn 0.3s ease-out',
+        overflowY: 'auto',
+        scrollbarWidth: 'none',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 2rem', marginBottom: '2rem', alignItems: 'center' }}>
+        {/* Header */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', padding: '2rem 1.5rem 1.5rem', alignItems: 'center' }}>
           <div>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--on-surface)', fontFamily: 'var(--font-display)' }}>
+            <h3 style={{ fontSize: '1.15rem', fontWeight: 800, margin: 0, color: 'var(--on-surface)', fontFamily: 'var(--font-display)' }}>
               <span className="gradient-text">Kest</span>
             </h3>
-            <p style={{ fontSize: '0.675rem', color: 'var(--primary)', letterSpacing: '0.2em', textTransform: 'uppercase', fontStyle: 'italic', fontWeight: 700 }}>
-              Documentation
+            <p style={{ fontSize: '0.6rem', color: 'var(--primary)', letterSpacing: '0.2em', textTransform: 'uppercase', fontStyle: 'italic', fontWeight: 700, marginTop: '0.15rem' }}>
+              v0.3.0 Docs
             </p>
           </div>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer' }}>
-             <X size={24} />
+            <X size={22} />
           </button>
         </div>
 
-        <nav style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-          {navItems.map((item) => {
-            const isActive = pathname === item.href;
+        {/* Nav */}
+        <nav style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {NAV.map((section) => {
+            const isOpen = openSections[section.href] ?? false;
+            const hasChildren = !!section.children?.length;
+            const isSectionActive =
+              pathname === section.href ||
+              (section.href !== '/' && pathname.startsWith(section.href));
+
             return (
-              <Link 
-                key={item.href} 
-                href={item.href} 
-                onClick={onClose}
-                className={isActive ? 'active-pill' : ''}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '1rem',
-                  padding: '1rem 2rem',
-                  fontSize: '0.9rem',
-                  color: isActive ? 'var(--primary)' : 'var(--on-surface-variant)',
-                  backgroundColor: isActive ? 'rgba(79, 70, 229, 0.1)' : 'transparent',
-                  textDecoration: 'none',
-                  transition: 'background 0.2s'
-                }}
-              >
-                <item.icon size={20} />
-                <span style={{ fontWeight: isActive ? 700 : 400, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{item.label}</span>
-              </Link>
+              <div key={section.href}>
+                <div style={{ display: 'flex', alignItems: 'center' }}>
+                  <Link
+                    href={section.href}
+                    onClick={onClose}
+                    style={{
+                      flex: 1,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.875rem',
+                      padding: '0.875rem 1.5rem',
+                      fontSize: '0.875rem',
+                      fontWeight: isSectionActive ? 700 : 500,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.06em',
+                      color: isSectionActive ? 'var(--primary)' : 'var(--on-surface-variant)',
+                      backgroundColor: isSectionActive ? 'rgba(79,70,229,0.08)' : 'transparent',
+                      textDecoration: 'none',
+                    }}
+                  >
+                    <section.icon size={17} />
+                    <span>{section.label}</span>
+                  </Link>
+
+                  {hasChildren && (
+                    <button
+                      onClick={() => toggle(section.href)}
+                      style={{
+                        background: 'none', border: 'none', cursor: 'pointer',
+                        padding: '0.875rem 1rem',
+                        color: isSectionActive ? 'var(--primary)' : 'var(--on-surface-variant)',
+                        opacity: 0.6,
+                        display: 'flex', alignItems: 'center',
+                      }}
+                    >
+                      <ChevronRight
+                        size={15}
+                        style={{
+                          transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                          transition: 'transform 0.2s ease',
+                        }}
+                      />
+                    </button>
+                  )}
+                </div>
+
+                {hasChildren && isOpen && (
+                  <div style={{ paddingBottom: '0.5rem' }}>
+                    {section.children!.map((child) => {
+                      const isChildActive = pathname === child.href;
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onClose}
+                          style={{
+                            display: 'block',
+                            padding: '0.5rem 1.5rem 0.5rem 3.5rem',
+                            fontSize: '0.8rem',
+                            color: isChildActive ? 'var(--primary)' : 'rgba(220,225,251,0.5)',
+                            fontWeight: isChildActive ? 600 : 400,
+                            borderLeft: isChildActive ? '2px solid var(--primary)' : '2px solid transparent',
+                            marginLeft: '1rem',
+                            textDecoration: 'none',
+                            lineHeight: 1.5,
+                          }}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             );
           })}
         </nav>
@@ -96,7 +201,7 @@ export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean, onC
         <style>{`
           @keyframes slideIn {
             from { transform: translateX(-100%); }
-            to { transform: translateX(0); }
+            to   { transform: translateX(0); }
           }
         `}</style>
       </aside>

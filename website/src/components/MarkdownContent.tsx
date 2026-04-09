@@ -1,7 +1,8 @@
 import { compileContent } from '@/lib/mdx';
 import { prefixPath } from '@/lib/utils';
-import CopyButton from './CopyButton';
+import ExpandableCode from './ExpandableCode';
 import Mermaid from './Mermaid';
+import ExpandableImage from './ExpandableImage';
 
 /**
  * Server-side markdown renderer using next-mdx-remote/rsc.
@@ -13,6 +14,7 @@ import Mermaid from './Mermaid';
  *
  * Mermaid code blocks (```mermaid) are rendered as interactive diagrams.
  * Tables are supported via remark-gfm.
+ * Images are expandable — click to open in a full-viewport lightbox.
  *
  * rehype-pretty-code adds:
  * - data-language attribute to <code> elements
@@ -41,28 +43,20 @@ function Pre({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>) {
   const language = typeof langAttr === 'string' ? langAttr : '';
   const rawCode = getTextContent(children);
 
-  // Mermaid diagrams → render as interactive SVG
+  // Mermaid diagrams → render as interactive SVG, wrapped in ExpandableCode header
   if (language === 'mermaid') {
     return (
-      <div className="code-block-wrapper">
-        <div className="code-block-header">
-          <span className="lang-label">diagram</span>
-          <CopyButton text={rawCode} />
-        </div>
+      <ExpandableCode language="diagram" rawCode={rawCode} noPreWrapper>
         <Mermaid chart={rawCode} />
-      </div>
+      </ExpandableCode>
     );
   }
 
-  // Regular code blocks → glass header + syntax-highlighted pre
+  // Regular code blocks → glass header + expand + copy + syntax-highlighted pre
   return (
-    <div className="code-block-wrapper">
-      <div className="code-block-header">
-        <span className="lang-label">{language}</span>
-        <CopyButton text={rawCode} />
-      </div>
-      <pre {...props}>{children}</pre>
-    </div>
+    <ExpandableCode language={language} rawCode={rawCode} preProps={props}>
+      {children}
+    </ExpandableCode>
   );
 }
 
@@ -71,21 +65,27 @@ function Figure({ children, ...props }: React.ComponentPropsWithoutRef<'figure'>
   return <figure {...props}>{children}</figure>;
 }
 
-// Custom img component to prefix basePath for static images in markdown content
+// Custom table component — wraps in a scrollable div so IDs/index never wrap
+function Table({ children, ...props }: React.ComponentPropsWithoutRef<'table'>) {
+  return (
+    <div className="table-scroll">
+      <table {...props}>{children}</table>
+    </div>
+  );
+}
+
+// Custom img component — renders as ExpandableImage (click to zoom in lightbox)
 function Img(props: React.ImgHTMLAttributes<HTMLImageElement>) {
   const { src, alt, ...rest } = props;
   const resolvedSrc = typeof src === 'string' && src.startsWith('/') ? prefixPath(src) : src;
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
+    <ExpandableImage
       src={resolvedSrc}
       alt={alt || ''}
       {...rest}
       style={{
         maxWidth: '100%',
         height: 'auto',
-        // Cap height so landscape diagrams (stored as 1:1 with black padding)
-        // don't appear excessively tall on the page.
         maxHeight: '520px',
         display: 'block',
         borderRadius: '12px',
@@ -105,13 +105,42 @@ function Anchor(props: React.AnchorHTMLAttributes<HTMLAnchorElement>) {
   return <a href={resolvedHref} {...rest} />;
 }
 
-export default async function MarkdownContent({ content, currentDir }: { content: string; currentDir?: string }) {
-  const { content: renderedContent } = await compileContent(content, {
+// Builds a H1 component that suppresses the FIRST h1 only (used when the
+// page template already renders the title from frontmatter to prevent duplication)
+function makeSuppressedH1() {
+  let seen = false;
+  return function H1({ children, ...props }: React.ComponentPropsWithoutRef<'h1'>) {
+    if (!seen) {
+      seen = true;
+      return null; // swallow the first h1
+    }
+    return <h1 {...props}>{children}</h1>;
+  };
+}
+
+export default async function MarkdownContent({
+  content,
+  currentDir,
+  suppressFirstH1 = false,
+}: {
+  content: string;
+  currentDir?: string;
+  suppressFirstH1?: boolean;
+}) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const components: Record<string, React.ComponentType<any>> = {
     pre: Pre,
     figure: Figure,
+    table: Table,
     img: Img,
     a: Anchor,
-  }, currentDir);
+  };
+
+  if (suppressFirstH1) {
+    components.h1 = makeSuppressedH1();
+  }
+
+  const { content: renderedContent } = await compileContent(content, components, currentDir);
 
   return (
     <div className="md-body">
