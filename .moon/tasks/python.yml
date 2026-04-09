@@ -27,3 +27,9 @@ tasks:
     command: "uv run ruff format ."
     deps:
       - "install"
+      - "isort"
+
+  isort:
+    command: "uv run ruff check --select I --fix ."
+    deps:
+      - "install"

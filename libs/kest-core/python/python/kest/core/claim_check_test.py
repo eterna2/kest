@@ -1,14 +1,14 @@
-from opentelemetry import baggage
 import opentelemetry.context as otel_context
+from opentelemetry import baggage
 
 from kest.core import (
-    kest_verified,
-    configure,
+    BaggageManager,
     MockIdentityProvider,
     MockPolicyEngine,
-    SimpleCache,
-    BaggageManager,
     Passport,
+    SimpleCache,
+    configure,
+    kest_verified,
 )
 
 
@@ -84,14 +84,18 @@ def test_claim_check_failure_no_cache():
 
     try:
         import pytest
-        with pytest.raises(RuntimeError, match="no cache backend configured for retrieval"):
+
+        with pytest.raises(
+            RuntimeError, match="no cache backend configured for retrieval"
+        ):
             BaggageManager.unpack(baggage.get_baggage, cache=None)
     finally:
         otel_context.detach(token)
 
+
 def test_claim_check_expired_ttl_fails_closed():
     """
-    F-GC-02: If the Cache TTL expires... the claim check fails. 
+    F-GC-02: If the Cache TTL expires... the claim check fails.
     The implementation MUST fail securely.
     """
     shared_cache = SimpleCache()
@@ -101,12 +105,13 @@ def test_claim_check_expired_ttl_fails_closed():
         cache=shared_cache,
         clear=True,
     )
-    
+
     ctx = baggage.set_baggage("kest.claim_check", "some-expired-id")
     token = otel_context.attach(ctx)
 
     try:
         import pytest
+
         with pytest.raises(RuntimeError, match="NOT FOUND in cache"):
             BaggageManager.unpack(baggage.get_baggage, cache=shared_cache)
     finally:

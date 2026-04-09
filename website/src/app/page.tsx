@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Terminal, Code, Shield, BookOpen, Cpu, ArrowRight } from 'lucide-react';
 import BentoCard from '@/components/BentoCard';
+import SketchyHighlight from '@/components/SketchyHighlight';
 import { getAllPosts } from '@/lib/mdx';
 import { prefixPath } from '@/lib/utils';
 
@@ -30,14 +31,20 @@ export default function Home() {
             fontWeight: 800, 
             letterSpacing: '0.2em', 
             color: 'var(--primary)', 
-            textTransform: 'uppercase' 
+            textTransform: 'uppercase',
+            position: 'relative',
+            zIndex: 1
           }}>
-            Zero Trust Execution Lineage
+            <SketchyHighlight type="underline" color="var(--primary)" strokeWidth={2} animationDuration={800}>
+              Zero Trust Execution Lineage
+            </SketchyHighlight>
           </span>
 
           {/* Display-md headline */}
-          <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', lineHeight: 1.05, margin: 0, fontFamily: 'var(--font-display)' }}>
-            <span className="gradient-text">Key Trust.</span><br />
+          <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', lineHeight: 1.05, margin: 0, fontFamily: 'var(--font-display)', position: 'relative', zIndex: 1 }}>
+            <SketchyHighlight type="highlight" color="var(--secondary-container)" animationDuration={1000}>
+              <span className="gradient-text">Key Trust.</span>
+            </SketchyHighlight><br />
             Verified Lineage for AI.
           </h1>
 
@@ -131,7 +138,7 @@ export default function Home() {
           tag="Architecture"
           title="Design Specification"
           description="Deep-dive into the Secret Zero problem, Merkle DAG lineage, ABAC policy enforcement, and edge case handling."
-          href="/blog/design/overview"
+          href="/concepts/design/overview"
           icon={<Code size={24} />}
         />
       </section>
@@ -191,9 +198,9 @@ export default function Home() {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
              {[
-               { title: 'Workload Identity (SPIFFE)', desc: 'Replace static API keys with dynamically rotated X509-SVIDs.', href: '/blog/infra/spire' },
-               { title: 'Cryptographic Lineage', desc: 'Merkle DAGs over OpenTelemetry baggage. Every hop is signed via JWS.', href: '/blog/design/merkle_dag' },
-               { title: 'Policy as Code (OPA/Cedar)', desc: 'Continuous authorization using ABAC policies at every hop.', href: '/blog/design/abac_policy' },
+               { title: 'Workload Identity (SPIFFE)', desc: 'Replace static API keys with dynamically rotated X509-SVIDs.', href: '/concepts/infra/spire' },
+               { title: 'Cryptographic Lineage', desc: 'Merkle DAGs over OpenTelemetry baggage. Every hop is signed via JWS.', href: '/concepts/design/merkle_dag' },
+               { title: 'Policy as Code (OPA/Cedar)', desc: 'Continuous authorization using ABAC policies at every hop.', href: '/concepts/design/abac_policy' },
              ].map((concept) => (
                 <Link key={concept.href} href={concept.href} style={{ textDecoration: 'none' }}>
                   <div style={{ position: 'relative', paddingLeft: '1.5rem' }}>

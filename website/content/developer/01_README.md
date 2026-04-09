@@ -7,13 +7,15 @@ Welcome to the Kest Developer Guide. This section takes you from zero to a fully
 | Step | Article | What You'll Learn |
 |---|---|---|
 | 1 | [Getting Started](getting_started) | Installation, configuration, your first `@kest_verified` function |
-| 2 | [Trust Model](trust_model) | CARTA trust scores, degradation, sanitizers, `ORIGIN_TRUST_MAP` |
-| 3 | [Identity & Context](identity_context) | Identity providers, user/agent/task context, auto-detection |
-| 4 | [Decorators Reference](decorators) | Every `@kest_verified` parameter, the 13-step lifecycle |
-| 5 | [Distributed Propagation](middleware) | Middleware stack, `KestMiddleware`, `KestHttpxInterceptor`, Claim Check |
-| 6 | [Testing & Kest Lab](testing) | `MockPolicyEngine`, unit tests, the kest-lab integration environment |
-| 7 | [Telemetry & Visualization](visualization) | OTel setup, exporters, `kest-viz` CLI |
+| 2 | [Decorators Reference](decorators) | Every `@kest_verified` parameter, the 13-step lifecycle |
+| 3 | [Distributed Propagation](middleware) | Middleware stack, `KestMiddleware`, `KestHttpxInterceptor`, Claim Check |
+| 4 | [Trust Model](trust_model) | CARTA trust scores, degradation, sanitizers, `ORIGIN_TRUST_MAP` |
+| 5 | [Identity & Context](identity_context) | Identity providers, user/agent/task context, auto-detection |
+| 6 | [Telemetry & Visualization](telemetry) | OTel setup, exporters, `kest-viz` CLI |
+| 7 | [Testing & Kest Lab](testing) | `MockPolicyEngine`, unit tests, the kest-lab integration environment |
 | 8 | [Kest Lab Deep Dive](kest_lab) | Docker Compose architecture, SPIRE, OPA, Cedar, Keycloak, 17 integration tests |
+| 9 | [3-Hop Distributed Verification](distributed_verification) | Example: Verifying cryptographic lineage across three distinct distributed services |
+| 10 | [Scope-Delegated Gateway E2E](gateway_e2e) | Example: Full Zero Trust delegation flow with token contents and policy context |
 
 ## Prerequisites
 

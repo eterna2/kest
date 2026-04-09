@@ -1,7 +1,9 @@
-import pytest
 from pathlib import Path
+
+import pytest
 from regopy import Interpreter
-from .testing_utils import HAS_REGOPY, is_allowed, HAS_CEDAR, is_cedar_allowed
+
+from .testing_utils import HAS_CEDAR, HAS_REGOPY, is_allowed, is_cedar_allowed
 
 
 @pytest.mark.opa

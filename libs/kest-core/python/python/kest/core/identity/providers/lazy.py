@@ -1,6 +1,6 @@
-import hashlib
 import base64
 import concurrent.futures
+import hashlib
 
 from kest.core.identity.base import IdentityProvider
 

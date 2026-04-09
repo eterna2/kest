@@ -1,8 +1,9 @@
-import pytest
 import base64
 import json
 
-from kest.core.identity.providers.bedrock import BedrockAgentIdentity, HAS_BOTO3
+import pytest
+
+from kest.core.identity.providers.bedrock import HAS_BOTO3, BedrockAgentIdentity
 
 if HAS_BOTO3:
     from moto import mock_aws

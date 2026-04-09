@@ -181,4 +181,4 @@ Now `@kest_verified(policy="kest/allow_trusted")` will make real HTTP calls to O
 
 ---
 
-*For the complete API specification, see [Spec §5](../blog/design/kest_spec_v0.3.0).*
+*For the complete API specification, see [Spec §5](../concepts/design/kest_spec_v0.3.0).*

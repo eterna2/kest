@@ -206,4 +206,4 @@ Current suite health:
 
 ---
 
-*For a deep dive into the lab architecture, see [Kest Lab Deep Dive](kest_lab). For the full spec on edge-case testing, see [Spec §11](../blog/design/kest_spec_v0.3.0).*
+*For a deep dive into the lab architecture, see [Kest Lab Deep Dive](kest_lab). For the full spec on edge-case testing, see [Spec §11](../concepts/design/kest_spec_v0.3.0).*

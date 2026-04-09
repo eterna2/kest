@@ -1,4 +1,4 @@
-# Non-Fungible Audit
+# KestEntry: The Non-Fungible Audit Schema
 
 Every `KestEntry` is a self-contained, cryptographically signed audit record. Unlike traditional log lines — which are mutable text that can be silently altered — Kest entries are **non-fungible**: tamper-evident, non-repudiable, and permanently linked to their predecessors.
 

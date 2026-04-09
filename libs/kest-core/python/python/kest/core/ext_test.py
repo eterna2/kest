@@ -1,12 +1,13 @@
-import pytest
 import httpx
-from opentelemetry import baggage, trace
 import opentelemetry.context as otel_context
+import pytest
+from opentelemetry import baggage, trace
+
 from kest.core.ext import (
-    KestMiddleware,
-    KestHttpxInterceptor,
     _LAB_BAGGAGE_STORE,
     _LAB_LOCK,
+    KestHttpxInterceptor,
+    KestMiddleware,
 )
 
 

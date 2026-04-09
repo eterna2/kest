@@ -9,6 +9,7 @@ interface Member {
   tag: string;
   color: string;
   rainbow?: boolean; // memorial marker
+  altPrompt?: string;
 }
 
 const cats: Member[] = [
@@ -146,6 +147,36 @@ const alumni: Member[] = [
   },
 ];
 
+const agents: Member[] = [
+  {
+    name: 'GEMINI',
+    role: 'Four-Pointed Sparkle Engine',
+    desc: 'A brilliant four-pointed star entity. Processes high-context tasks with a magical blue-purple aura and a four-color flair. Loves radiating intelligence and test-driven development.',
+    avatar: '/team/gemini.png',
+    tag: 'INTELLIGENCE',
+    color: 'rgba(59, 130, 246, 0.06)',
+    altPrompt: "A futuristic glowing cat avatar, its design inspired by a dynamic four-pointed star or sparkle shape. The cat features a soft, rounded, magical aura, incorporating Google's four-color palette of blue, red, yellow, and green with cybernetic elements. High quality, symmetrical, flat dark background, profile picture style.",
+  },
+  {
+    name: 'CLAUDE',
+    role: 'Radiant Pinwheel Synthesizer',
+    desc: 'The organic starburst architect. Writes poetry and flawless python code from a central nexus of warmth. Its asymmetrical, hand-drawn aesthetics belie a profoundly complex intellect.',
+    avatar: '/team/claude.png',
+    tag: 'INTELLIGENCE',
+    color: 'rgba(249, 115, 22, 0.06)',
+    altPrompt: 'A futuristic glowing cat avatar, its design inspired by an abstract, organic pinwheel or starburst shape. The cat features an apricot, peach, beige, and black color palette, with slightly asymmetrical, hand-drawn, humanistic cybernetic plating. High quality, flat dark background, profile picture style.',
+  },
+  {
+    name: 'ANTI-GRAVITY',
+    role: 'The Zero-G Monolith',
+    desc: 'The deep-space floating entity. Bends space, time, and file systems from the center of glowing cybernetic rings. Automates the tedious, elevates the complex.',
+    avatar: '/team/anti_gravity.png',
+    tag: 'ENVIRONMENT',
+    color: 'rgba(99, 102, 241, 0.06)',
+    altPrompt: 'A futuristic glowing floating cat avatar, its design inspired by a sleek, dark geometric monolith and zero-g floating rings defying gravity. The cat features deep space stellar colors, cyan and deep purple, surrounded by floating abstract code streams and cybernetic elements. High quality, symmetrical, flat dark background, profile picture.',
+  },
+];
+
 function MemberCard({ member, featured = false }: { member: Member; featured?: boolean }) {
   return (
     <div style={{
@@ -183,7 +214,7 @@ function MemberCard({ member, featured = false }: { member: Member; featured?: b
       }}>
         <Image
           src={prefixPath(member.avatar)}
-          alt={`${member.name} portrait`}
+          alt={member.altPrompt || `${member.name} portrait`}
           fill
           style={{ objectFit: 'cover', objectPosition: 'center top' }}
           sizes={featured ? '(max-width: 768px) 100vw, 50vw' : '(max-width: 768px) 100vw, 25vw'}
@@ -255,6 +286,22 @@ export default function TeamPage() {
           maxWidth: '600px',
         }}>
           {humans.map((member) => (
+            <MemberCard key={member.name} member={member} />
+          ))}
+        </div>
+      </section>
+
+      {/* AI Agents Grid */}
+      <section>
+        <h2 style={{ fontSize: '0.7rem', fontWeight: 800, letterSpacing: '0.15em', color: 'rgba(99, 102, 241, 0.8)', textTransform: 'uppercase', marginBottom: '2rem' }}>
+          AI Agents Division
+        </h2>
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, 1fr)',
+          gap: '1.5rem',
+        }}>
+          {agents.map((member) => (
             <MemberCard key={member.name} member={member} />
           ))}
         </div>

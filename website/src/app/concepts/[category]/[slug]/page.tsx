@@ -48,7 +48,7 @@ export default async function BlogPostPage({
         }}
       >
         <Link
-          href="/blog"
+          href="/concepts"
           style={{
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
@@ -56,7 +56,7 @@ export default async function BlogPostPage({
             textDecoration: 'none',
           }}
         >
-          Journal
+          Concepts
         </Link>
         <span>/</span>
         <span style={{ color: 'var(--primary)', fontWeight: 600 }}>
@@ -91,7 +91,7 @@ export default async function BlogPostPage({
       <PageNavigation
         prev={prev ? { slug: prev.slug, title: prev.meta.title } : null}
         next={next ? { slug: next.slug, title: next.meta.title } : null}
-        basePath={`/blog/${category}`}
+        basePath={`/concepts/${category}`}
       />
     </div>
   );

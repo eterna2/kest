@@ -115,4 +115,4 @@ for span in spans:
 
 ---
 
-*For the integration test environment that uses all telemetry features, see [Kest Lab Deep Dive](kest_lab). For the OTel specification, see [Spec §10](../blog/design/kest_spec_v0.3.0).*
+*For the integration test environment that uses all telemetry features, see [Kest Lab Deep Dive](kest_lab). For the OTel specification, see [Spec §10](../concepts/design/kest_spec_v0.3.0).*

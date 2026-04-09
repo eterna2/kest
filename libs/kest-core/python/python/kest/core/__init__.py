@@ -8,41 +8,42 @@ This package provides the core Python implementation of Kest, including:
 - Distributed propagation via OpenTelemetry.
 """
 
-from kest.core._core import version, KestEntry
-from kest.core.engine import (
-    PolicyEngine,
-    MockPolicyEngine,
-    OPAPolicyEngine,
-    CedarPolicyEngine,
-    CedarLocalEngine,
-    RegoLocalEngine,
-    AVPPolicyEngine,
-    PolicyCache,
-)
-from kest.core.identity import (
-    IdentityProvider,
-    get_default_identity,
-    MockIdentityProvider,
-    SPIREProvider,
-    LazySigningProvider,
-    AWSWorkloadIdentity,
-    BedrockAgentIdentity,
-    OIDCIdentity,
-    StaticIdentity,
-    LocalEd25519Provider,
-)
+from typing import Any
+
+from kest.core._core import KestEntry, version
 from kest.core.cache import CacheProvider, SimpleCache
 from kest.core.decorators import kest_verified
+from kest.core.engine import (
+    AVPPolicyEngine,
+    CedarLocalEngine,
+    CedarPolicyEngine,
+    MockPolicyEngine,
+    OPAPolicyEngine,
+    PolicyCache,
+    PolicyEngine,
+    RegoLocalEngine,
+)
+from kest.core.ext import KestHttpxInterceptor, KestMiddleware
+from kest.core.identity import (
+    AWSWorkloadIdentity,
+    BedrockAgentIdentity,
+    IdentityProvider,
+    LazySigningProvider,
+    LocalEd25519Provider,
+    MockIdentityProvider,
+    OIDCIdentity,
+    SPIREProvider,
+    StaticIdentity,
+    get_default_identity,
+)
 from kest.core.models import (
-    Passport,
-    TrustEvaluator,
-    DefaultTrustEvaluator,
-    PassportVerifier,
     BaggageManager,
+    DefaultTrustEvaluator,
+    Passport,
+    PassportVerifier,
+    TrustEvaluator,
     register_origin_trust,
 )
-from kest.core.ext import KestMiddleware, KestHttpxInterceptor
-from typing import Any
 
 _active_engine: PolicyEngine | None = None
 _active_identity: IdentityProvider | None = None
@@ -74,7 +75,12 @@ def configure(
         deviations: (Optional) List of PolicyDeviations for bypassing baseline policies.
         clear: If True, resets all global configurations to None.
     """
-    global _active_engine, _active_identity, _active_cache, _active_enterprise_policies, _active_deviations
+    global \
+        _active_engine, \
+        _active_identity, \
+        _active_cache, \
+        _active_enterprise_policies, \
+        _active_deviations
     if clear:
         _active_engine = None
         _active_identity = None

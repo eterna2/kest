@@ -1,10 +1,10 @@
-import uuid
-import json
 import base64
 import hashlib
-from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any, TypedDict
+import json
+import uuid
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, TypedDict
 
 
 @dataclass
@@ -18,6 +18,26 @@ class Passport:
     """
 
     entries: List[str] = field(default_factory=list)
+
+    @staticmethod
+    def merge(*passports: "Passport") -> "Passport":
+        """
+        Merges multiple passports, deduplicating entries while preserving topological order.
+
+        Args:
+            *passports: Passport instances to merge.
+
+        Returns:
+            Passport: A new Passport instance containing the union of all entries.
+        """
+        seen = set()
+        merged_entries = []
+        for p in passports:
+            for entry in p.entries:
+                if entry not in seen:
+                    seen.add(entry)
+                    merged_entries.append(entry)
+        return Passport(entries=merged_entries)
 
     def add_signature(self, signature: str):
         """
@@ -57,7 +77,7 @@ class Passport:
 
 class PassportVerifier:
     """
-    Utility to verify the integrity and authenticity of a Passport chain.
+    Utility to verify the integrity and authenticity of a Passport graph (DAG).
 
     The verifier checks both the cryptographic signatures of individual entries
     and the Merkle links between entries to ensure the lineage is untampered.
@@ -66,7 +86,7 @@ class PassportVerifier:
     @staticmethod
     def verify(passport: Passport, providers: Dict[str, Any]) -> bool:
         """
-        Verifies all signatures and Merkle links in the passport.
+        Verifies all signatures and Merkle links in the passport DAG.
 
         Args:
             passport: The Passport instance to verify.
@@ -78,7 +98,7 @@ class PassportVerifier:
         Raises:
             ValueError: If a signature is invalid or a Merkle link is broken.
         """
-        last_signature_hash = "0"
+        seen_hashes = {"0"}
 
         for signature in passport.entries:
             # 1. Split JWS (header.payload.signature)
@@ -95,20 +115,19 @@ class PassportVerifier:
             payload_json = base64.urlsafe_b64decode(payload_b64 + padding).decode()
             payload = json.loads(payload_json)
 
-            # 3. Verify Merkle Link
+            # 3. Verify Merkle Links (DAG verification)
             parents = payload.get("parent_ids", [])
-            parent_hash = parents[0] if parents else "0"
+            if not parents:
+                parents = ["0"]
 
-            if parent_hash != last_signature_hash:
-                raise ValueError(
-                    f"Merkle link broken. Expected {last_signature_hash}, got {parent_hash}"
-                )
+            for pid in parents:
+                if pid not in seen_hashes:
+                    raise ValueError(
+                        f"Merkle link broken or out of order. Parent {pid} not yet seen. "
+                        "Lineage must be in topological order."
+                    )
 
             # 4. Verify Signature for providers that expose a public key.
-            # No silent bypass for test/pending signatures: every entry MUST
-            # be either verifiable (if provider present) or skipped gracefully
-            # (if provider absent) — but never silently accepted based on
-            # the *content* of the signature string.
             principal = payload.get("principal") or payload.get("labels", {}).get(
                 "principal"
             )
@@ -125,8 +144,9 @@ class PassportVerifier:
                         f"Signature verification failed for {principal}: {e}"
                     )
 
-            # Update last hash for next iteration
-            last_signature_hash = hashlib.sha256(signature.encode()).hexdigest()
+            # Update seen_hashes for next iteration
+            current_hash = hashlib.sha256(signature.encode()).hexdigest()
+            seen_hashes.add(current_hash)
 
         return True
 
@@ -254,8 +274,13 @@ class BaggageManager:
 # Keys and values defined below are MANDATORY defaults.
 # They MUST NOT be overridden; use register_origin_trust() to ADD new entries.
 _MANDATORY_ORIGIN_KEYS = {
-    "system", "internal", "verified_rag",
-    "third_party_api", "user_input", "internet", "llm",
+    "system",
+    "internal",
+    "verified_rag",
+    "third_party_api",
+    "user_input",
+    "internet",
+    "llm",
 }
 
 ORIGIN_TRUST_MAP: dict = {

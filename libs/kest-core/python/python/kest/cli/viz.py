@@ -1,8 +1,8 @@
 import argparse
-import json
-import sqlite3
-import os
 import base64
+import json
+import os
+import sqlite3
 
 
 def parse_spans_from_file(path: str):

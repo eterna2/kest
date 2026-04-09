@@ -1,8 +1,10 @@
 import json
 import sqlite3
+
 from opentelemetry import trace
 from opentelemetry.sdk.trace import TracerProvider
-from kest.core.telemetry import FileSpanExporter, SQLiteSpanExporter, KestTelemetry
+
+from kest.core.telemetry import FileSpanExporter, KestTelemetry, SQLiteSpanExporter
 
 
 def test_file_span_exporter(tmp_path):

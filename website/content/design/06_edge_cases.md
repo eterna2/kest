@@ -1,4 +1,4 @@
-# Fail-Secure by Default
+# Fail-Secure Edge Case Handling
 
 Kest's fourth principle (P4) mandates that **any failure mode must result in denial**, not a degraded-but-allowed path. This article documents every edge case the spec addresses and how Kest handles each one.
 
@@ -13,6 +13,7 @@ Kest's fourth principle (P4) mandates that **any failure mode must result in den
 | Clock skew between nodes | Timestamps informational only | §11.5 |
 | Empty policy list | Reject at configuration time | §11.6 |
 | Concurrent async execution | Task-local context isolation | §11.7 |
+| DAG topology violations | Topological order enforced | §11.8 |
 
 ## Policy Sidecar Unreachable (§11.1)
 
@@ -136,3 +137,93 @@ graph TD
 ---
 
 *For the full normative edge-case handling, see [Spec §11](kest_spec_v0.3.0).*
+
+## DAG Topology Violations (§11.8)
+
+The `PassportVerifier` enforces a strict **topological ordering contract**: every parent entry must appear in the Passport before any child that references it. Violations are caught at verification time with a `ValueError`.
+
+### Orphaned Parent Reference
+
+**Condition**: An entry's `parent_ids` contains a hash that does not correspond to any prior entry in the Passport.
+
+**Required behaviour**: Raise a `ValueError` immediately. The chain is broken and cannot be trusted.
+
+```python
+# sig_c claims parent=hash(sig_b), but sig_b is not in the passport
+passport = Passport(entries=[sig_a, sig_c])  # sig_b is missing
+
+# This raises ValueError: "parent hash not in seen entries"
+PassportVerifier.verify(passport, providers={...})
+```
+
+**Common causes:**
+- A branch's entries were not included when merging lineages
+- Using `kest.chain_tip` baggage without a corresponding `kest.passport` entry
+- Manual Passport construction that skips intermediate entries
+
+**Mitigation**: Always use `Passport.merge()` to combine branches — it guarantees all entries from contributing lineages are present and ordered correctly.
+
+### Out-of-Order Entries
+
+**Condition**: A child entry appears in the Passport before one of its parents.
+
+**Required behaviour**: The parent's hash will not yet be in `seen_hashes` when the child is processed, causing a `ValueError`. This is equivalent to an orphaned parent reference from the verifier's perspective.
+
+```python
+# sig_b has parent=hash(sig_a), but is placed first in the list
+passport = Passport(entries=[sig_b, sig_a])  # wrong order
+
+# Raises ValueError — sig_a's hash not seen when processing sig_b
+PassportVerifier.verify(passport, providers={...})
+```
+
+**Why this matters**: Unlike a linear chain where ordering is self-evident, a DAG can have multiple valid topological orderings (topo-sorts). Kest requires one of them — not necessarily the original execution order — but parents MUST precede children. `Passport.merge()` guarantees this.
+
+### Fan-In Without Merge
+
+**Condition**: A downstream step in a Fan-In topology does not include all branch entries in the Passport.
+
+```python
+# Diamond: A → B, A → C, {B,C} → D
+# Correct: Passport contains [sig_a, sig_b, sig_c, sig_d]
+# Incorrect: Passport contains only [sig_a, sig_b, sig_d] — sig_c is missing
+#            but sig_d.parent_ids = [hash(sig_b), hash(sig_c)]
+```
+
+**Required behaviour**: `ValueError` when `hash(sig_c)` is not found in `seen_hashes` during processing of `sig_d`.
+
+**Mitigation**: When performing a Fan-In, always merge ALL branch passports before the convergence step:
+
+```python
+# After parallel execution:
+merged = Passport.merge(branch_a_passport, branch_b_passport)
+
+# Now set merged as the active passport before calling the merge-point function
+```
+
+### Trust Score in Multi-Parent Nodes
+
+**Condition**: When an entry has multiple parents with different trust scores or taint sets.
+
+**Required behaviour**: Apply the **pessimistic** strategy:
+- `trust_score` = minimum of all parents' trust scores
+- `taints` = union of all parents' taint sets
+
+```python
+# parent_a: trust_score=80, taints=[]
+# parent_b: trust_score=40, taints=["user_input"]
+# merge node: trust_score=40, taints=["user_input"]  ← pessimistic
+```
+
+This follows from Principle P4 (Fail-Secure) — when merging lineages, the weakest link in any branch defines the trust level of the merged result.
+
+### Cyclic Reference (Impossibility Guarantee)
+
+**Condition**: An entry attempts to reference a future entry as its parent.
+
+**Required behaviour**: This is structurally impossible — `parent_ids` contains SHA-256 hashes. A hash can only reference something that already exists. A JWS cannot hash itself. Therefore, **cycles cannot be introduced in a correctly implemented Passport** and require no explicit cycle-detection in the verifier.
+
+---
+
+*For the full normative edge-case handling, see [Spec §11](kest_spec_v0.3.0). For the DAG topology model, see [Merkle DAG](merkle_dag).*
+

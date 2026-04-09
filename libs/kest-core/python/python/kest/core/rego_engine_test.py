@@ -1,8 +1,10 @@
 """Unit tests for RegoLocalEngine."""
 
 import importlib.util
+
 import pytest
-from kest.core.engine import RegoLocalEngine, PolicyCache
+
+from kest.core.engine import PolicyCache, RegoLocalEngine
 
 HAS_REGOPY = importlib.util.find_spec("regopy") is not None
 

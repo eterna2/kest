@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Menu, Terminal } from 'lucide-react';
+import { Menu, Terminal, Pencil, Moon } from 'lucide-react';
+import { useTheme } from './ThemeProvider';
 import GlobalSearch from './GlobalSearch';
 import type { SearchItem } from './GlobalSearch';
 
@@ -11,6 +12,8 @@ interface TopNavBarProps {
 }
 
 export default function TopNavBar({ onMenuClick, searchItems = [] }: TopNavBarProps) {
+  const { theme, toggleTheme, mounted } = useTheme();
+
   return (
     <header style={{
       position: 'fixed',
@@ -22,8 +25,8 @@ export default function TopNavBar({ onMenuClick, searchItems = [] }: TopNavBarPr
       display: 'flex',
       alignItems: 'center',
       padding: '0 2rem',
-      backgroundColor: 'rgba(12, 19, 36, 0.6)',
-      backdropFilter: 'blur(20px)',
+      backgroundColor: mounted && theme === 'scratchpad' ? 'rgba(250, 246, 240, 0.8)' : 'rgba(12, 19, 36, 0.6)',
+      backdropFilter: mounted && theme === 'scratchpad' ? 'none' : 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       borderBottom: '1px solid var(--outline-variant-ghost)',
       boxShadow: 'var(--shadow-l4)',
@@ -54,9 +57,9 @@ export default function TopNavBar({ onMenuClick, searchItems = [] }: TopNavBarPr
         fontWeight: 500,
         color: 'var(--on-surface-variant)'
       }} className="hidden md:flex">
-        <Link href="/blog" style={{ color: 'inherit', textDecoration: 'none' }}>Journal</Link>
+        <Link href="/concepts" style={{ color: 'inherit', textDecoration: 'none' }}>Concepts</Link>
         <Link href="/developers" style={{ color: 'inherit', textDecoration: 'none' }}>Portal</Link>
-        <Link href="/team" style={{ color: 'inherit', textDecoration: 'none' }}>Collective</Link>
+        <Link href="/team" style={{ color: 'inherit', textDecoration: 'none' }}>The Clowder</Link>
       </nav>
 
       {/* Action Area */}
@@ -65,6 +68,14 @@ export default function TopNavBar({ onMenuClick, searchItems = [] }: TopNavBarPr
         <div className="hidden sm:flex">
           <GlobalSearch items={searchItems} compact placeholder="Search insights..." />
         </div>
+
+        <button 
+          onClick={toggleTheme} 
+          style={{ background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer', display: 'flex' }}
+          aria-label={`Switch to ${theme === 'obsidian' ? 'scratchpad' : 'obsidian'} theme`}
+        >
+          {mounted && theme === 'scratchpad' ? <Moon size={18} /> : <Pencil size={18} />}
+        </button>
 
         <a href="https://github.com/eterna2/kest" target="_blank" rel="noreferrer" style={{ color: 'var(--on-surface-variant)', display: 'flex' }} aria-label="View source on GitHub">
           <Terminal size={20} />

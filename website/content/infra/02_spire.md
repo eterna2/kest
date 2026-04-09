@@ -1,4 +1,4 @@
-# Deploying Workload Identity
+# SPIFFE/SPIRE Integration
 
 Kest relies heavily on robust cryptographic identities to provide non-repudiation guarantees. While SPIFFE/SPIRE is the recommended, production-grade identity control plane, Kest v0.3.0 decoupled strict SPIFFE reliance to support various environments.
 

@@ -209,4 +209,4 @@ async def charge_payment(order: dict):
 
 ---
 
-*For edge cases (oversized passports, missing claim checks), see [Fail-Secure by Default](/blog/design/edge_cases). For the full specification, see [Spec §8](../blog/design/kest_spec_v0.3.0).*
+*For edge cases (oversized passports, missing claim checks), see [Fail-Secure by Default](/concepts/design/edge_cases). For the full specification, see [Spec §8](../concepts/design/kest_spec_v0.3.0).*

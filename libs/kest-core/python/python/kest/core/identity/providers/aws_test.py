@@ -1,8 +1,9 @@
-import pytest
 import base64
 import json
 
-from kest.core.identity.providers.aws import AWSWorkloadIdentity, HAS_BOTO3
+import pytest
+
+from kest.core.identity.providers.aws import HAS_BOTO3, AWSWorkloadIdentity
 
 if HAS_BOTO3:
     from moto import mock_aws

@@ -1,4 +1,4 @@
-# Non-Fungible Audit Trails
+# Cryptographic Audit Trails
 
 In conventional architectures, application logs are typically forwarded to a centralized logging server (e.g., Elasticsearch, Splunk) as flat text or JSON objects. This model is fundamentally flawed from a security and compliance perspective.
 

@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@300;400;500;600&family=Fira+Code:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&family=Inter:wght@300;400;500;600&family=Fira+Code:wght@400;500&family=Architects+Daughter&family=Patrick+Hand&display=swap');
 
 :root {
   /* Colors - Obsidian Lens Palette (DESIGN.md §2) */
@@ -818,3 +818,228 @@ body {
   max-width: 100%;
   height: auto;
 }
+
+/* ========================================
+   Scratchpad Mode — Sketchy Light Theme
+   ======================================== */
+
+[data-theme="scratchpad"] {
+  /* Colors - Warm Paper / Parchment Tint */
+  --background: #faf6f0;
+  --surface: #f5f0e8;
+  --surface-dim: #ede7db;
+  --surface-bright: #ffffff;
+  --surface-container-lowest: #ffffff;
+  --surface-container-low: #f5f0e8;
+  --surface-container: #ede7db;
+  --surface-container-high: #e8e1d4;
+  --surface-container-highest: #ddd6c8;
+  --primary: #2c3e50;
+  --primary-container: #e74c3c;
+  --on-primary: #ffffff;
+  --on-primary-container: #2c3e50;
+  --secondary: #e74c3c;
+  --secondary-container: #fce4e4;
+  --on-secondary: #2c2c2c;
+  --on-surface: #2c2c2c;
+  --on-surface-variant: #555555;
+  --outline: #999999;
+  --outline-variant: #cccccc;
+  --outline-variant-ghost: rgba(0, 0, 0, 0.12);
+
+  /* Typography — hand-drawn fonts */
+  --font-display: 'Architects Daughter', cursive;
+  --font-body: 'Patrick Hand', cursive;
+  /* --font-mono stays Fira Code */
+
+  /* Shadows — disabled in light mode */
+  --shadow-l1: none;
+  --shadow-l2: none;
+  --shadow-l3: none;
+  --shadow-l4: none;
+
+  /* Radii — slightly more rounded for sketchy feel */
+  --radius-xs: 0.125rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.25rem;
+  --radius-2xl: 2rem;
+}
+
+/* Sidebar contrast fix: keep text colors light over the dark glass sidebar */
+[data-theme="scratchpad"] .sidebar-dark {
+  --primary: #c3c0ff;
+  --on-surface: #ffffff;
+  --on-surface-variant: rgba(220, 225, 251, 0.7);
+}
+
+/* Disable glassmorphism in scratchpad mode */
+[data-theme="scratchpad"] .glass,
+[data-theme="scratchpad"] .glass-sidebar {
+  background-color: var(--surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* Disable KestGlow in scratchpad mode */
+[data-theme="scratchpad"] .kest-glow::after {
+  display: none;
+}
+
+/* Apply wobbly filter to cards & bordered elements */
+[data-theme="scratchpad"] .bento-card,
+[data-theme="scratchpad"] .ghost-border {
+  filter: url(#sketchy);
+  border: 2px solid #2c2c2c !important;
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.08); /* cartoon drop shadow */
+  transform: rotate(-0.3deg); /* subtle imperfection */
+}
+
+[data-theme="scratchpad"] .bento-card:hover {
+  transform: rotate(0.2deg) translateY(-2px);
+  background-color: var(--surface-container);
+}
+
+/* Gradient text → solid dark in scratchpad */
+[data-theme="scratchpad"] .gradient-text {
+  background: none;
+  -webkit-background-clip: initial;
+  -webkit-text-fill-color: var(--primary);
+  background-clip: initial;
+}
+
+/* Images: sketchy frames */
+[data-theme="scratchpad"] img {
+  filter: url(#sketchy);
+  border: 2px solid #2c2c2c !important;
+  border-radius: var(--radius-md);
+  padding: 2px;
+}
+
+/* Buttons: sketchy style */
+[data-theme="scratchpad"] .btn-premium {
+  background: var(--primary);
+  box-shadow: 3px 3px 0 rgba(0,0,0,0.15);
+  filter: url(#sketchy);
+  border: 2px solid #2c2c2c;
+  color: #fff;
+  border-radius: var(--radius-lg);
+}
+
+[data-theme="scratchpad"] .btn-premium:hover {
+  box-shadow: 4px 4px 0 rgba(0,0,0,0.2);
+  filter: url(#sketchy) brightness(1.1);
+}
+
+[data-theme="scratchpad"] .btn-secondary {
+  filter: url(#sketchy);
+  border: 2px solid #2c2c2c;
+  box-shadow: 2px 2px 0 rgba(0,0,0,0.1);
+  background-color: var(--surface-bright);
+}
+
+/* Code blocks: paper-like */
+[data-theme="scratchpad"] .md-body pre {
+  background-color: #ffffff !important;
+  border: 2px solid #2c2c2c;
+  filter: url(#sketchy);
+}
+[data-theme="scratchpad"] .code-block-header {
+  background-color: transparent;
+  border-bottom: 2px solid #2c2c2c;
+  backdrop-filter: none;
+}
+
+/* Paper texture overlay via pseudo-element */
+[data-theme="scratchpad"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: -1;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ========================================
+   Scratchpad Mode — Typography & Layout Tweaks
+   ======================================== */
+
+[data-theme="scratchpad"] .md-body {
+  font-size: clamp(1.1rem, 2.5vw, 1.25rem);
+  max-width: 85ch;
+}
+
+[data-theme="scratchpad"] .md-body h1 { font-size: clamp(2rem, 5vw, 3rem); }
+[data-theme="scratchpad"] .md-body h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); }
+[data-theme="scratchpad"] .md-body h3 { font-size: clamp(1.3rem, 3vw, 1.6rem); }
+
+@media (min-width: 1024px) {
+  [data-theme="scratchpad"] .layout-main > div {
+    max-width: 1100px !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  [data-theme="scratchpad"] .layout-main > div {
+    max-width: 1400px !important;
+  }
+}
+
+/* Navigation Typography tweaks */
+[data-theme="scratchpad"] header nav a,
+[data-theme="scratchpad"] header .btn-premium {
+  font-size: 1.15rem !important;
+}
+
+[data-theme="scratchpad"] header a > span.gradient-text {
+  font-size: 1.75rem !important;
+}
+
+[data-theme="scratchpad"] aside a,
+[data-theme="scratchpad"] aside a span {
+  font-size: 1.1rem !important;
+}
+
+[data-theme="scratchpad"] nav.md\:hidden span {
+  font-size: 0.95rem !important;
+}
+
+/* Home Page & General UI Tweaks */
+[data-theme="scratchpad"] .hero-title {
+  font-size: clamp(2.5rem, 8vw, 4.5rem) !important;
+  line-height: 1.1;
+}
+
+[data-theme="scratchpad"] .hero-subtitle {
+  font-size: 1.4rem !important;
+  max-width: 60ch;
+}
+
+[data-theme="scratchpad"] .bento-card h3 {
+  font-size: 1.5rem !important;
+}
+
+[data-theme="scratchpad"] .bento-card p {
+  font-size: 1.1rem !important;
+}
+
+[data-theme="scratchpad"] .btn-secondary,
+[data-theme="scratchpad"] button {
+  font-size: 1.05rem;
+}
+
+/* Strong Sketchy lines for Nav & Side bar */
+[data-theme="scratchpad"] header {
+  border-bottom: 3px solid #2c2c2c !important;
+  filter: url(#sketchy);
+}
+
+[data-theme="scratchpad"] aside {
+  border-right: 3px solid #2c2c2c !important;
+  filter: url(#sketchy);
+}
+
+
+

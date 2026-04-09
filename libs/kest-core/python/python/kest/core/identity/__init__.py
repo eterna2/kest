@@ -1,16 +1,16 @@
 import os
 
 from kest.core.identity.base import IdentityProvider
-from kest.core.identity.providers.spiffe import SPIREProvider, HAS_SPIFFE
-from kest.core.identity.providers.aws import AWSWorkloadIdentity, HAS_BOTO3
+from kest.core.identity.providers.aws import HAS_BOTO3, AWSWorkloadIdentity
 from kest.core.identity.providers.bedrock import BedrockAgentIdentity
-from kest.core.identity.providers.oidc import OIDCIdentity
+from kest.core.identity.providers.lazy import LazySigningProvider
 from kest.core.identity.providers.local import (
-    StaticIdentity,
     LocalEd25519Provider,
     MockIdentityProvider,
+    StaticIdentity,
 )
-from kest.core.identity.providers.lazy import LazySigningProvider
+from kest.core.identity.providers.oidc import OIDCIdentity
+from kest.core.identity.providers.spiffe import HAS_SPIFFE, SPIREProvider
 
 
 def get_default_identity() -> IdentityProvider:

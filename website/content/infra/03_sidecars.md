@@ -1,4 +1,4 @@
-# Policy Sidecars (OPA/Cedar)
+# Local Policy Sidecars (OPA & Cedar)
 
 Kest evaluates policies locally using a sidecar architecture. Rather than relying on a centralized policy service that introduces latency and a single point of failure, Kest nodes evaluate complex rules directly alongside the workload.
 

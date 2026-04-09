@@ -3,15 +3,17 @@ Tests for Policy Evaluation Deduplication constraint (F-PE-07).
 """
 
 import json
-from opentelemetry import baggage
-import pytest
 
-from kest.core import kest_verified, configure, PolicyEngine, MockIdentityProvider
+from opentelemetry import baggage
+
+from kest.core import MockIdentityProvider, PolicyEngine, configure, kest_verified
+
 
 class TrackingPolicyEngine(PolicyEngine):
     """
     Mock engine that counts the number of times each policy string is evaluated.
     """
+
     def __init__(self, allow=True):
         self.allow = allow
         self.evaluations = {}
@@ -20,6 +22,7 @@ class TrackingPolicyEngine(PolicyEngine):
         for policy in policy_names:
             self.evaluations[policy] = self.evaluations.get(policy, 0) + 1
         return self.allow
+
 
 def test_policy_deduplication():
     """
@@ -37,7 +40,7 @@ def test_policy_deduplication():
         return baggage.get_baggage("kest.passport")
 
     passport = my_func()
-    
+
     # Assert deduplication applied on the engine evaluations
     assert engine.evaluations.get("pol_A") == 1
     assert engine.evaluations.get("pol_B") == 1
@@ -47,7 +50,10 @@ def test_policy_deduplication():
     # Assert the generated JWS records the deduplicated policies in its policy_context
     entries = json.loads(passport)
     import base64
+
     parts = entries[0].split(".")
-    payload = json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (4 - len(parts[1]) % 4)))
+    payload = json.loads(
+        base64.urlsafe_b64decode(parts[1] + "=" * (4 - len(parts[1]) % 4))
+    )
 
     assert payload["policy_context"]["function_policies"] == ["pol_A", "pol_B", "pol_C"]

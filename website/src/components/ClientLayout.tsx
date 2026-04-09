@@ -8,12 +8,22 @@ import MobileDrawer from './MobileDrawer';
 import KestGlow from './KestGlow';
 import BottomNav from './BottomNav';
 import type { SearchItem } from './GlobalSearch';
+import { ThemeProvider } from './ThemeProvider';
 
 export default function ClientLayout({ children, searchItems = [] }: { children: React.ReactNode; searchItems?: SearchItem[] }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
-    <>
+    <ThemeProvider>
+      {/* SVG Filter for Scratchpad wobbly borders */}
+      <svg width="0" height="0" style={{ position: 'absolute', pointerEvents: 'none' }}>
+        <defs>
+          <filter id="sketchy">
+            <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" result="noise" />
+            <feDisplacementMap in="SourceGraphic" in2="noise" scale="5" xChannelSelector="R" yChannelSelector="G" />
+          </filter>
+        </defs>
+      </svg>
       <KestGlow />
       <TopNavBar onMenuClick={() => setIsMenuOpen(true)} searchItems={searchItems} />
       <MobileDrawer isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
@@ -53,6 +63,6 @@ export default function ClientLayout({ children, searchItems = [] }: { children:
           </p>
         </div>
       </footer>
-    </>
+    </ThemeProvider>
   );
 }

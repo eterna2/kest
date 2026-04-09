@@ -1,26 +1,26 @@
-import functools
-import uuid_utils
-import hashlib
-import os
-import json
 import base64
-from typing import List, Optional, Union, Any
-from opentelemetry import baggage, trace
-import opentelemetry.context as otel_context
+import functools
+import hashlib
+import json
+import os
+from typing import Any, List, Optional, Union
 
-from kest.core.context import get_current_jwt
-from kest.core.models import (
-    BaggageManager,
-    TrustEvaluator,
-    DefaultTrustEvaluator,
-    ORIGIN_TRUST_MAP,
-)
-from kest.core.identity import IdentityProvider
-from kest.core.engine import PolicyEngine
+import opentelemetry.context as otel_context
+import uuid_utils
+from opentelemetry import baggage, trace
+
 from kest.core._core import KestEntry, sign_entry
+from kest.core.context import get_current_jwt
+from kest.core.engine import PolicyEngine
+from kest.core.identity import IdentityProvider
+from kest.core.models import (
+    ORIGIN_TRUST_MAP,
+    BaggageManager,
+    DefaultTrustEvaluator,
+    TrustEvaluator,
+)
 
 tracer = trace.get_tracer(__name__)
-
 
 
 # SHARED LAB FILE: To ensure Merkle chain links in the lab where OTel propagation is failing
@@ -136,11 +136,13 @@ def get_active_cache() -> Optional[Any]:
 
 def get_active_enterprise_policies() -> List[str]:
     import kest.core
+
     return getattr(kest.core, "_active_enterprise_policies", [])
 
 
 def get_active_deviations() -> List[Any]:
     import kest.core
+
     return getattr(kest.core, "_active_deviations", [])
 
 
@@ -225,7 +227,7 @@ def kest_verified(
 
         def _execute_core(
             span,
-            parent_hash,
+            parent_hashes,
             passport,
             cache,
             active_id,
@@ -264,7 +266,7 @@ def kest_verified(
                 operation=func.__name__,
                 classification="system",
                 trust_score=trust_score,
-                parent_ids=[parent_hash],
+                parent_ids=parent_hashes,
                 labels=labels,
                 added_taints=added_taints or [],
                 removed_taints=removed_taints or [],
@@ -328,14 +330,23 @@ def kest_verified(
             if not active_eng:
                 raise PermissionError("No PolicyEngine configured")
 
-            parent_hash = _BaggageGetter("kest.chain_tip")
+            raw_tips = _BaggageGetter("kest.chain_tip")
+            parent_hashes = (
+                [t.strip() for t in raw_tips.split(",")]
+                if raw_tips and raw_tips != "0"
+                else []
+            )
             service_name = os.getenv("SERVICE_NAME", "unknown")
-            if not parent_hash or parent_hash == "0":
-                parent_hash = _get_lab_parent(service_name)
-            parent_hash = parent_hash or "0"
+            if not parent_hashes:
+                lab_parent = _get_lab_parent(service_name)
+                if lab_parent and lab_parent != "0":
+                    parent_hashes = [lab_parent]
+
+            if not parent_hashes:
+                parent_hashes = ["0"]
 
             passport = BaggageManager.unpack(_BaggageGetter, cache=cache)
-            if not passport.entries and parent_hash != "0":
+            if not passport.entries and parent_hashes != ["0"]:
                 try:
                     if os.path.exists(_LAB_AUDIT_FILE):
                         with open(_LAB_AUDIT_FILE, "r") as f:
@@ -343,11 +354,8 @@ def kest_verified(
                 except Exception:
                     pass
 
-            is_root = (not passport.entries) and (parent_hash == "0")
+            is_root = (not passport.entries) and (parent_hashes == ["0"])
             evaluator = trust_evaluator or DefaultTrustEvaluator()
-            # F-TS-02/F-TS-03: self_score is the node's own origin trust.
-            # For root nodes, this IS the final trust score (no parents to inherit from).
-            # For non-root nodes, evaluator attenuates self_score through parent chain.
             self_score = ORIGIN_TRUST_MAP.get(origin, 100) if origin else 100
             current_node_trust = self_score if is_root else 100
             if is_root:
@@ -389,14 +397,14 @@ def kest_verified(
                     "kest.policy_ids": ",".join(policies),
                     "kest.principal": principal,
                     "kest.entry_id": entry_id,
-                    "kest.chain_tip": parent_hash,
+                    "kest.chain_tip": ",".join(parent_hashes),
                     "kest.trust_score": current_node_trust,
                 },
             ) as span:
                 ctx_to_eval = {
                     "principal": principal,
                     "jwt": get_current_jwt(),
-                    "chain_tip": parent_hash,
+                    "chain_tip": ",".join(parent_hashes),
                     "is_root": is_root,
                     "origin": origin,
                     "trust_score": current_node_trust,
@@ -425,7 +433,7 @@ def kest_verified(
 
                 new_ctx = _execute_core(
                     span,
-                    parent_hash,
+                    parent_hashes,
                     passport,
                     cache,
                     active_id,
@@ -453,14 +461,23 @@ def kest_verified(
             if not active_eng:
                 raise PermissionError("No PolicyEngine configured")
 
-            parent_hash = _BaggageGetter("kest.chain_tip")
+            raw_tips = _BaggageGetter("kest.chain_tip")
+            parent_hashes = (
+                [t.strip() for t in raw_tips.split(",")]
+                if raw_tips and raw_tips != "0"
+                else []
+            )
             service_name = os.getenv("SERVICE_NAME", "unknown")
-            if not parent_hash or parent_hash == "0":
-                parent_hash = _get_lab_parent(service_name)
-            parent_hash = parent_hash or "0"
+            if not parent_hashes:
+                lab_parent = _get_lab_parent(service_name)
+                if lab_parent and lab_parent != "0":
+                    parent_hashes = [lab_parent]
+
+            if not parent_hashes:
+                parent_hashes = ["0"]
 
             passport = BaggageManager.unpack(_BaggageGetter, cache=cache)
-            if not passport.entries and parent_hash != "0":
+            if not passport.entries and parent_hashes != ["0"]:
                 try:
                     if os.path.exists(_LAB_AUDIT_FILE):
                         with open(_LAB_AUDIT_FILE, "r") as f:
@@ -468,7 +485,7 @@ def kest_verified(
                 except Exception:
                     pass
 
-            is_root = (not passport.entries) and (parent_hash == "0")
+            is_root = (not passport.entries) and (parent_hashes == ["0"])
             evaluator = trust_evaluator or DefaultTrustEvaluator()
             # F-TS-02/F-TS-03: self_score is the node's own origin trust.
             self_score = ORIGIN_TRUST_MAP.get(origin, 100) if origin else 100
@@ -512,14 +529,14 @@ def kest_verified(
                     "kest.policy_ids": ",".join(policies),
                     "kest.principal": principal,
                     "kest.entry_id": entry_id,
-                    "kest.chain_tip": parent_hash,
+                    "kest.chain_tip": ",".join(parent_hashes),
                     "kest.trust_score": current_node_trust,
                 },
             ) as span:
                 ctx_to_eval = {
                     "principal": principal,
                     "jwt": get_current_jwt(),
-                    "chain_tip": parent_hash,
+                    "chain_tip": ",".join(parent_hashes),
                     "is_root": is_root,
                     "origin": origin,
                     "trust_score": current_node_trust,
@@ -548,7 +565,7 @@ def kest_verified(
 
                 new_ctx = _execute_core(
                     span,
-                    parent_hash,
+                    parent_hashes,
                     passport,
                     cache,
                     active_id,

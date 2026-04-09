@@ -1,19 +1,18 @@
 import logging
 from typing import Any
 
+from kest.core import (
+    IdentityProvider,
+    Passport,
+    PolicyEngine,
+    configure,
+    kest_verified,
+    version,
+)
 from opentelemetry import baggage, trace
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
-
-from kest.core import (
-    PolicyEngine,
-    IdentityProvider,
-    configure,
-    kest_verified,
-    Passport,
-    version,
-)
 
 
 # 1. Setup OpenTelemetry

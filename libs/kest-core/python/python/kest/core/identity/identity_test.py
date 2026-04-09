@@ -2,11 +2,11 @@ import os
 from unittest.mock import patch
 
 from kest.core.identity import get_default_identity
-from kest.core.identity.providers.local import LocalEd25519Provider
-from kest.core.identity.providers.aws import AWSWorkloadIdentity, HAS_BOTO3
+from kest.core.identity.providers.aws import HAS_BOTO3, AWSWorkloadIdentity
 from kest.core.identity.providers.bedrock import BedrockAgentIdentity
-from kest.core.identity.providers.spiffe import SPIREProvider, HAS_SPIFFE
+from kest.core.identity.providers.local import LocalEd25519Provider
 from kest.core.identity.providers.oidc import OIDCIdentity
+from kest.core.identity.providers.spiffe import HAS_SPIFFE, SPIREProvider
 
 
 def test_autodetect_fallback():

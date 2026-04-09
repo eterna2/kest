@@ -1,4 +1,4 @@
-# Framework Mapping
+# Zero Trust Compliance Framework Mapping
 
 Kest's architecture maps directly to the foundational requirements of modern security and compliance frameworks.
 

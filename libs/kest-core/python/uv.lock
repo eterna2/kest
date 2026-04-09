@@ -1120,7 +1120,7 @@ dev = [
     { name = "cryptography", specifier = ">=42.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "hypothesis", specifier = ">=6.0.0" },
-    { name = "maturin", specifier = ">=1.5,<2.0" },
+    { name = "maturin", specifier = ">=1.5,<1.13" },
     { name = "moto", extras = ["kms", "sts"], specifier = ">=5.0.0" },
     { name = "mypy", specifier = ">=1.9.0" },
     { name = "pytest", specifier = ">=8.0.0" },
