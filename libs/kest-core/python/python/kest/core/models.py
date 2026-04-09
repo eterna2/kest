@@ -3,7 +3,7 @@ import json
 import base64
 import hashlib
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, TypedDict
 from abc import ABC, abstractmethod
 
 
@@ -104,25 +104,26 @@ class PassportVerifier:
                     f"Merkle link broken. Expected {last_signature_hash}, got {parent_hash}"
                 )
 
-            # 4. Verify Signature (Simulated for non-local providers, Real for LocalEd25519)
-            if ".pending." in signature or ".mock-sig." in signature:
-                pass
-            else:
-                principal = payload.get("principal") or payload.get("labels", {}).get(
-                    "principal"
-                )
-                provider = providers.get(principal)
+            # 4. Verify Signature for providers that expose a public key.
+            # No silent bypass for test/pending signatures: every entry MUST
+            # be either verifiable (if provider present) or skipped gracefully
+            # (if provider absent) — but never silently accepted based on
+            # the *content* of the signature string.
+            principal = payload.get("principal") or payload.get("labels", {}).get(
+                "principal"
+            )
+            provider = providers.get(principal)
 
-                if provider and hasattr(provider, "public_key"):
-                    signing_input = f"{header_b64}.{payload_b64}".encode()
-                    sig_padding = "=" * (4 - len(sig_b64) % 4)
-                    sig_bytes = base64.urlsafe_b64decode(sig_b64 + sig_padding)
-                    try:
-                        provider.public_key.verify(sig_bytes, signing_input)
-                    except Exception as e:
-                        raise ValueError(
-                            f"Signature verification failed for {principal}: {e}"
-                        )
+            if provider and hasattr(provider, "public_key"):
+                signing_input = f"{header_b64}.{payload_b64}".encode()
+                sig_padding = "=" * (4 - len(sig_b64) % 4)
+                sig_bytes = base64.urlsafe_b64decode(sig_b64 + sig_padding)
+                try:
+                    provider.public_key.verify(sig_bytes, signing_input)
+                except Exception as e:
+                    raise ValueError(
+                        f"Signature verification failed for {principal}: {e}"
+                    )
 
             # Update last hash for next iteration
             last_signature_hash = hashlib.sha256(signature.encode()).hexdigest()
@@ -169,6 +170,13 @@ class DefaultTrustEvaluator(TrustEvaluator):
         return (min_parent * self_score) // 100
 
 
+class PolicyDeviation(TypedDict):
+    policy: str
+    tier: str
+    reason: Optional[str]
+    approver: Optional[str]
+
+
 class BaggageManager:
     """
     Handles the hybrid propagation of lineage data in OpenTelemetry (OTel) Baggage.
@@ -178,7 +186,7 @@ class BaggageManager:
     avoid exceeding HTTP header limits.
     """
 
-    MAX_BAGGAGE_SIZE = 4000  # 4KB safety limit
+    MAX_BAGGAGE_SIZE = 4096  # F-CP-04: default 4096-byte threshold
 
     @staticmethod
     def pack(passport: Passport, cache: Optional[Any] = None) -> Dict[str, str]:
@@ -221,20 +229,18 @@ class BaggageManager:
         claim_id = baggage_func("kest.claim_check")
         if claim_id:
             if not cache:
-                print(
-                    f"[Kest.Baggage] Warning: claim_check {claim_id} found but no cache configured for retrieval."
+                raise RuntimeError(
+                    f"[F-GC-01] Kest lineage claim_check {claim_id} found but no cache "
+                    "backend configured for retrieval. Failing closed."
                 )
-                return Passport()
 
             cached = cache.get(f"kest.claim.{claim_id}")
             if cached:
-                print(
-                    f"[Kest.Baggage] Successfully retrieved lineage from cache via claim_check {claim_id}"
-                )
                 return Passport.deserialize(cached)
             else:
-                print(
-                    f"[Kest.Baggage] Error: claim_check {claim_id} present but record NOT FOUND in cache."
+                raise RuntimeError(
+                    f"[F-GC-02] Kest lineage claim_check {claim_id} present but record "
+                    "NOT FOUND in cache (TTL expired or cache evicted). Failing closed."
                 )
 
         raw_passport = baggage_func("kest.passport")
@@ -244,8 +250,15 @@ class BaggageManager:
         return Passport()
 
 
-# Standard Trust Bootstrap Scores
-ORIGIN_TRUST_MAP = {
+# Standard Trust Bootstrap Scores (F-TS-02)
+# Keys and values defined below are MANDATORY defaults.
+# They MUST NOT be overridden; use register_origin_trust() to ADD new entries.
+_MANDATORY_ORIGIN_KEYS = {
+    "system", "internal", "verified_rag",
+    "third_party_api", "user_input", "internet", "llm",
+}
+
+ORIGIN_TRUST_MAP: dict = {
     "system": 100,
     "internal": 100,
     "verified_rag": 90,
@@ -254,6 +267,30 @@ ORIGIN_TRUST_MAP = {
     "internet": 10,
     "llm": 0,
 }
+
+
+def register_origin_trust(source_type: str, score: int) -> None:
+    """
+    Register a custom origin trust score.
+
+    F-TS-02: deployments MAY add custom source_type keys.
+    Mandatory defaults (system, internal, verified_rag, third_party_api,
+    user_input, internet, llm) MUST NOT be overridden.
+
+    Args:
+        source_type: The name of the new origin type.
+        score: The trust bootstrap score (0–100).
+
+    Raises:
+        ValueError: If source_type is one of the mandatory defaults.
+    """
+    if source_type in _MANDATORY_ORIGIN_KEYS:
+        raise ValueError(
+            f"Cannot override mandatory origin '{source_type}'. "
+            "Add a custom key instead."
+        )
+    ORIGIN_TRUST_MAP[source_type] = score
+
 
 # Backward-compat alias — prefer ORIGIN_TRUST_MAP
 SOURCE_TRUST_MAP = ORIGIN_TRUST_MAP

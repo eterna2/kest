@@ -1,77 +1,184 @@
 # Getting Started with Kest
 
-This guide will walk you through securing a simple Python microservice using Kest.
+This guide walks you through securing your first Python function with Kest — from installation to a fully working policy-enforced, cryptographically signed execution.
 
 ## 1. Installation
 
-Install the Kest core library along with the optional dependencies for your environment.
+Install the Kest Python package:
 
 ```bash
-# Basic installation
 pip install kest
+```
 
-# With SPIRE support
-pip install kest[spiffe]
+Or with [uv](https://docs.astral.sh/uv/) (recommended):
 
-# With AWS support (IAM/KMS)
-pip install kest[aws]
+```bash
+uv add kest
+```
 
-# With OPA/Cedar support
-pip install kest[opa,cedar]
+This installs the Python package along with its Rust core (`kest-core-rs`) for high-performance RFC 8785 canonicalization and Ed25519 signing.
+
+### Verify the Installation
+
+```python
+from kest.core import version
+print(version())  # → "0.3.0"
 ```
 
 ## 2. Configuration
 
-Before Kest can evaluate policies or sign the cryptographic lineage, it requires access to an **Identity Provider** and a **Policy Engine**. In most applications, this is configured once during the startup phase.
+Kest uses a global `configure()` function to set up the execution environment. This should be called **once at application startup** — typically in your `main()`, FastAPI `lifespan`, or equivalent:
 
 ```python
-import os
-from kest.core import configure, SPIREProvider, CedarLocalEngine
+from kest.core import configure, MockPolicyEngine
 
-# 1. Initialize Workload Identity
-# Kest auto-detects SPIRE, AWS, or Local environments if not provided.
-identity = SPIREProvider()
-
-# 2. Initialize Policy Engine
-# Here we use an in-process Cedar engine for low-latency checks.
-engine = CedarLocalEngine()
-
-# 3. Apply Global Configuration
-configure(engine=engine, identity=identity)
+configure(
+    engine=MockPolicyEngine(allow=True),
+    # identity is auto-detected by default
+)
 ```
 
-## 3. Securing Functions
+### `configure()` Parameters
 
-Use the `@kest_verified` decorator to protect your critical business logic. Kest will automatically check policies and record the execution lineage.
+| Parameter | Type | Purpose |
+|---|---|---|
+| `engine` | `PolicyEngine` | **Required.** The policy engine for authorization checks |
+| `identity` | `IdentityProvider` | An explicit identity provider. If omitted, Kest auto-detects |
+| `cache` | `CacheProvider` | Optional. For Claim Check pattern (large Passports) |
+| `enterprise_policies` | `list[str]` | Optional. Enterprise baseline policy names |
+| `deviations` | `list[dict]` | Optional. Policy deviations (authorized exemptions) |
+| `clear` | `bool` | If `True`, resets all global config to `None` |
+
+### Development vs Production
+
+```python
+# Development / Unit testing
+configure(
+    engine=MockPolicyEngine(allow=True),
+    # Auto-detects LocalEd25519Provider
+)
+
+# Production
+from kest.core import OPAPolicyEngine, SPIREProvider
+configure(
+    engine=OPAPolicyEngine(host="localhost", port=8181),
+    identity=SPIREProvider(
+        socket_path="/run/spire/sockets/agent.sock"
+    ),
+    enterprise_policies=["baseline-auth", "data-classification"],
+)
+```
+
+## 3. Your First Protected Function
+
+The `@kest_verified` decorator wraps any function with the full Kest verification lifecycle:
 
 ```python
 from kest.core import kest_verified
 
-@kest_verified(policy="financial/transaction-limit")
-async def transfer_funds(amount: float, recipient: str):
-    # This code only executes if the policy allows it
-    # and the caller has a valid, untampered lineage.
-    print(f"Transferring ${amount} to {recipient}")
-    return {"status": "success"}
+@kest_verified(
+    policy="kest/allow_trusted",
+    source_type="internal"
+)
+def process_payment(order_id: str, amount: float) -> dict:
+    """Process a payment — now cryptographically verified."""
+    return {
+        "order_id": order_id,
+        "amount": amount,
+        "status": "completed"
+    }
 ```
 
-## 4. Observability & Auditing
+### What Happens When You Call It
 
-Kest exports the non-fungible audit trail as OpenTelemetry spans. Use the `KestTelemetry` helper to ship these logs to your preferred backend.
+When you call `process_payment("ORD-123", 99.95)`, the decorator executes a 13-step lifecycle before your function body runs:
+
+1. **Extract context** — reads existing Passport from OTel baggage
+2. **Evaluate trust** — computes trust score based on source type and parent lineage
+3. **Collect taints** — computes cumulative taint set
+4. **Hash inputs** — SHA-256 of the function arguments
+5. **Build KestEntry** — populate all fields
+6. **Evaluate enterprise policies** → OPA/Cedar
+7. **Evaluate platform policies** → OPA/Cedar
+8. **Evaluate application policies** → OPA/Cedar
+9. **Evaluate function policies** → OPA/Cedar
+10. **Sign entry** — canonicalize (RFC 8785) → JWS (EdDSA)
+11. **Append to Passport** — update Merkle chain
+12. **Execute function** — your code runs
+13. **Hash output** — SHA-256 of return value; emit OTel span
+
+If any policy denies (steps 6–9) or any signing/identity error occurs (step 10), the function body **never executes**.
+
+### Calling the Function
 
 ```python
-from kest.core.telemetry import KestTelemetry
+# Call it like any normal function
+result = process_payment("ORD-123", 99.95)
+print(result)
+# → {"order_id": "ORD-123", "amount": 99.95, "status": "completed"}
+```
 
-# Bootstrap OpenTelemetry with a local SQLite exporter for auditing
-provider = KestTelemetry.setup(
-    service_name="payment-service", 
-    exporter_type="sqlite", 
-    endpoint="audit_log.db"
+The Passport is automatically maintained in the OTel context. If you make another `@kest_verified` call from within this function, the Merkle chain extends automatically.
+
+## 4. Inspecting the Passport
+
+Access the current execution context from anywhere:
+
+```python
+from kest.core.context import get_current_passport
+
+passport = get_current_passport()
+
+# Number of entries in the chain
+print(f"Chain length: {len(passport.entries)}")
+
+# The last JWS entry (raw compact serialization)
+print(f"Latest: {passport.entries[-1][:80]}...")
+```
+
+## 5. Running with a Real Policy Engine
+
+Replace `MockPolicyEngine` with a real OPA sidecar:
+
+```bash
+# Start OPA with a simple policy
+docker run -d -p 8181:8181 \
+  -v ./policies:/policies \
+  openpolicyagent/opa:latest run \
+  --server /policies
+```
+
+Create `policies/kest/allow_trusted.rego`:
+
+```rego
+package kest.allow_trusted
+
+default allow = false
+
+allow {
+    input.trust_score >= 40
+}
+```
+
+Update your configuration:
+
+```python
+from kest.core import configure, OPAPolicyEngine
+
+configure(
+    engine=OPAPolicyEngine(host="localhost", port=8181),
 )
 ```
 
-## Next Steps
+Now `@kest_verified(policy="kest/allow_trusted")` will make real HTTP calls to OPA.
 
-- Explore the **[Policy Library](../policies/overview.md)** for pre-built security models.
-- Learn about **[Continuous Trust (CARTA)](../policies/trust.md)** and trust scores.
-- Check the **[API Reference](../reference/api.md)** for detailed module documentation.
+## 6. Next Steps
+
+- **[Trust Model](trust_model)** — learn how trust scores degrade and how to control them
+- **[Identity & Context](identity_context)** — configure SPIRE, AWS, or OIDC identity
+- **[Decorators Reference](decorators)** — every parameter of `@kest_verified`
+- **[Testing](testing)** — testing strategies and the kest-lab environment
+
+---
+
+*For the complete API specification, see [Spec §5](../blog/design/kest_spec_v0.3.0).*

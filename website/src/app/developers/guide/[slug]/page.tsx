@@ -50,17 +50,19 @@ export default async function GuidePage({
             <span style={{ color: "var(--primary)" }}>{post.meta.title}</span>
           </div>
           <h1>{post.meta.title}</h1>
-          <p
-            style={{
-              fontSize: "1.25rem",
-              color: "var(--on-surface-variant)",
-              lineHeight: 1.6,
-            }}
-          >
-            {post.meta.description}
-          </p>
+          {post.meta.description && (post.meta as Record<string, unknown>)._fromFrontmatter && (
+            <p
+              style={{
+                fontSize: "1.25rem",
+                color: "var(--on-surface-variant)",
+                lineHeight: 1.6,
+              }}
+            >
+              {post.meta.description}
+            </p>
+          )}
         </div>
-        <MarkdownContent content={post.content} currentDir="developer" />
+        <MarkdownContent content={post.content} currentDir="developer" suppressFirstH1 />
         <PageNavigation
           prev={prev ? { slug: prev.slug, title: prev.meta.title } : null}
           next={next ? { slug: next.slug, title: next.meta.title } : null}

@@ -1,100 +1,131 @@
-# Audit Entry Specification
+# Non-Fungible Audit
 
-This document defines the schema and cryptographic properties of a Kest audit entry. Developers can use this specification to build custom verifiers or integrate Kest's non-fungible audit trail into external security platforms.
+Every `KestEntry` is a self-contained, cryptographically signed audit record. Unlike traditional log lines — which are mutable text that can be silently altered — Kest entries are **non-fungible**: tamper-evident, non-repudiable, and permanently linked to their predecessors.
 
-## The Passport Entry (JWS)
+This article walks through the KestEntry schema field by field, explaining why each field exists and what compliance guarantee it provides.
 
-Each hop in an execution lineage produces a **JSON Web Signature (JWS)**. A JWS consists of three base64url-encoded parts separated by periods: `header.payload.signature`.
-
-### 1. The Header
+## The KestEntry Schema (Spec §4.1)
 
 ```json
 {
-  "alg": "EdDSA",
-  "typ": "JWS"
-}
-```
-
-- **alg**: Cryptographic algorithm. Currently `EdDSA` (Ed25519) via the Rust PyO3 core.
-- **typ**: Always `JWS` for Kest audit entries.
-
-### 2. The Payload (KestEntry)
-
-The payload contains the execution metadata. Before signing, this JSON object is canonicalized using **RFC 8785 (JCS)** via `serde_jcs` in the Rust core, ensuring byte-identical serialization regardless of runtime or language.
-
-```json
-{
-  "entry_id": "e5bb092f-6f0f-4e12-9f3e-c3cadf64e194",
-  "operation": "func_sanitizer",
-  "classification": "system",
-  "trust_score": 100,
-  "parent_ids": ["31a2f90fb8aeda526638948834a5fd599cf0a6fa7119817d48c2efadeec3dc5b"],
-  "added_taints": [],
-  "removed_taints": ["malicious_input"],
-  "taints": ["untrusted_source"],
-  "labels": {
-    "principal": "spiffe://kest.internal/workload/hop2",
-    "kest.identity": "{\"user\": \"alice-uuid\", \"agent\": \"kest-agent\"}",
-    "trace_id": "cafb9a789e16bd9cdcb0a70c3fdaf60e"
+  "schema_version": "0.3.0",
+  "runtime": {
+    "name": "kest-python",
+    "version": "0.3.0"
   },
-  "environment": {},
-  "otel_context": {},
-  "metadata": null,
-  "content_hash": "",
-  "input_hash": "",
-  "timestamp_ms": 1775494770269
+  "entry_id":       "019746a2-3c4f-7da1-8b5f-2a1c3d4e5f67",
+  "operation":      "process_payment",
+  "classification": "system",
+  "trust_score":    40,
+  "parent_ids":     ["a1b2c3d4e5f6..."],
+  "added_taints":   ["user_input"],
+  "removed_taints": [],
+  "taints":         ["user_input"],
+  "labels": {
+    "principal":          "spiffe://kest.internal/workload/payment-svc",
+    "kest.identity":      "{\"user\":\"alice\",\"agent\":\"web-app\",\"task\":\"checkout\"}",
+    "kest.resource_attr": "{\"amount\":150,\"currency\":\"USD\"}",
+    "trace_id":           "4bf92f3577b34da6a3ce929d0e0e4736"
+  },
+  "policy_context": {
+    "enterprise_policies": ["baseline-auth"],
+    "platform_policies":   ["payments-pci"],
+    "app_policies":        [],
+    "function_policies":   ["kest/allow_trusted"],
+    "deviations": []
+  },
+  "environment":  {},
+  "otel_context":  {},
+  "metadata":      null,
+  "content_hash":  "e3b0c44298fc1c14...",
+  "input_hash":    "7f83b1657ff1fc53...",
+  "timestamp_ms":  1712150400000
 }
 ```
 
-| Field | Type | Description |
+## Field-by-Field Reference
+
+### Versioning & Runtime
+
+| Field | Purpose | Compliance Value |
 |---|---|---|
-| `entry_id` | `string` | UUID v4 unique to this execution event. |
-| `operation` | `string` | Name of the decorated Python function. |
-| `classification` | `string` | Data classification (`"system"` by default). |
-| `trust_score` | `int` | Integer trust score (0–100) at time of execution. |
-| `parent_ids` | `array[string]` | SHA-256 hash(es) of parent JWS entries. Root nodes use `["0"]`. |
-| `added_taints` | `array[string]` | New risk taints introduced at this node. |
-| `removed_taints` | `array[string]` | Taints explicitly removed at this node (sanitizers). |
-| `taints` | `array[string]` | Accumulated taints from all ancestors plus `added_taints` minus `removed_taints`. |
-| `labels` | `dict` | Arbitrary key-value metadata (principal, trace ID, identity, etc.). |
-| `timestamp_ms` | `int` | Epoch milliseconds of the execution. |
+| `schema_version` | Schema version of this entry format (F-AE-05) | Enables forward-compatible parsing by audit tools as the spec evolves |
+| `runtime.name` | Which Kest library produced this entry (F-AE-06) | Cross-language diagnostics — identifies if an interop bug is language-specific |
+| `runtime.version` | Semantic version of the library | Matches entries to known library releases for vulnerability tracing |
 
-### 3. The Signature
+### Identity & Ordering
 
-The Ed25519 signature is computed over:
+| Field | Purpose | Compliance Value |
+|---|---|---|
+| `entry_id` | UUID v7 — time-ordered, globally unique (F-AE-04) | Natural chronological ordering without secondary sorting. RFC 9562 guarantees uniqueness |
+| `operation` | Name of the protected function (F-AE-07) | Maps audit entries to specific business operations for access reviews |
+| `timestamp_ms` | Epoch milliseconds at entry creation (F-AE-12) | Approximate forensic timing. **Not** used for ordering — cryptographic hash chain supersedes (Spec §11.5) |
 
+### Cryptographic Linkage
+
+| Field | Purpose | Compliance Value |
+|---|---|---|
+| `parent_ids` | SHA-256 hash of the preceding JWS string, or `["0"]` for root (F-AE-08) | Creates the Merkle chain — tamper-evident ordering |
+| `content_hash` | SHA-256 of the function's return value | Proves what the function produced |
+| `input_hash` | SHA-256 of the function's input arguments | Proves what the function received |
+
+### Trust & Taints
+
+| Field | Purpose | Compliance Value |
+|---|---|---|
+| `trust_score` | Integer 0–100 (F-AE-09) | Quantified risk level — feeds into CARTA-based policy decisions |
+| `added_taints` | New taint labels at this node (F-TT-02) | Traces where risk was introduced |
+| `removed_taints` | Taints cleared at this node (F-TT-03) | Auditable sanitization — proves a node declared itself as a sanitizer |
+| `taints` | Cumulative taint set: `(parent ∪ added) − removed` (F-AE-10) | Full risk profile visible to policy engines and auditors |
+
+### Labels
+
+| Field | Purpose | Compliance Value |
+|---|---|---|
+| `labels.principal` | The `workload_id` from the IdentityProvider (F-AE-11) | Who signed this entry — non-repudiable identity |
+| `labels.trace_id` | OTel trace ID (F-AE-11) | Correlates audit entries with distributed traces |
+| `labels.kest.identity` | JSON: `{user, agent, task}` (F-IC-04) | Fine-grained identity context for ABAC policies |
+| `labels.kest.resource_attr` | JSON: resource attributes (F-IC-04) | ABAC resource attributes (e.g., document ID, sensitivity level) |
+
+### Policy Context
+
+| Field | Purpose | Compliance Value |
+|---|---|---|
+| `policy_context.enterprise_policies` | Enterprise baseline policies evaluated (F-AE-13) | Proves enterprise-level compliance was enforced |
+| `policy_context.platform_policies` | Platform-scoped policies evaluated | Proves platform governance was applied |
+| `policy_context.function_policies` | Function-level policies evaluated | Proves the specific access control was checked |
+| `policy_context.deviations` | Active policy deviations at this invocation (F-PE-12) | Cryptographic proof of any compliance exemptions |
+
+The `deviations` array is **always present** — an empty array `[]` means "no deviations were active." If the field is absent entirely, it indicates potential tampering (the signed payload is incomplete).
+
+## Why Non-Fungible?
+
+Traditional logs:
 ```
-ASCII(base64url(UTF8(header)) || '.' || base64url(JCS(payload)))
+2024-03-15 10:23:45 INFO payment processed for user alice amount=150
 ```
 
-Where `JCS(payload)` is the RFC 8785 canonical JSON of the payload object. This is computed in Rust via `serde_jcs` and signed via `ed25519-dalek`.
+This log line can be:
+- ✗ Modified after the fact (change "alice" to "bob")
+- ✗ Deleted silently
+- ✗ Fabricated by a compromised service
+- ✗ Reordered to hide a sequence of events
 
-## Merkle-Link Verification
+A KestEntry cannot be any of these things because:
+- ✓ It is **signed** by the workload's private key (JWS/EdDSA)
+- ✓ It is **hash-linked** to its predecessor (SHA-256 parent_ids)
+- ✓ Its payload is **canonicalized** (RFC 8785) for deterministic verification
+- ✓ Modification of any entry **breaks** every subsequent hash in the chain
 
-To verify a Passport chain `[JWS₁, JWS₂, …, JWSₙ]`:
+## Compliance Mappings
 
-1. **Start** with `last_hash = "0"`.
-2. **Decode** the payload of `JWSᵢ`.
-3. **Assert** `JWSᵢ.payload.parent_ids[0] == last_hash`.
-4. **Verify** the Ed25519 signature of `JWSᵢ` against the public key of its signer.
-5. **Compute** `last_hash = SHA-256(JWSᵢ)` (the full compact JWS string).
-6. **Repeat** for `JWSᵢ₊₁`.
+| Standard | KestEntry Mechanism |
+|---|---|
+| **NIST SP 800-207** Tenet 6 | Policy evaluated before execution; decision recorded in `policy_context` |
+| **SOC 2** CC7.2 | Tamper-evident audit trail via Merkle-linked JWS |
+| **PCI-DSS v4.0** Req. 10 | Cryptographically signed, non-fungible access logs |
+| **GDPR** Art. 30 | `kest.identity` and `kest.resource_attr` provide processing activity records |
 
-If any step fails, the lineage is invalid (tampered or replayed).
+---
 
-```python
-from kest.core.models import Passport, PassportVerifier
-
-passport = Passport.deserialize(baggage_json_string)
-PassportVerifier.verify(passport, providers={
-    "spiffe://kest.internal/workload/hop1": hop1_identity_provider,
-})
-```
-
-## Taint Audit Trail
-
-Because `added_taints`, `removed_taints`, and `taints` are all in the **signed** payload, the following properties are cryptographically guaranteed:
-
-- **Taint attribution**: Any verifier can determine exactly which node introduced a taint.
-- **Sanitizer accountability**: A `removed_taints` field proves a specific node claimed to clean that taint. Disputes are resolved by re-running the verifier against the signed chain.
-- **Non-repudiation**: Neither the service that added a taint nor the one that removed it can deny their action without invalidating their signature.
+*For how entries are chained into a Passport, see [Lineage Over Assertion](merkle_dag). For the full schema constraints, see [Spec §4.1](kest_spec_v0.3.0).*

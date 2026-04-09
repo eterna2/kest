@@ -6,6 +6,52 @@ import httpx
 import time
 
 
+# ---------------------------------------------------------------------------
+# Keycloak liveness check — runs once at import time
+# ---------------------------------------------------------------------------
+_KEYCLOAK_BASE = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
+_KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "kest-lab")
+
+def _keycloak_is_ready() -> bool:
+    """Check if Keycloak is reachable (best-effort, non-blocking)."""
+    try:
+        r = httpx.get(
+            f"{_KEYCLOAK_BASE}/realms/{_KEYCLOAK_REALM}",
+            timeout=3.0,
+        )
+        return r.status_code == 200
+    except Exception:
+        return False
+
+
+_KEYCLOAK_AVAILABLE = _keycloak_is_ready()
+
+requires_keycloak = pytest.mark.skipif(
+    not _KEYCLOAK_AVAILABLE,
+    reason=f"Keycloak not reachable at {_KEYCLOAK_BASE}",
+)
+
+# ---------------------------------------------------------------------------
+# Gateway liveness check
+# ---------------------------------------------------------------------------
+_GATEWAY_URL = os.getenv("GATEWAY_URL", "http://kest-gateway:8002")
+
+def _gateway_is_ready() -> bool:
+    try:
+        r = httpx.get(f"{_GATEWAY_URL}/", timeout=3.0)
+        return r.status_code < 500
+    except Exception:
+        return False
+
+
+_GATEWAY_AVAILABLE = _gateway_is_ready()
+
+requires_gateway = pytest.mark.skipif(
+    not _GATEWAY_AVAILABLE,
+    reason=f"kest-gateway not reachable at {_GATEWAY_URL}",
+)
+
+
 @pytest.fixture(autouse=True)
 def auto_clean():
     """Ensure audit artifacts are wiped before each test."""

@@ -27,7 +27,7 @@ tasks:
       - "bootstrap"
       - "kest-core-python:check"
   test-live:
-    script: "docker compose exec hop1 sh -c 'until /app/.venv/bin/python -m pytest --version 2>/dev/null; do echo \"Waiting for hop1 to be ready...\" && sleep 2; done && /app/.venv/bin/python -m pytest /app/tests/'"
+    script: "docker compose exec hop1 sh -c 'until /workspace/app/.venv/bin/python -m pytest --version 2>/dev/null; do sleep 2; done && until curl -s http://localhost:8000/ > /dev/null || [ $$? -ne 7 ]; do sleep 2; done && until curl -s http://kest-agent:8001/ > /dev/null || [ $$? -ne 7 ]; do sleep 2; done && until curl -s http://kest-gateway:8002/ > /dev/null || [ $$? -ne 7 ]; do sleep 2; done && /workspace/app/.venv/bin/python -m pytest /workspace/app/tests/'"
     deps:
       - "up"
   spire-healthcheck:

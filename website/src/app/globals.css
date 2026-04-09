@@ -339,16 +339,18 @@ input[type="email"]:focus {
 .md-body {
   font-family: var(--font-body);
   color: var(--on-surface-variant);
-  font-size: 1.05rem;
+  font-size: clamp(0.95rem, 2vw, 1.05rem);
   line-height: 1.8;
+  /* Optimal reading width — relax the line length */
+  max-width: 72ch;
 }
 
-.md-body h1 { font-size: 2.5rem; margin-bottom: 2rem; color: var(--on-surface); }
-.md-body h2 { font-size: 1.75rem; margin-top: 4rem; margin-bottom: 1.5rem; color: var(--on-surface); }
-.md-body h3 { font-size: 1.35rem; margin-top: 3rem; margin-bottom: 1rem; color: var(--on-surface); }
-.md-body h4 { font-size: 1.15rem; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--on-surface); }
+.md-body h1 { font-size: clamp(1.75rem, 4vw, 2.5rem); margin-bottom: 1.5rem; color: var(--on-surface); }
+.md-body h2 { font-size: clamp(1.35rem, 3vw, 1.75rem); margin-top: 3rem; margin-bottom: 1.25rem; color: var(--on-surface); }
+.md-body h3 { font-size: clamp(1.1rem, 2.5vw, 1.35rem); margin-top: 2.5rem; margin-bottom: 0.875rem; color: var(--on-surface); }
+.md-body h4 { font-size: clamp(1rem, 2vw, 1.15rem); margin-top: 1.75rem; margin-bottom: 0.625rem; color: var(--on-surface); }
 
-.md-body p { margin-bottom: 1.5rem; }
+.md-body p { margin-bottom: 1.25rem; }
 
 /* Inline code */
 .md-body code {
@@ -372,18 +374,27 @@ input[type="email"]:focus {
   padding: 1.5rem;
   margin: 2rem 0;
   overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Never bust out of the reading column */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .md-body pre code {
   background: transparent;
   padding: 0;
   color: inherit;
+  /* Let the pre control the scroll, not the code element */
+  white-space: pre;
+  word-break: normal;
+  overflow-wrap: normal;
 }
 
 /* Code block wrapper — glass header (DESIGN.md §5) */
 .code-block-wrapper {
   border-radius: var(--radius-md);
-  overflow: hidden;
+  /* No overflow:hidden here — the pre must be able to scroll horizontally.
+     Header radius is applied separately on .code-block-header. */
   margin: 2rem 0;
 }
 
@@ -395,6 +406,10 @@ input[type="email"]:focus {
   background-color: rgba(25, 31, 49, 0.5);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  /* Prevent header itself from overflowing */
+  min-width: 0;
+  overflow: hidden;
 }
 
 .code-block-header .lang-label {
@@ -405,6 +420,12 @@ input[type="email"]:focus {
   letter-spacing: 0.1em;
   color: var(--on-surface-variant);
   opacity: 0.6;
+  /* Prevent label from pushing copy button off-screen */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
 }
 
 .code-block-header .copy-btn {
@@ -418,6 +439,9 @@ input[type="email"]:focus {
   opacity: 0.5;
   transition: opacity 0.2s, color 0.2s;
   border-radius: var(--radius-sm);
+  /* Always keep copy button visible and never truncated */
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .code-block-header .copy-btn:hover {
@@ -428,6 +452,12 @@ input[type="email"]:focus {
 .code-block-wrapper pre {
   margin: 0;
   border-radius: 0 0 var(--radius-md) var(--radius-md);
+  /* Horizontal scroll within the block — critical for mobile */
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* Ensure code block is never wider than viewport */
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 /* Blockquotes */
@@ -451,14 +481,35 @@ input[type="email"]:focus {
 }
 
 /* Tables — DESIGN.MD §2: Tonal shifting, ghost borders */
+/* Wrapped in a scrollable div by MarkdownContent to avoid display:block on table */
+.md-body .table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  margin: 2rem 0;
+  border-radius: var(--radius-lg);
+}
+
 .md-body table {
   width: 100%;
+  min-width: 480px; /* prevent collapse below readable width */
   border-collapse: collapse;
-  margin: 2rem 0;
+  margin: 0;
   font-size: 0.9rem;
   background-color: var(--surface-container);
   border-radius: var(--radius-lg);
   overflow: hidden;
+}
+
+/* First column (ID / index) must never wrap */
+.md-body th:first-child,
+.md-body td:first-child {
+  white-space: nowrap;
+  min-width: 7rem;
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  color: var(--primary);
+  letter-spacing: 0.02em;
 }
 
 .md-body th {
@@ -530,7 +581,7 @@ input[type="email"]:focus {
 /* Layout utilities */
 .container {
   width: 100%;
-  max-width: 1200px;
+  max-width: min(1200px, 100%);
 }
 
 .mx-auto {
@@ -616,4 +667,154 @@ input[type="email"]:focus {
 .team-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+
+/* Lightbox animation for expandable images */
+@keyframes lightbox-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ========================================
+   Comprehensive Mobile & Tablet Responsive
+   ======================================== */
+
+/* --- Small mobile (< 480px) --- */
+@media (max-width: 480px) {
+  /* Main content padding */
+  .layout-main > div {
+    padding: 1rem !important;
+  }
+
+  /* Hero: stack columns, shrink gap */
+  .layout-main section:first-child {
+    grid-template-columns: 1fr !important;
+    gap: 2rem !important;
+    padding-top: 0.5rem !important;
+  }
+
+  /* Hero image: fill width at modest aspect ratio on mobile */
+  .layout-main section:first-child > div:last-child {
+    aspect-ratio: 16 / 9 !important;
+    max-height: 220px;
+  }
+
+  /* Version banner: tighter padding */
+  .layout-main section:nth-child(2) {
+    padding: 1.25rem !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 1rem !important;
+  }
+
+  .bento-card {
+    padding: 1.25rem !important;
+  }
+
+  /* Shrink pre/code on tiny screens */
+  .md-body pre {
+    padding: 0.75rem !important;
+    font-size: 0.8rem;
+  }
+
+  /* Code block header: tighter padding on mobile */
+  .code-block-header {
+    padding: 0.375rem 0.75rem !important;
+  }
+
+  /* Hide " Copy" / " Copied" text — show icon only on tiny screens */
+  .copy-btn-text {
+    display: none;
+  }
+
+  .md-body table {
+    font-size: 0.78rem;
+  }
+
+  .md-body th, .md-body td {
+    padding: 0.5rem 0.75rem !important;
+  }
+
+  /* Blockquote — tighter */
+  .md-body blockquote {
+    padding: 0.75rem 1rem !important;
+    margin: 1.25rem 0 !important;
+  }
+}
+
+/* --- Mobile (481px – 767px) --- */
+@media (min-width: 481px) and (max-width: 767px) {
+  .layout-main > div {
+    padding: 1.25rem !important;
+  }
+
+  .layout-main section:first-child {
+    grid-template-columns: 1fr !important;
+    gap: 2.5rem !important;
+  }
+
+  .layout-main section:first-child > div:last-child {
+    aspect-ratio: 16 / 9 !important;
+    max-height: 280px;
+  }
+  
+  .bento-card {
+    padding: 1.5rem !important;
+  }
+}
+
+/* --- Tablet (768px – 1023px) --- */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .layout-main > div {
+    padding: 1.5rem 2rem !important;
+  }
+
+  .layout-main section:first-child {
+    grid-template-columns: 1fr !important;
+    gap: 3rem !important;
+  }
+
+  .layout-main section:first-child > div:last-child {
+    aspect-ratio: 16 / 9 !important;
+    max-height: 360px;
+  }
+}
+
+/* --- Desktop with sidebar (>= 1024px) --- */
+@media (min-width: 1024px) {
+  /* Relax max-width slightly for better line length */
+  .layout-main > div {
+    max-width: 960px !important;
+    padding: 2rem 2.5rem !important;
+  }
+}
+
+/* --- Wide desktop (>= 1400px) --- */
+@media (min-width: 1400px) {
+  .layout-main > div {
+    max-width: 1100px !important;
+  }
+}
+
+/* Prevent horizontal scroll on all screens */
+body {
+  overflow-x: hidden;
+}
+
+/* Tables: horizontal scroll wrapper */
+.table-wrapper {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.md-body table td:first-child,
+.md-body table th:first-child {
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+/* Images should never overflow */
+.md-body img {
+  max-width: 100%;
+  height: auto;
 }

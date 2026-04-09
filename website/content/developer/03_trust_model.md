@@ -1,131 +1,211 @@
 # CARTA Trust Model
 
-Kest implements **Continuous Adaptive Risk and Trust Assessment (CARTA)**. Trust is not a static binary state ("authenticated" vs "unauthenticated"); it is fluid and evaluated dynamically based on the execution lineage.
+Kest implements **Continuous Adaptive Risk and Trust Assessment (CARTA)** — a model where trust is not a static binary (authenticated/unauthenticated) but a **dynamic integer** that flows through the execution graph, degrading through untrusted nodes and increasing only through explicit sanitization.
 
 ## Trust Scores (0–100)
 
-Every execution hop produces a JWS-signed `KestEntry`. Part of the signed payload includes a `trust_score` as an **integer between 0 (Untrusted) and 100 (Fully Trusted)**. This makes the score directly comparable to percentage-based policy thresholds in OPA and Cedar.
+Trust is represented as an integer from 0 (completely untrusted) to 100 (maximum trust). The score quantifies confidence in the provenance of the execution chain.
 
-### Origin Trust Map
+![Trust score propagation showing degradation through a service chain](/images/trust-degradation.png)
 
-When a function is the **root** of a chain (i.e., `is_root=True`), its initial trust score is bootstrapped from `ORIGIN_TRUST_MAP` using the `origin` parameter:
+### The ORIGIN_TRUST_MAP
 
-| `origin=` | `trust_score` | Description |
+Every data source has a default trust score defined in the `ORIGIN_TRUST_MAP` (Spec §7.1):
+
+| Source Type | Trust Score | Rationale |
 |---|---|---|
-| `"system"` | **100** | Trusted internal system component or cron job |
-| `"internal"` | **100** | Internal API gateway or service-to-service call |
-| `"verified_rag"` | **90** | Data from a verified RAG pipeline |
-| `"third_party_api"` | **60** | External integrations (Stripe, GitHub, etc.) |
-| `"user_input"` | **40** | Data provided by a human user directly |
-| `"internet"` | **10** | Traffic from the untrusted public internet |
-| `"llm"` | **0** | Raw, unverified LLM output |
+| `system` | 100 | Machine-generated, no human input |
+| `internal` | 80 | Internal API, behind perimeter |
+| `verified_partner` | 70 | Contractually bound external partner |
+| `partner` | 60 | Third-party integration |
+| `authenticated_user` | 50 | Known human user, verified identity |
+| `user_input` | 40 | Unverified user-provided data |
+| `third_party` | 30 | External, untrusted service |
+| `unauthenticated` | 10 | No identity verification |
+| `adversarial` | 0 | Explicitly hostile input (pen testing) |
+
+### Using `source_type`
 
 ```python
-# Public API: bootstrapped at trust_score=10
-@kest_verified(policy="api_gateway", origin="internet")
-async def handle_public_request():
-    ...
+@kest_verified(
+    policy="kest/allow_trusted",
+    source_type="user_input"  # trust = 40
+)
+def handle_form_submission(data: dict):
+    return validate(data)
+```
 
-# Internal service: bootstrapped at trust_score=100
-@kest_verified(policy="task_policy", origin="internal")
-async def execute_task():
-    ...
+### Registering Custom Source Types
+
+Extend the trust map with domain-specific source types:
+
+```python
+from kest.core import register_origin_trust
+
+register_origin_trust("ml_model_output", 65)
+register_origin_trust("llm_generated", 25)
+
+@kest_verified(
+    policy="kest/allow_trusted",
+    source_type="llm_generated"  # trust = 25
+)
+def process_llm_output(text: str):
+    return sanitize(text)
 ```
 
 ## Trust Propagation
 
-By default, Kest applies a **weakest-link** propagation model across the DAG:
+When a `@kest_verified` function calls another `@kest_verified` function, trust propagates with **monotonic non-increase** — it can only stay the same or decrease:
 
 ```
-score = (min(parent_scores) * self_score) // 100
+effective_trust = min(parent_trust, self_origin_trust)
 ```
 
-This means:
-- A single low-trust ancestor degrades all downstream scores.
-- Trust **never improves** without an explicit override.
-- An internet entry (score=10) propagating through an internal node (score=100) yields: `(10 * 100) // 100 = 10`.
+### Example: Trust Degradation
 
 ```python
-from kest.core.models import DefaultTrustEvaluator
+@kest_verified(policy="allow", source_type="system")        # trust=100
+def step_1():
+    return step_2()
 
-evaluator = DefaultTrustEvaluator()
-# evaluator.calculate(self_score=100, parent_scores=[10, 100])
-# → (10 * 100) // 100 = 10
+@kest_verified(policy="allow", source_type="internal")      # trust=min(100,80)=80
+def step_2():
+    return step_3()
+
+@kest_verified(policy="allow", source_type="user_input")    # trust=min(80,40)=40
+def step_3():
+    return {"result": "processed"}
 ```
 
-## Policy Integration
+The trust at `step_3` is 40 — capped by `user_input` — regardless of how many trusted hops preceded it. This is the core CARTA principle: **one untrusted input taints the entire chain**.
 
-The `trust_score` integer is passed directly to the policy engine context. Policies compare it against integer thresholds:
+## Trust Override
 
-### Rego Example
-
-```rego
-package kest.allow
-
-import future.keywords
-
-default allow := false
-
-allow if {
-    input.trust_score >= 80
-    input.is_root == false
-}
-```
-
-### Cedar Example
-
-```cedar
-permit(principal, action, resource) when {
-    context["trust_score"] >= 50 &&
-    context has "principal_scope" &&
-    context["principal_scope"] == "task:process-data"
-};
-```
-
-## Implementing Custom Evaluators
-
-For systems with advanced risk models, inject a custom `TrustEvaluator`:
-
-```python
-from typing import List
-from kest.core import TrustEvaluator, kest_verified
-
-class WeightedTrustEvaluator(TrustEvaluator):
-    def calculate(self, self_score: int, parent_scores: List[int]) -> int:
-        """Weighted average of parent scores biased toward history."""
-        if not parent_scores:
-            return self_score
-        avg_parent = sum(parent_scores) // len(parent_scores)
-        return (avg_parent * 70 + self_score * 30) // 100
-
-@kest_verified(policy="advanced_check", trust_evaluator=WeightedTrustEvaluator())
-def my_function():
-    ...
-```
-
-## Lineage Taints
-
-Taints represent specific risks or data provenance labels (e.g., `"contains_pii"`, `"unverified_llm_output"`). Unlike the numeric trust score, taints are strings that **accumulate** across the DAG.
-
-- **`added_taints`**: New risks introduced at this node.
-- **`removed_taints`**: Taints this node has verified and cleaned (requires explicit override).
-- **`taints`**: The full set of accumulated taints at this point in the chain.
-
-All three are recorded in the signed `KestEntry` payload and passed to the policy engine for enforcement.
-
-### Sanitizers — Taint Removal & Trust Override
-
-To explicitly increase trust or declare data clean, configure a node as a **Sanitizer**:
+In some cases, you need direct control over the trust score — for example, when a function sanitizes input and should be trusted at a higher level:
 
 ```python
 @kest_verified(
-    policy="sanitizer_policy",
-    trust_override=100,                    # bypass evaluator; force score to 100
-    removed_taints=["unverified_input"],   # declare these taints cleared
+    policy="kest/allow_trusted",
+    trust_override=80  # Override to 80, bypassing propagation
 )
-async def input_scanner(data):
-    # After this node, trust_score=100 and "unverified_input" is gone from taints.
-    ...
+def sanitize_user_input(data: dict) -> dict:
+    """After validation and sanitization, we trust this output."""
+    validated = deep_validate(data)
+    return escape_all_strings(validated)
 ```
 
-The `removed_taints` are recorded in the signed payload so the removal itself is cryptographically auditable — any verifier can confirm *which* node claimed to sanitize which taints.
+> **Warning**: `trust_override` bypasses the normal propagation rules. Use it only for functions that genuinely transform untrusted data into a trusted form (sanitizers, validators, cryptographic verifiers). The override is recorded in the signed KestEntry, making it auditable.
+
+## TrustEvaluator Interface
+
+The trust computation logic is injectable via the `TrustEvaluator` interface (Spec §7):
+
+```python
+from abc import ABC, abstractmethod
+
+class TrustEvaluator(ABC):
+    @abstractmethod
+    def compute_trust(
+        self,
+        source_type: str,
+        parent_trust: int | None,
+        trust_override: int | None,
+    ) -> int:
+        """Compute the trust score for the current hop."""
+```
+
+### DefaultTrustEvaluator
+
+The built-in `DefaultTrustEvaluator` implements the standard propagation rules:
+
+```python
+from kest.core import DefaultTrustEvaluator
+
+evaluator = DefaultTrustEvaluator()
+
+# Root node, no parent
+evaluator.compute_trust("internal", None, None)  # → 80
+
+# Child node with parent trust
+evaluator.compute_trust("user_input", 80, None)  # → 40
+
+# With trust override
+evaluator.compute_trust("user_input", 80, 90)    # → 90
+```
+
+### Custom TrustEvaluator
+
+For organization-specific trust models (e.g., trust scores that factor in time-of-day, geographic region, or threat intelligence feeds):
+
+```python
+class ThreatAwareTrustEvaluator(TrustEvaluator):
+    def __init__(self, threat_intelligence_client):
+        self._threat = threat_intelligence_client
+
+    def compute_trust(self, source_type, parent_trust, trust_override):
+        base = ORIGIN_TRUST_MAP.get(source_type, 0)
+        if parent_trust is not None:
+            base = min(parent_trust, base)
+        if trust_override is not None:
+            base = trust_override
+        # Reduce trust during active incidents
+        if self._threat.active_incident():
+            base = max(0, base - 20)
+        return base
+```
+
+## Taints: Tracking Risk Tags
+
+While trust is a numeric score, **taints** are named labels that track *what kind of risk* a node introduces:
+
+### Adding Taints
+
+```python
+@kest_verified(
+    policy="kest/allow_trusted",
+    source_type="user_input",
+    added_taints=["user_input", "contains_pii"]
+)
+def receive_user_profile(profile: dict):
+    return profile
+```
+
+### Removing Taints (Sanitization)
+
+```python
+@kest_verified(
+    policy="kest/allow_trusted",
+    source_type="internal",
+    removed_taints=["contains_pii"],
+    trust_override=80
+)
+def redact_pii(profile: dict) -> dict:
+    """Remove PII and declare data safe."""
+    return {k: v for k, v in profile.items() if k != "ssn"}
+```
+
+### Taint Propagation Formula
+
+```
+taints(current) = (taints(parent) ∪ added_taints) − removed_taints
+```
+
+Taints are **cumulative** and **inherited** — a downstream function sees all taints from its ancestors plus its own additions, minus any declared removals.
+
+### Using Taints in Policies
+
+```rego
+package kest.require_sanitized
+
+default allow = false
+
+# Only allow if no dangerous taints remain
+allow {
+    not input.subject.taints[_] == "user_input"
+    not input.subject.taints[_] == "contains_pii"
+}
+```
+
+---
+
+*For the normative specification of trust propagation, see [Spec §7](../blog/design/kest_spec_v0.3.0). For the complete decorator parameters, see [Decorators Reference](decorators).*

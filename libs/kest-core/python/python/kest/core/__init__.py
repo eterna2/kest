@@ -39,18 +39,24 @@ from kest.core.models import (
     DefaultTrustEvaluator,
     PassportVerifier,
     BaggageManager,
+    register_origin_trust,
 )
 from kest.core.ext import KestMiddleware, KestHttpxInterceptor
+from typing import Any
 
 _active_engine: PolicyEngine | None = None
 _active_identity: IdentityProvider | None = None
 _active_cache: CacheProvider | None = None
+_active_enterprise_policies: list[str] = []
+_active_deviations: list[Any] = []
 
 
 def configure(
     engine: PolicyEngine | None = None,
     identity: IdentityProvider | None = None,
     cache: CacheProvider | None = None,
+    enterprise_policies: list[str] | None = None,
+    deviations: list[Any] | None = None,
     clear: bool = False,
 ):
     """
@@ -64,13 +70,17 @@ def configure(
         engine: The PolicyEngine to use for @kest_verified checks.
         identity: The IdentityProvider for signing audit entries.
         cache: (Optional) Cache for policy results and lineage claim-checks.
+        enterprise_policies: (Optional) List of policy names enforced at the enterprise level tier.
+        deviations: (Optional) List of PolicyDeviations for bypassing baseline policies.
         clear: If True, resets all global configurations to None.
     """
-    global _active_engine, _active_identity, _active_cache
+    global _active_engine, _active_identity, _active_cache, _active_enterprise_policies, _active_deviations
     if clear:
         _active_engine = None
         _active_identity = None
         _active_cache = None
+        _active_enterprise_policies = []
+        _active_deviations = []
 
     if engine:
         _active_engine = engine
@@ -82,6 +92,10 @@ def configure(
             _active_identity = get_default_identity()
     if cache:
         _active_cache = cache
+    if enterprise_policies is not None:
+        _active_enterprise_policies = enterprise_policies
+    if deviations is not None:
+        _active_deviations = deviations
 
 
 __all__ = [
@@ -115,4 +129,5 @@ __all__ = [
     "DefaultTrustEvaluator",
     "PassportVerifier",
     "BaggageManager",
+    "register_origin_trust",
 ]

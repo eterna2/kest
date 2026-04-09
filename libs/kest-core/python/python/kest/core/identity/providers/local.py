@@ -79,19 +79,21 @@ class MockIdentityProvider(IdentityProvider):
 
     def sign(self, payload: bytes) -> str:
         """
-        Generates a non-cryptographic mock signature.
+        Returns only the signature portion of a mock JWS.
+
+        The Rust bridge (sign_kest_entry) constructs the full JWS as:
+          header_b64 . payload_b64 . <return-value-of-sign>
+        So this method MUST return only the signature segment — a structurally
+        valid base64url string — NOT a full JWS itself.
 
         Args:
-            payload: The binary payload to 'sign'.
+            payload: The binary payload to 'sign' (the signing input bytes
+                     passed by the Rust bridge: header_b64.payload_b64).
 
         Returns:
-            str: A mock JWS string.
+            str: A base64url-encoded mock signature (no dots).
         """
-        # Fake JWS for Mock
-        header = (
-            base64.urlsafe_b64encode(b'{"alg":"mock","typ":"JWS"}').decode().rstrip("=")
-        )
-        payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
-        return (
-            f"{header}.{payload_b64}.mock-sig.{hashlib.sha256(payload).hexdigest()[:8]}"
-        )
+        # Produce a deterministic, structurally valid base64url signature part.
+        # Using HMAC-SHA256 of the payload gives a constant-length 44-char output.
+        raw = hashlib.sha256(b"mock-key" + payload).digest()
+        return base64.urlsafe_b64encode(raw).decode().rstrip("=")

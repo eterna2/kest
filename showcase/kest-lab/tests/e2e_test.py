@@ -6,27 +6,26 @@ import httpx
 import base64
 import hashlib
 
+from conftest import requires_keycloak
+
 
 def get_payload(sig):
-    try:
-        parts = sig.split(".")
-        # Try each part to find the KestEntry JSON
-        for part in parts:
-            try:
-                # Handle base64url padding
-                p_b64 = part + "=" * ((4 - len(part) % 4) % 4)
-                data = json.loads(base64.urlsafe_b64decode(p_b64))
-                # KestEntry payload contains entry_id (not "resource" which is an old schema)
-                if isinstance(data, dict) and "entry_id" in data:
-                    return data
-            except Exception:
-                continue
-        return {}
-    except Exception:
-        return {}
+    parts = sig.split(".", maxsplit=2)
+    if len(parts) != 3:
+        raise ValueError("Invalid JWS signature format.")
+    
+    payload_b64 = parts[1]
+    payload_b64 += "=" * ((4 - len(payload_b64) % 4) % 4)
+    data = json.loads(base64.urlsafe_b64decode(payload_b64))
+    return data
 
-
+@requires_keycloak
+@pytest.mark.live
 def test_distributed_e2e():
+    """
+    F-PA-*: Ensures multi-hop baggage parsing and cryptographic signature extraction works.
+    F-AE-*: Ensures all mandatory KestEntry fields are correctly serialized across hops.
+    """
     print("--- Starting Distributed E2E Integration Test ---")
 
     # 0. Clear old audit files
@@ -116,6 +115,12 @@ def test_distributed_e2e():
         print(
             f"  [{i}] Operation: {p.get('operation')} (Principal: {identity}, Trust: {score})"
         )
+        
+        # F-AE-* Assertions
+        assert p.get("schema_version") == "0.3.0", f"Hop {i} missing/invalid schema_version"
+        assert p.get("runtime", {}).get("name") == "kest-python", f"Hop {i} missing/invalid runtime name"
+        assert isinstance(p.get("policy_context"), dict), f"Hop {i} missing policy_context"
+        assert "function_policies" in p["policy_context"]
 
     if len(sorted_sigs) < 3:
         pytest.fail("Expected at least 3 hops in the Merkle chain.")

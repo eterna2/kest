@@ -1,41 +1,75 @@
 # Developer Guide
 
-Welcome to the Kest Developer Guide. This section provides step-by-step tutorials, architectural deep-dives, and integration patterns for building high-fidelity Zero Trust systems.
+Welcome to the Kest Developer Guide. This section takes you from zero to a fully secured, policy-enforced, cryptographically audited microservice in Python.
 
-Kest is designed to be **Secure by Architecture**. By following these guides, you will move beyond peripheral security (firewalls and API keys) toward **Continuous Verification** and **Verifiable Execution Lineage**.
+## Learning Path
+
+| Step | Article | What You'll Learn |
+|---|---|---|
+| 1 | [Getting Started](getting_started) | Installation, configuration, your first `@kest_verified` function |
+| 2 | [Trust Model](trust_model) | CARTA trust scores, degradation, sanitizers, `ORIGIN_TRUST_MAP` |
+| 3 | [Identity & Context](identity_context) | Identity providers, user/agent/task context, auto-detection |
+| 4 | [Decorators Reference](decorators) | Every `@kest_verified` parameter, the 13-step lifecycle |
+| 5 | [Distributed Propagation](middleware) | Middleware stack, `KestMiddleware`, `KestHttpxInterceptor`, Claim Check |
+| 6 | [Testing & Kest Lab](testing) | `MockPolicyEngine`, unit tests, the kest-lab integration environment |
+| 7 | [Telemetry & Visualization](visualization) | OTel setup, exporters, `kest-viz` CLI |
+| 8 | [Kest Lab Deep Dive](kest_lab) | Docker Compose architecture, SPIRE, OPA, Cedar, Keycloak, 17 integration tests |
+
+## Prerequisites
+
+- **Python 3.11+** (the reference implementation)
+- **pip** or **uv** for package management
+- **Docker & Docker Compose** (for kest-lab integration tests)
+- Basic familiarity with REST APIs and microservices
+
+## Architecture at a Glance
+
+```mermaid
+graph TB
+    subgraph "Your Application"
+        A["@kest_verified decorator"]
+        B["Business Logic"]
+    end
+    subgraph "Kest Core"
+        C["IdentityProvider"]
+        D["PolicyEngine"]
+        E["Passport (Merkle DAG)"]
+        F["TrustEvaluator"]
+    end
+    subgraph "Infrastructure"
+        G["SPIRE Agent"]
+        H["OPA / Cedar Sidecar"]
+        I["OTel Collector"]
+    end
+    A --> C
+    A --> D
+    A --> E
+    A --> F
+    C --> G
+    D --> H
+    E --> I
+    A --> B
+```
+
+## Quick Start
+
+```python
+from kest.core import configure, MockPolicyEngine, kest_verified
+
+# 1. Configure (once at startup)
+configure(engine=MockPolicyEngine(allow=True))
+
+# 2. Protect your function
+@kest_verified(policy="kest/allow_trusted", source_type="internal")
+def process_data(payload: dict):
+    return {"status": "processed", "items": len(payload)}
+
+# 3. Call it normally
+result = process_data({"key": "value"})
+```
+
+That's it. Kest handles identity, signing, policy evaluation, Merkle chain linkage, and OTel emission automatically.
 
 ---
 
-## 🛤️ The Path to Mastery
-
-Whether you are securing a single microservice or orchestrating a distributed intelligence swarm, we recommend following this progression:
-
-### 🐣 1. Fundamentals
-Get up and running with the Kest core and understand the mental model behind the framework.
-- **[Getting Started](getting_started.md)**: Your first 10 minutes with Kest—installation, configuration, and basic protection.
-- **[The Trust Model](trust_model.md)**: Deep-dive into Identity-First security, SPIFFE attestation, and Merkle DAG chains.
-
-### 🛠️ 2. Integration Patterns
-Learn how to weave Kest into your existing application stacks with minimal friction.
-- **[Decorators & Trust Scores](decorators.md)**: Using `@kest_verified` to enforce policies and manage complex execution taints.
-- **[Identity & Resource Context](identity_context.md)**: Passing `user`, `agent`, `task`, and `resource_attr` for fine-grained, identity-aware ABAC enforcement.
-- **[Middleware & Context Propagation](middleware.md)**: Automatically passing the Merkle lineage and JWT identity across FastAPI, HTTPX, and background workers.
-
-### 🔬 3. Observability & Assurance
-Verify that your system is behaving as expected and maintain a non-fungible audit trail.
-- **[Lineage Visualization](visualization.md)**: Generating Mermaid.js Merkle DAGs from your execution history.
-- **[Testing & Verification](testing.md)**: Best practices for TDD in Zero Trust environments.
-- **[Kest Lab (E2E Simulation)](kest_lab.md)**: Using our distributed Docker lab to simulate real-world attacks and multi-hop trace leakage.
-
----
-
-## 🧠 The Kest Way: Design Principles
-
-As you navigate these guides, keep the following core principles in mind:
-
-1.  **Identity is the Perimeter**: Every action requires a cryptographically verified workload identity (SVID).
-2.  **No Blind Trust**: Use the `kest_verified` trust scores to dynamically adjust behavior based on a request's lineage.
-3.  **Audit is Data**: Your execution history is as valuable as your business data. Treat it as a first-class, tamper-evident citizen.
-
----
-*For low-level implementation details, see the [API Reference](../reference/README.md). For ready-to-use security models, explore the [Policy Library](../policies/README.md).*
+*Ready to begin? Start with [Getting Started](getting_started).*

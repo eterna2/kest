@@ -45,7 +45,17 @@ export default function CopyButton({ text }: { text: string }) {
         borderRadius: 'var(--radius-sm)',
       }}
     >
-      {copied ? '✓ Copied' : 'Copy'}
+      {copied ? (
+        <>
+          <span className="copy-btn-icon">✓</span>
+          <span className="copy-btn-text"> Copied</span>
+        </>
+      ) : (
+        <>
+          <span className="copy-btn-icon">⧉</span>
+          <span className="copy-btn-text"> Copy</span>
+        </>
+      )}
     </button>
   );
 }

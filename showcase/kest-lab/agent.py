@@ -48,7 +48,7 @@ else:
 JWKS_URI = os.getenv("KEYCLOAK_JWKS_URI")
 
 
-def _load_cedar_policies(policy_dir: str = "/app/cedar/policies") -> dict:
+def _load_cedar_policies(policy_dir: str = "/workspace/app/cedar/policies") -> dict:
     policies = {}
     if os.path.isdir(policy_dir):
         for fname in os.listdir(policy_dir):

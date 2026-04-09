@@ -76,7 +76,7 @@ HOP1_URL = os.getenv("HOP1_URL", "http://hop1:8000")
 TASK_TTL_SECONDS = int(os.getenv("TASK_TOKEN_TTL", "300"))  # 5 minutes
 
 
-def _load_cedar_policies(policy_dir: str = "/app/cedar/policies") -> dict:
+def _load_cedar_policies(policy_dir: str = "/workspace/app/cedar/policies") -> dict:
     policies = {}
     if os.path.isdir(policy_dir):
         for fname in os.listdir(policy_dir):

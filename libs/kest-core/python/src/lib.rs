@@ -1,7 +1,52 @@
 use pyo3::prelude::*;
-use kest_core_rs::models::{KestEntry as CoreEntry, KestClassification};
+use pyo3::types::{PyDict, PyList};
+use kest_core_rs::models::{
+    KestEntry as CoreEntry, KestClassification, KestRuntime, PolicyContext, PolicyDeviation,
+};
 use kest_core_rs::crypto::{IdentityProvider as CoreIdentityProvider, CryptoError};
 use std::collections::BTreeMap;
+
+/// Converts a Python dict representing a PolicyContext into the Rust PolicyContext struct.
+fn py_dict_to_policy_context(py: Python<'_>, dict: &Bound<'_, PyDict>) -> PolicyContext {
+    let get_str_vec = |key: &str| -> Vec<String> {
+        dict.get_item(key)
+            .ok()
+            .flatten()
+            .and_then(|v| v.downcast::<PyList>().ok().map(|l| {
+                l.iter()
+                    .filter_map(|i| i.extract::<String>().ok())
+                    .collect()
+            }))
+            .unwrap_or_default()
+    };
+
+    let deviations = dict
+        .get_item("deviations")
+        .ok()
+        .flatten()
+        .and_then(|v| v.downcast::<PyList>().ok().map(|l| {
+            l.iter()
+                .filter_map(|item| {
+                    let d = item.downcast::<PyDict>().ok()?;
+                    Some(PolicyDeviation {
+                        policy: d.get_item("policy").ok().flatten()?.extract::<String>().ok()?,
+                        tier: d.get_item("tier").ok().flatten()?.extract::<String>().ok()?,
+                        reason: d.get_item("reason").ok().flatten().and_then(|v| v.extract::<String>().ok()),
+                        approver: d.get_item("approver").ok().flatten().and_then(|v| v.extract::<String>().ok()),
+                    })
+                })
+                .collect()
+        }))
+        .unwrap_or_default();
+
+    PolicyContext {
+        enterprise_policies: get_str_vec("enterprise_policies"),
+        platform_policies: get_str_vec("platform_policies"),
+        app_policies: get_str_vec("app_policies"),
+        function_policies: get_str_vec("function_policies"),
+        deviations,
+    }
+}
 
 #[pyclass]
 #[derive(Clone)]
@@ -12,8 +57,23 @@ pub struct KestEntry {
 #[pymethods]
 impl KestEntry {
     #[new]
-    #[pyo3(signature = (entry_id, operation, classification, trust_score, parent_ids=None, labels=None, added_taints=None, removed_taints=None, taints=None))]
+    #[pyo3(signature = (
+        entry_id,
+        operation,
+        classification,
+        trust_score,
+        parent_ids=None,
+        labels=None,
+        added_taints=None,
+        removed_taints=None,
+        taints=None,
+        schema_version=None,
+        runtime_name=None,
+        runtime_version=None,
+        policy_context=None,
+    ))]
     fn new(
+        py: Python<'_>,
         entry_id: String,
         operation: String,
         classification: String,
@@ -23,6 +83,10 @@ impl KestEntry {
         added_taints: Option<Vec<String>>,
         removed_taints: Option<Vec<String>>,
         taints: Option<Vec<String>>,
+        schema_version: Option<String>,
+        runtime_name: Option<String>,
+        runtime_version: Option<String>,
+        policy_context: Option<Bound<'_, PyDict>>,
     ) -> Self {
         let classification_enum = match classification.to_lowercase().as_str() {
             "system" => KestClassification::System,
@@ -32,7 +96,17 @@ impl KestEntry {
             _ => KestClassification::System,
         };
 
+        let pc = policy_context
+            .as_ref()
+            .map(|d| py_dict_to_policy_context(py, d))
+            .unwrap_or_default();
+
         let inner = CoreEntry {
+            schema_version: schema_version.unwrap_or_else(|| "0.3.0".to_string()),
+            runtime: KestRuntime {
+                name: runtime_name.unwrap_or_else(|| "kest-python".to_string()),
+                version: runtime_version.unwrap_or_else(|| env!("CARGO_PKG_VERSION").to_string()),
+            },
             entry_id,
             parent_ids: parent_ids.unwrap_or_default(),
             classification: classification_enum,
@@ -51,6 +125,7 @@ impl KestEntry {
             taints: taints.unwrap_or_default(),
             trust_score,
             metadata: None,
+            policy_context: pc,
         };
 
         KestEntry { inner }
@@ -84,6 +159,32 @@ impl KestEntry {
     #[getter]
     fn taints(&self) -> Vec<String> {
         self.inner.taints.clone()
+    }
+
+    /// Returns the policy_context as a Python dict.
+    #[getter]
+    fn policy_context(&self, py: Python<'_>) -> PyResult<PyObject> {
+        let pc = &self.inner.policy_context;
+        let d = PyDict::new(py);
+        d.set_item("enterprise_policies", &pc.enterprise_policies)?;
+        d.set_item("platform_policies", &pc.platform_policies)?;
+        d.set_item("app_policies", &pc.app_policies)?;
+        d.set_item("function_policies", &pc.function_policies)?;
+
+        let dev_list: Vec<PyObject> = pc.deviations.iter().map(|dv| {
+            let dd = PyDict::new(py);
+            dd.set_item("policy", &dv.policy).unwrap();
+            dd.set_item("tier", &dv.tier).unwrap();
+            if let Some(r) = &dv.reason {
+                dd.set_item("reason", r).unwrap();
+            }
+            if let Some(a) = &dv.approver {
+                dd.set_item("approver", a).unwrap();
+            }
+            dd.to_object(py)
+        }).collect();
+        d.set_item("deviations", dev_list)?;
+        Ok(d.into())
     }
 }
 

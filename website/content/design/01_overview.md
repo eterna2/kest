@@ -1,54 +1,68 @@
-# High-Level Overview
+# Why Kest?
 
-Kest (Key + Trust) provides a cryptographically verifiable framework for distributed execution. It ensures that every action taken by a microservice is authenticated via **Workload Identity**, authorized via **Fine-Grained Policy**, and immutably recorded in a **Merkle-Linked Audit Trail**.
+Modern distributed systems are secured at the perimeter — firewalls, API gateways, and static API keys form the first and often the only line of defense. Once an attacker breaches this perimeter or compromises a single key, they move laterally through the network with impunity. Logs can be altered, dropped, or spoofed. Post-breach forensics becomes guesswork.
 
-## The Zero Trust Request Flow
+Kest exists because perimeter security is not enough.
 
-When a request enters a Kest-secured system, it undergoes continuous verification at every hop.
+## The Gap in Current Zero Trust
 
-```mermaid
-sequenceDiagram
-    participant U as External User
-    participant H1 as Service Hop 1
-    participant S as SPIRE Agent
-    participant P as Policy Sidecar (OPA/Cedar)
-    participant O as OTel Collector
+Zero Trust architectures (NIST SP 800-207) mandate "never trust, always verify." But most implementations stop at the authentication step — *is this caller who they claim to be?* They rarely ask the deeper question: *what is the full history of this request, and can I cryptographically prove it hasn't been tampered with?*
 
-    U->>H1: Request
-    H1->>S: Fetch X509-SVID
-    S-->>H1: Cert + Private Key
-    H1->>P: Evaluate Policy (context + identity)
-    P-->>H1: Allow
-    H1->>H1: Execute Logic
-    H1->>O: Export Signed Merkle Span
-    H1->>Service Hop 2: Request + Kest Baggage
+Consider a 3-hop microservice call:
+
+```
+User → API Gateway → Payment Service → Database Service
 ```
 
-## Core Components
+Traditional approaches verify identity at each hop independently. But if the Payment Service is compromised, it can:
+1. Forge its identity in logs
+2. Claim the request came from a different origin
+3. Drop inconvenient audit records
+4. Replay old, legitimate requests to the Database Service
+
+These attacks are invisible to conventional logging because logs are **fungible** — mutable text files forwarded to a centralized system.
+
+## The Kest Approach
+
+Kest combines three pillars into a single, cohesive toolkit:
 
 ### 1. Workload Identity (SPIFFE/SPIRE)
-Kest eliminates the "Secret Zero" problem. Services do not use static API keys. Instead, they attest their identity to a local SPIRE Agent to receive short-lived, dynamically rotated X509 certificates.
 
-### 2. Policy Sidecars (ABAC)
-Every hop enforces its own rules. By using local sidecars (OPA or Cedar), Kest ensures that authorization is performed with sub-millisecond latency. Policies can be **Lineage-Aware**, meaning they can inspect the entire path the request has taken.
+Services do not use static API keys. They receive short-lived, automatically rotated X.509 certificates from SPIRE, where the infrastructure itself attests the workload's identity through kernel-level evidence. No shared secrets ever touch the wire.
 
-### 3. Merkle-Linked Audit Trail
-Traditional logs are fungible. Kest logs are **Non-Fungible**. Each execution span contains a cryptographic signature that links to the hash of the previous signature.
+*Spec Reference: §5.1 IdentityProvider, Principle P1*
 
-```mermaid
-graph LR
-    subgraph "Execution Lineage (The Passport)"
-    H1[Hop 1 Signature] -->|Hash Link| H2[Hop 2 Signature]
-    H2 -->|Hash Link| H3[Hop 3 Signature]
-    end
-    
-    H1 -.-> O1[OTel Span 1]
-    H2 -.-> O2[OTel Span 2]
-    H3 -.-> O3[OTel Span 3]
-```
+### 2. Cryptographic Lineage (Merkle DAG)
 
-## Why Kest?
+Every execution hop produces a **KestEntry** — a JSON Web Signature (JWS) whose payload is canonicalized per RFC 8785 and whose `parent_ids` field hashes the preceding JWS. This creates a tamper-evident Merkle chain called the **Passport**. If any prior entry is altered, every subsequent hash breaks.
 
-- **Non-Repudiation**: Services cannot deny their actions; every span is signed by their unique private key.
-- **Tamper-Evidence**: If an attacker alters a log entry or tries to inject a fake hop, the Merkle chain breaks immediately.
-- **CARTA Compliance**: Trust is calculated continuously based on the proven history of the request, not just the last hop.
+![Merkle chain linking three execution hops via SHA-256 parent hashes](/images/merkle-chain.png)
+
+*Spec Reference: §4.1 KestEntry, §4.4 Passport, Principle P3*
+
+### 3. Continuous Verification (OPA/Cedar)
+
+At every hop, a co-located policy sidecar evaluates the *entire* cryptographic lineage — not just the immediate caller. This enables Continuous Adaptive Risk and Trust Assessment (CARTA): trust is a dynamic integer (0–100) that degrades through untrusted hops and can only be restored by explicitly declared, cryptographically signed sanitizers.
+
+*Spec Reference: §9 Policy Engine, §7 Trust Model, Principle P2*
+
+## What You Get
+
+| Capability | Traditional | Kest |
+|---|---|---|
+| **Identity** | Static API keys | Ephemeral SPIRE SVIDs |
+| **Audit** | Mutable JSON logs | Merkle-linked JWS signatures |
+| **Authorization** | Per-hop RBAC | Full-lineage ABAC (OPA/Cedar) |
+| **Trust** | Binary (auth/unauth) | Continuous integer 0–100 |
+| **Tamper detection** | None | Cryptographic hash chain |
+| **Cross-language** | Framework-specific | Spec-driven, language-agnostic |
+
+## Target Audiences
+
+-   **Security & Crypto Engineers** — dive into the [Design Principles](principles) and [Specification](kest_spec_v0.3.0) to understand our cryptographic guarantees.
+-   **Platform & Infra Engineers** — explore the [Developer Guide](/developers/guide/getting_started) to deploy SPIRE, configure OPA/Cedar, and manage OTel collectors.
+-   **Application Developers** — check out the [Getting Started](/developers/guide/getting_started) guide to see how simple it is to secure your functions with `@kest_verified`.
+
+---
+
+*The full normative specification is available in the [Kest v0.3.0 Spec](kest_spec_v0.3.0).*

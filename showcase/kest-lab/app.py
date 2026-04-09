@@ -76,7 +76,7 @@ else:
 # --- Load Cedar policies from /app/cedar/policies/*.cedar ---
 # CedarLocalEngine evaluates in-process using cedarpy (Rust-backed).
 # This avoids the sidecar's entity-UID API format requirements.
-def _load_cedar_policies(policy_dir: str = "/app/cedar/policies") -> dict:
+def _load_cedar_policies(policy_dir: str = "/workspace/app/cedar/policies") -> dict:
     policies = {}
     if os.path.isdir(policy_dir):
         for fname in os.listdir(policy_dir):

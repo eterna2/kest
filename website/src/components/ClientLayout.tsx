@@ -21,7 +21,7 @@ export default function ClientLayout({ children, searchItems = [] }: { children:
       <BottomNav />
       
       {/* Dynamic Content Area with Desktop Sidebar Offset */}
-      <main className="layout-main" style={{ paddingTop: '96px', minHeight: '100vh' }}>
+      <main className="layout-main" style={{ paddingTop: '80px', minHeight: '100vh' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '2rem' }}>
           {children}
         </div>

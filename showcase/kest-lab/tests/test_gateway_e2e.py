@@ -22,6 +22,8 @@ from conftest import (
     get_keycloak_token,
     exchange_token_obo,
     decode_jwt_payload,
+    requires_keycloak,
+    requires_gateway,
 )
 
 AGENT_URL = "http://kest-agent:8001"
@@ -74,6 +76,8 @@ def all_audit_payloads(audit_entries: list[str]) -> list[dict]:
 # Flow D: Full delegation chain — happy path
 # ---------------------------------------------------------------------------
 
+@requires_keycloak
+@requires_gateway
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_full_delegation_chain_alice(wait_for_audit):
@@ -166,6 +170,8 @@ async def test_full_delegation_chain_alice(wait_for_audit):
 # Flow E: Insufficient delegated scope — gateway denies
 # ---------------------------------------------------------------------------
 
+@requires_keycloak
+@requires_gateway
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_gateway_denies_insufficient_scope():
@@ -209,6 +215,8 @@ async def test_gateway_denies_insufficient_scope():
 # Flow F: Task token cannot re-authorise (scope boundary enforcement)
 # ---------------------------------------------------------------------------
 
+@requires_keycloak
+@requires_gateway
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_task_token_cannot_access_authorise_endpoint():
@@ -256,6 +264,8 @@ async def test_task_token_cannot_access_authorise_endpoint():
 # Flow G: Audit trail integrity
 # ---------------------------------------------------------------------------
 
+@requires_keycloak
+@requires_gateway
 @pytest.mark.live
 @pytest.mark.asyncio
 async def test_audit_trail_integrity(wait_for_audit):
