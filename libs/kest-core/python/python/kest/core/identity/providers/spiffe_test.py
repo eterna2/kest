@@ -1,5 +1,6 @@
 import pytest
-from kest.core.identity.providers.spiffe import SPIREProvider, HAS_SPIFFE
+
+from kest.core.identity.providers.spiffe import HAS_SPIFFE, SPIREProvider
 
 
 def test_spire_provider_fail_secure():

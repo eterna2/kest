@@ -1,11 +1,12 @@
-from opentelemetry import baggage
 import opentelemetry.context as otel_context
+from opentelemetry import baggage
+
 from kest.core import (
-    kest_verified,
-    configure,
     MockIdentityProvider,
     MockPolicyEngine,
     SimpleCache,
+    configure,
+    kest_verified,
 )
 
 

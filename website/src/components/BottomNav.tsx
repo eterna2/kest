@@ -2,10 +2,12 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Book, Terminal, User } from 'lucide-react';
+import { Home, Book, Terminal, User, Pencil, Moon } from 'lucide-react';
+import { useTheme } from './ThemeProvider';
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { theme, toggleTheme, mounted } = useTheme();
 
   const navItems = [
     { label: 'Home', href: '/', icon: Home },
@@ -26,8 +28,8 @@ export default function BottomNav() {
       alignItems: 'center',
       justifyContent: 'space-around',
       /* Glass Rule (DESIGN.md §2) */
-      backgroundColor: 'rgba(12, 19, 36, 0.6)',
-      backdropFilter: 'blur(20px)',
+      backgroundColor: mounted && theme === 'scratchpad' ? 'rgba(250, 246, 240, 0.95)' : 'rgba(12, 19, 36, 0.6)',
+      backdropFilter: mounted && theme === 'scratchpad' ? 'none' : 'blur(20px)',
       WebkitBackdropFilter: 'blur(20px)',
       /* Ghost Border Fallback (DESIGN.md §4) */
       borderTop: '1px solid var(--outline-variant-ghost)',
@@ -56,6 +58,18 @@ export default function BottomNav() {
           </Link>
         );
       })}
+      
+      <button 
+        onClick={toggleTheme}
+        style={{
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25rem',
+          color: 'var(--on-surface-variant)', background: 'none', border: 'none', cursor: 'pointer',
+          padding: 0
+        }}
+      >
+        {mounted && theme === 'scratchpad' ? <Moon size={20} /> : <Pencil size={20} />}
+        <span style={{ textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: '0.625rem', fontWeight: 500 }}>Theme</span>
+      </button>
     </nav>
   );
 }

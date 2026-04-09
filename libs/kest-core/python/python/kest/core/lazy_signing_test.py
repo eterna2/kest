@@ -1,15 +1,16 @@
 import time
+
 from opentelemetry import baggage
 
 from kest.core import (
-    kest_verified,
-    configure,
-    MockPolicyEngine,
-    MockIdentityProvider,
     LazySigningProvider,
+    LocalEd25519Provider,
+    MockIdentityProvider,
+    MockPolicyEngine,
     Passport,
     PassportVerifier,
-    LocalEd25519Provider,
+    configure,
+    kest_verified,
 )
 
 

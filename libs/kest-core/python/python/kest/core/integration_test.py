@@ -1,18 +1,19 @@
+from unittest.mock import patch
+
+import httpx
+import opentelemetry.context as otel_context
 import pytest
 import respx
-import httpx
-from unittest.mock import patch
 from opentelemetry import baggage, trace
-import opentelemetry.context as otel_context
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from kest.core import (
-    OPAPolicyEngine,
-    kest_verified,
-    configure,
     MockIdentityProvider,
+    OPAPolicyEngine,
+    configure,
+    kest_verified,
     version,
 )
 
@@ -148,8 +149,8 @@ def test_e2e_taint_and_override(otel_recorder):
         # Check trust scores
         assert span2.attributes["kest.trust_score"] == 100
 
-        import json
         import base64
+        import json
 
         # Verify taints in signatures
         sig1 = span1.attributes["kest.signature"]

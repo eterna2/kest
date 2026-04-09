@@ -12,15 +12,15 @@ import uuid
 
 import pytest
 
+from kest.core import LocalEd25519Provider, MockIdentityProvider, SimpleCache
 from kest.core._core import KestEntry
 from kest.core.models import (
+    ORIGIN_TRUST_MAP,
     BaggageManager,
     DefaultTrustEvaluator,
-    ORIGIN_TRUST_MAP,
     Passport,
     PassportVerifier,
 )
-from kest.core import MockIdentityProvider, LocalEd25519Provider, SimpleCache
 
 # ---------------------------------------------------------------------------
 # UUID v7 regex: version nibble MUST be 7 (F-AE-04, RFC 9562 §5.7)
@@ -47,6 +47,7 @@ def _decode_jws_payload(jws: str) -> dict:
 def _sign(entry: KestEntry) -> str:
     provider = MockIdentityProvider()
     from kest.core._core import sign_entry
+
     return sign_entry(entry, provider)
 
 
@@ -70,7 +71,9 @@ def test_kest_entry_required_fields_present_in_signed_payload():
     assert "name" in payload["runtime"], "F-AE-06: runtime.name missing"
     assert "version" in payload["runtime"], "F-AE-06: runtime.version missing"
     assert "timestamp_ms" in payload, "F-AE-12: timestamp_ms missing"
-    assert isinstance(payload["timestamp_ms"], int), "F-AE-12: timestamp_ms must be integer"
+    assert isinstance(payload["timestamp_ms"], int), (
+        "F-AE-12: timestamp_ms must be integer"
+    )
     assert payload["timestamp_ms"] > 0, "F-AE-12: timestamp_ms must be positive"
     assert "policy_context" in payload, "F-AE-13: policy_context missing"
     pc = payload["policy_context"]
@@ -132,7 +135,7 @@ def test_entry_id_uuid_v7_format():
     entry_id MUST be UUID v7. F-AE-04
     Verified by checking the version nibble in the third UUID group.
     """
-    from kest.core import kest_verified, configure, MockPolicyEngine
+    from kest.core import MockPolicyEngine, configure, kest_verified
 
     configure(engine=MockPolicyEngine(), identity=MockIdentityProvider(), clear=True)
     captured_ids = []
@@ -283,7 +286,7 @@ def test_passport_verifier_three_hop_chain():
     for i in range(3):
         e = KestEntry(
             entry_id=str(uuid.uuid4()),
-            operation=f"hop{i+1}",
+            operation=f"hop{i + 1}",
             classification="system",
             trust_score=100,
             parent_ids=[last_hash],
@@ -375,6 +378,7 @@ def test_origin_trust_map_mandatory_defaults_not_overridable():
         # Attempt to create a map that overrides 'system' to a different value
         # The implementation should enforce this constraint.
         from kest.core import register_origin_trust
+
         register_origin_trust("system", 50)  # Must raise
 
 
@@ -405,8 +409,12 @@ def test_baggage_manager_claim_check_above_threshold():
     big_sig = "x" * 5000
     large_passport = Passport(entries=[big_sig])
     packed = BaggageManager.pack(large_passport, cache=cache)
-    assert "kest.claim_check" in packed, "F-CP-04: claim_check key absent for large passport"
-    assert "kest.passport" not in packed, "F-CP-04: inline passport must not be in header when claim-check used"
+    assert "kest.claim_check" in packed, (
+        "F-CP-04: claim_check key absent for large passport"
+    )
+    assert "kest.passport" not in packed, (
+        "F-CP-04: inline passport must not be in header when claim-check used"
+    )
     # Verify it was stored in cache
     claim_id = packed["kest.claim_check"]
     cached = cache.get(f"kest.claim.{claim_id}")

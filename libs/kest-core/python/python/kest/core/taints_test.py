@@ -1,21 +1,24 @@
 """
 Unit tests covering Taint Lifecycle (F-TT-*) constraints.
 """
-import json
+
 import base64
+import json
+
 from opentelemetry import baggage
 
-from kest.core import kest_verified, configure, MockIdentityProvider, MockPolicyEngine
+from kest.core import MockIdentityProvider, MockPolicyEngine, configure, kest_verified
+
 
 def test_taint_accumulation_and_removal():
     """
     F-TT-01, F-TT-02: Taints MUST accumulate down the lineage chain and be removable.
-    
+
     This test executes a 3-hop chain:
     - Hop 1: Adds 'taint_A'
     - Hop 2: Inherits 'taint_A', adds 'taint_B'
     - Hop 3: Inherits 'taint_A' and 'taint_B', removes 'taint_A', adds 'taint_C'
-    
+
     Asserts that the final entry's 'taints' array correctly reflects this lifecycle sum.
     """
     configure(engine=MockPolicyEngine(), identity=MockIdentityProvider(), clear=True)
@@ -35,11 +38,13 @@ def test_taint_accumulation_and_removal():
     final_baggage = hop1()
     entries = json.loads(str(final_baggage))
     assert len(entries) == 3
-    
+
     # helper
     def get_payload(jws):
         parts = jws.split(".")
-        return json.loads(base64.urlsafe_b64decode(parts[1] + "=" * (4 - len(parts[1]) % 4)))
+        return json.loads(
+            base64.urlsafe_b64decode(parts[1] + "=" * (4 - len(parts[1]) % 4))
+        )
 
     # Entry 1 matches Hop1
     p1 = get_payload(entries[0])

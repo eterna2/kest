@@ -1,6 +1,6 @@
 import base64
 import json
-from typing import Optional, Any
+from typing import Any, Optional
 
 from kest.core.identity.base import IdentityProvider
 

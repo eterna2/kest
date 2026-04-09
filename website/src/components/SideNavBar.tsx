@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { useTheme } from "./ThemeProvider";
 import {
   Info,
   BookOpen,
@@ -81,6 +82,7 @@ const NAV: NavSection[] = [
 
 export default function SideNavBar() {
   const pathname = usePathname();
+  const { theme, mounted } = useTheme();
 
   // Auto-expand whichever section is active
   const initialOpen = NAV.reduce<Record<string, boolean>>((acc, section) => {
@@ -111,9 +113,9 @@ export default function SideNavBar() {
         overflowY: "auto",
         scrollbarWidth: "none",
         /* Glass Rule (DESIGN.md §2) */
-        backgroundColor: "rgba(12, 19, 36, 0.4)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
+        backgroundColor: mounted && theme === "scratchpad" ? "rgba(250, 246, 240, 0.98)" : "rgba(12, 19, 36, 0.4)",
+        backdropFilter: mounted && theme === "scratchpad" ? "none" : "blur(20px)",
+        WebkitBackdropFilter: mounted && theme === "scratchpad" ? "none" : "blur(20px)",
         borderRight: "1px solid var(--outline-variant-ghost)",
         zIndex: 90,
       }}
@@ -241,7 +243,7 @@ export default function SideNavBar() {
                           fontSize: "0.775rem",
                           color: isChildActive
                             ? "var(--primary)"
-                            : "rgba(220, 225, 251, 0.45)",
+                            : "var(--on-surface-variant)",
                           textDecoration: "none",
                           fontWeight: isChildActive ? 600 : 400,
                           borderLeft: isChildActive
@@ -255,13 +257,13 @@ export default function SideNavBar() {
                         onMouseEnter={(e) => {
                           if (!isChildActive) {
                             (e.currentTarget as HTMLElement).style.color =
-                              "rgba(220, 225, 251, 0.75)";
+                              "var(--on-surface)";
                           }
                         }}
                         onMouseLeave={(e) => {
                           if (!isChildActive) {
                             (e.currentTarget as HTMLElement).style.color =
-                              "rgba(220, 225, 251, 0.45)";
+                              "var(--on-surface-variant)";
                           }
                         }}
                       >

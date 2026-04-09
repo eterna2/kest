@@ -1,6 +1,7 @@
 import pytest
 from opentelemetry import baggage
-from kest.core import kest_verified, configure, MockIdentityProvider, MockPolicyEngine
+
+from kest.core import MockIdentityProvider, MockPolicyEngine, configure, kest_verified
 
 
 def test_merkle_chain_propagation():
@@ -26,6 +27,7 @@ def test_merkle_chain_propagation():
 
     # Passport must be a JSON array of 2 JWS compact strings (header.payload.sig).
     import json
+
     entries = json.loads(passport_final)
     assert len(entries) == 2, f"Expected 2 passport entries, got {len(entries)}"
     for entry in entries:

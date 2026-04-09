@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react';
 
+import { useTheme } from './ThemeProvider';
+
 /**
  * Client-side Mermaid diagram renderer.
  * Renders mermaid source code into SVG diagrams using the mermaid.js library.
@@ -13,6 +15,7 @@ export default function Mermaid({ chart }: { chart: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string>('');
+  const { theme, mounted } = useTheme();
 
   useEffect(() => {
     let cancelled = false;
@@ -22,8 +25,24 @@ export default function Mermaid({ chart }: { chart: string }) {
         const mermaid = (await import('mermaid')).default;
         mermaid.initialize({
           startOnLoad: false,
-          theme: 'dark',
-          themeVariables: {
+          theme: mounted && theme === 'scratchpad' ? 'base' : 'dark',
+          themeVariables: mounted && theme === 'scratchpad' ? {
+            primaryColor: '#ffffff',
+            primaryTextColor: '#2c2c2c',
+            primaryBorderColor: '#2c2c2c',
+            lineColor: '#555555',
+            secondaryColor: '#f5f0e8',
+            tertiaryColor: '#ede7db',
+            fontFamily: 'var(--font-body)',
+            fontSize: '18px',
+            background: '#ffffff',
+            mainBkg: '#ffffff',
+            nodeBorder: '#2c2c2c',
+            clusterBkg: '#ede7db',
+            clusterBorder: '#999999',
+            titleColor: '#2c3e50',
+            edgeLabelBackground: '#f5f0e8',
+          } : {
             primaryColor: '#4f46e5',
             primaryTextColor: '#e4e2f0',
             primaryBorderColor: '#6366f1',
@@ -58,7 +77,7 @@ export default function Mermaid({ chart }: { chart: string }) {
 
     render();
     return () => { cancelled = true; };
-  }, [chart]);
+  }, [chart, theme, mounted]);
 
   if (error) {
     return (

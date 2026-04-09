@@ -1,11 +1,12 @@
 from typing import List
+
 from kest.core import (
-    kest_verified,
-    configure,
+    DefaultTrustEvaluator,
     MockIdentityProvider,
     MockPolicyEngine,
     TrustEvaluator,
-    DefaultTrustEvaluator,
+    configure,
+    kest_verified,
 )
 
 

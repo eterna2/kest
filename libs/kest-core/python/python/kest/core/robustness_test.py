@@ -1,15 +1,16 @@
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 from opentelemetry import baggage
-from hypothesis import given, strategies as st
 
 from kest.core import (
-    kest_verified,
-    configure,
+    BaggageManager,
     LocalEd25519Provider,
     MockPolicyEngine,
     Passport,
     PassportVerifier,
-    BaggageManager,
+    configure,
+    kest_verified,
 )
 
 

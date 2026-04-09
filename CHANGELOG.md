@@ -145,6 +145,8 @@ A fully orchestrated Docker Compose environment for live integration testing:
 - **Documentation Reorganization**: Restructured the site navigation. Moved code-heavy tutorials into a step-by-step linear Developer Guide path consisting of 11 sequential technical articles. Refactored the `blog` route into `concepts` for purely architectural references.
 - **Team Branding**: Renamed the open-source developer "Collective" to "The Clowder" across all UI components and documentation, fully embracing Kest's cat-themed identity.
 - **AI Agents Division**: Expanded the team page by adding Gemini, Claude, and Anti-gravity as an official AI Agents Division, alongside generating and persisting custom thematic avatars and prompts for each.
+- **Scratchpad Theme**: Introduced a new "Scratchpad" light theme (formerly "Napkin Mode") featuring a hand-drawn, sketchy aesthetic. The theme includes wobbly SVG displacement borders, a warm parchment color palette, and high-readability handwritten typography (Architects Daughter & Patrick Hand).
+- **Thematic Consistency**: Implemented automatic sketchy framing for all website images, theme-aware responsive Mermaid diagrams, and animated hand-drawn highlights on the homepage.
 
 ---
 

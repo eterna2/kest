@@ -1,7 +1,7 @@
 import base64
 import json
-import tempfile
 import os
+import tempfile
 
 from kest.core.identity.providers.oidc import OIDCIdentity
 

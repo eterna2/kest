@@ -1,6 +1,7 @@
-import os
 import base64
 import json
+import os
+
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
 from kest.core.identity.base import IdentityProvider

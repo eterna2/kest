@@ -1,12 +1,14 @@
-import pytest
-import json
 import base64
+import json
 import os
-from opentelemetry import baggage
+
 import opentelemetry.context as otel_context
-from kest.core.decorators import kest_verified, _LAB_AUDIT_FILE
-from kest.core.identity import StaticIdentity
+import pytest
+from opentelemetry import baggage
+
+from kest.core.decorators import _LAB_AUDIT_FILE, kest_verified
 from kest.core.engine import PolicyEngine
+from kest.core.identity import StaticIdentity
 
 
 class MockEngine(PolicyEngine):

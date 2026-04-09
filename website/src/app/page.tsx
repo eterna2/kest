@@ -2,6 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Terminal, Code, Shield, BookOpen, Cpu, ArrowRight } from 'lucide-react';
 import BentoCard from '@/components/BentoCard';
+import SketchyHighlight from '@/components/SketchyHighlight';
 import { getAllPosts } from '@/lib/mdx';
 import { prefixPath } from '@/lib/utils';
 
@@ -30,14 +31,20 @@ export default function Home() {
             fontWeight: 800, 
             letterSpacing: '0.2em', 
             color: 'var(--primary)', 
-            textTransform: 'uppercase' 
+            textTransform: 'uppercase',
+            position: 'relative',
+            zIndex: 1
           }}>
-            Zero Trust Execution Lineage
+            <SketchyHighlight type="underline" color="var(--primary)" strokeWidth={2} animationDuration={800}>
+              Zero Trust Execution Lineage
+            </SketchyHighlight>
           </span>
 
           {/* Display-md headline */}
-          <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', lineHeight: 1.05, margin: 0, fontFamily: 'var(--font-display)' }}>
-            <span className="gradient-text">Key Trust.</span><br />
+          <h1 style={{ fontSize: 'clamp(2.5rem, 5vw, 4rem)', lineHeight: 1.05, margin: 0, fontFamily: 'var(--font-display)', position: 'relative', zIndex: 1 }}>
+            <SketchyHighlight type="highlight" color="var(--secondary-container)" animationDuration={1000}>
+              <span className="gradient-text">Key Trust.</span>
+            </SketchyHighlight><br />
             Verified Lineage for AI.
           </h1>
 

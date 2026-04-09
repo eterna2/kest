@@ -1,9 +1,10 @@
-import os
 import base64
 import json
+import os
 from typing import Optional
+
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ed25519, padding, ec, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, padding, rsa
 
 from kest.core.identity.base import IdentityProvider
 

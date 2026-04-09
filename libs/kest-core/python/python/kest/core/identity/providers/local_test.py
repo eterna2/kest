@@ -1,7 +1,7 @@
 import base64
 import json
 
-from kest.core.identity.providers.local import StaticIdentity, MockIdentityProvider
+from kest.core.identity.providers.local import MockIdentityProvider, StaticIdentity
 
 
 def test_static_identity():

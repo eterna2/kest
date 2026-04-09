@@ -3,7 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
-import { X, Info, BookOpen, Terminal, Users, ChevronRight, Scroll } from 'lucide-react';
+import { X, Info, BookOpen, Terminal, Users, ChevronRight, Scroll, Pencil, Moon } from 'lucide-react';
+import { useTheme } from './ThemeProvider';
 
 interface NavChild {
   label: string;
@@ -57,6 +58,7 @@ const NAV: NavSection[] = [
 
 export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const pathname = usePathname();
+  const { theme, toggleTheme, mounted } = useTheme();
 
   const initialOpen = NAV.reduce<Record<string, boolean>>((acc, s) => {
     acc[s.href] =
@@ -87,8 +89,8 @@ export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean; onC
       <aside style={{
         position: 'fixed', top: 0, left: 0, bottom: 0,
         width: '280px',
-        backgroundColor: 'rgba(12, 19, 36, 0.92)',
-        backdropFilter: 'blur(20px)',
+        backgroundColor: mounted && theme === 'scratchpad' ? 'rgba(250, 246, 240, 0.98)' : 'rgba(12, 19, 36, 0.92)',
+        backdropFilter: mounted && theme === 'scratchpad' ? 'none' : 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
         borderRight: '1px solid var(--outline-variant-ghost)',
         zIndex: 150,
@@ -109,9 +111,14 @@ export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean; onC
               v0.3.0 Docs
             </p>
           </div>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer' }}>
-            <X size={22} />
-          </button>
+          <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+            <button onClick={toggleTheme} style={{ background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer', display: 'flex' }}>
+              {mounted && theme === 'scratchpad' ? <Moon size={22} /> : <Pencil size={22} />}
+            </button>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--on-surface-variant)', cursor: 'pointer', display: 'flex' }}>
+              <X size={22} />
+            </button>
+          </div>
         </div>
 
         {/* Nav */}
@@ -183,7 +190,7 @@ export default function MobileDrawer({ isOpen, onClose }: { isOpen: boolean; onC
                             display: 'block',
                             padding: '0.5rem 1.5rem 0.5rem 3.5rem',
                             fontSize: '0.8rem',
-                            color: isChildActive ? 'var(--primary)' : 'rgba(220,225,251,0.5)',
+                            color: isChildActive ? 'var(--primary)' : 'var(--on-surface-variant)',
                             fontWeight: isChildActive ? 600 : 400,
                             borderLeft: isChildActive ? '2px solid var(--primary)' : '2px solid transparent',
                             marginLeft: '1rem',

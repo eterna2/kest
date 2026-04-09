@@ -1,16 +1,17 @@
+import json
+import os
+import sqlite3
+from typing import Optional
+
 from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
+from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import (
     BatchSpanProcessor,
     ConsoleSpanExporter,
     SpanExporter,
 )
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-import json
-import sqlite3
-import os
-from typing import Optional
 
 
 class FileSpanExporter(SpanExporter):

@@ -1,5 +1,6 @@
 from opentelemetry import baggage
-from kest.core.context import get_current_passport, get_current_jwt
+
+from kest.core.context import get_current_jwt, get_current_passport
 
 
 def test_get_current_passport():

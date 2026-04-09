@@ -1,9 +1,10 @@
-import json
 import base64
+import json
 import threading
-from opentelemetry import baggage, trace
-import opentelemetry.context as otel_context
+
 import httpx
+import opentelemetry.context as otel_context
+from opentelemetry import baggage, trace
 
 # A global, thread-safe store for the lab to ensure propagation
 # In a real system, this would be handled by a proper OTel Propagator
