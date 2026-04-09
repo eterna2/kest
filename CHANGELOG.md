@@ -140,6 +140,12 @@ A fully orchestrated Docker Compose environment for live integration testing:
 - **Preview Site** (`preview-site.yml`): Publishes ephemeral docs to `preview/<branch>/` on pull requests.
 - **Pages Index** (`gen-pages-index.sh`): Auto-generates a root `index.html` splash page listing all deployed versions and live previews.
 
+### 📖 Documentation & Website
+
+- **Documentation Reorganization**: Restructured the site navigation. Moved code-heavy tutorials into a step-by-step linear Developer Guide path consisting of 11 sequential technical articles. Refactored the `blog` route into `concepts` for purely architectural references.
+- **Team Branding**: Renamed the open-source developer "Collective" to "The Clowder" across all UI components and documentation, fully embracing Kest's cat-themed identity.
+- **AI Agents Division**: Expanded the team page by adding Gemini, Claude, and Anti-gravity as an official AI Agents Division, alongside generating and persisting custom thematic avatars and prompts for each.
+
 ---
 
 ## [0.2.0] - 2026-03-18
