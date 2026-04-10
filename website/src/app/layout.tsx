@@ -33,6 +33,16 @@ export const metadata: Metadata = {
     address: false,
     telephone: false,
   },
+  icons: {
+    icon: [
+      { url: `${basePath}/favicon.ico`, sizes: 'any' },
+      { url: `${basePath}/icon.png`, type: 'image/png', sizes: '512x512' },
+    ],
+    apple: [
+      { url: `${basePath}/apple-icon.png`, type: 'image/png', sizes: '512x512' },
+    ],
+  },
+  manifest: `${basePath}/manifest.webmanifest`,
   alternates: {
     canonical: '/',
   },
@@ -43,12 +53,21 @@ export const metadata: Metadata = {
     siteName: 'Kest',
     locale: 'en_US',
     type: 'website',
+    images: [
+      {
+        url: `${baseUrl}/opengraph-image.png`,
+        width: 1200,
+        height: 630,
+        alt: 'Kest — Key Trust. Verified Lineage for AI.',
+      },
+    ],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Kest | Key Trust',
     description: 'Verified Lineage for AI. Cryptographic identity and policy-as-code for agentic workflows.',
     creator: '@eterna2',
+    images: [`${baseUrl}/twitter-image.png`],
   },
   robots: {
     index: true,
