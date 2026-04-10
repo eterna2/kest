@@ -2,6 +2,7 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { createPortal } from 'react-dom';
+import { useTheme } from './ThemeProvider';
 
 /**
  * A client-side lightbox overlay for expanding images.
@@ -20,11 +21,38 @@ export default function ExpandableImage({
 }: React.ImgHTMLAttributes<HTMLImageElement>) {
   const [isOpen, setIsOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { theme } = useTheme();
 
   const close = useCallback(() => setIsOpen(false), []);
 
   // Only portal after client mount to avoid SSR mismatch
   useEffect(() => setMounted(true), []);
+
+  // Determine the themed source
+  const getThemedSrc = (originalSrc: string | any | undefined) => {
+    if (typeof originalSrc !== 'string' || !mounted || theme !== 'scratchpad') return originalSrc;
+    
+    // List of images that have sketchy variants
+    const sketchyImages = [
+      'merkle-chain.png',
+      'trust-degradation.png',
+      'policy-tiers.png',
+      'kest-lab-arch.png',
+      'gateway_flow_diagram.png',
+      'scope_narrowing.png',
+      'merkle_chain_diagram.png',
+      'hero.png'
+    ];
+
+    const fileName = originalSrc.split('/').pop() || '';
+    if (sketchyImages.includes(fileName)) {
+      return originalSrc.replace('.png', '-sketch.png');
+    }
+    
+    return originalSrc;
+  };
+
+  const themedSrc = getThemedSrc(src);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -40,7 +68,7 @@ export default function ExpandableImage({
       {/* Inline image with expand hint */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
-        src={src}
+        src={themedSrc}
         alt={alt || ''}
         {...rest}
         onClick={() => setIsOpen(true)}
@@ -94,7 +122,7 @@ export default function ExpandableImage({
           {/* Expanded image */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={src}
+            src={themedSrc}
             alt={alt || ''}
             style={{
               maxWidth: '90vw',

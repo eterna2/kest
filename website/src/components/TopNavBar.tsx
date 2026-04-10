@@ -5,6 +5,7 @@ import { Menu, Terminal, Pencil, Moon } from 'lucide-react';
 import { useTheme } from './ThemeProvider';
 import GlobalSearch from './GlobalSearch';
 import type { SearchItem } from './GlobalSearch';
+import { prefixPath } from '@/lib/utils';
 
 interface TopNavBarProps {
   onMenuClick: () => void;
@@ -42,7 +43,12 @@ export default function TopNavBar({ onMenuClick, searchItems = [] }: TopNavBarPr
       </button>
 
       {/* Brand */}
-      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}>
+      <Link href="/" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', textDecoration: 'none' }}>
+        <img 
+          src={prefixPath(mounted && theme === 'scratchpad' ? '/images/logo-scratchpad.svg' : '/images/logo-obsidian.svg')} 
+          alt="Kest Logo" 
+          style={{ width: '32px', height: '32px' }}
+        />
         <span style={{ fontSize: '1.25rem', fontWeight: 800, fontFamily: 'var(--font-display)', color: 'var(--on-surface)', letterSpacing: '-0.04em' }}>
           <span className="gradient-text">Kest</span>
         </span>
