@@ -100,4 +100,28 @@ If a visual separator is unavoidable for accessibility:
 ---
 
 ### 7. Signature Interaction: The "Kest" Glow
-When a user hovers over a primary card or navigation item, apply a subtle radial gradient background that follows the cursor at 5% opacity. This "spotlight" effect reinforces the "Digital Observatory" theme—that the user is illuminating the documentation as they explore it.```
+
+---
+
+### 8. The Scratchpad: The Sketchy Doodle (Light Mode)
+
+While "The Obsidian Lens" is our authoritative identity, **The Scratchpad** represents the creative, experimental "Draft" phase of engineering. It is a portal into the engineer's notebook.
+
+#### Warm Paper & Charcoal
+The Scratchpad replaces the deep space of Obsidian with a "Warm Paper" or parchment-tinted background (`#faf6f0`). All high-end light effects (bloom, glassmorphism) are stripped away in favor of high-contrast, physical artifacts.
+- **Background:** `#faf6f0`
+- **Stroke/Lines:** `#2c2c2c` (Charcoal)
+- **Primary Accent:** `#e74c3c` (Red Marker tint)
+
+#### The Doodle Principle
+Structural elements in this mode (cards, code blocks, sidebars) must feel hand-drawn. We achieve this through:
+- **Wobbly Filter:** Applying a SVG displacement map (`#sketchy`) to all borders and images to create imperfections.
+- **Asymmetric Radii:** Borders are not uniform; they should have slight "over-shoots" at corners, simulating a quick pen stroke.
+- **Hand-drawn Typography:** Using `Architects Daughter` for headlines and `Patrick Hand` for body text.
+
+#### Dual-Identity Graphics
+Every core architectural diagram must have two identities:
+1.  **Sleek (Obsidian):** Precise vector lines, glowing nodes, dark backgrounds.
+2.  **Sketchy (Scratchpad):** Charcoal lines, hand-written labels, white paper backgrounds.
+
+The system must automatically swap these assets based on the user's focus, reinforcing that Kest is both a rigid cryptographic tool and a flexible framework for human creators.

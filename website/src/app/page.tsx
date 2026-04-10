@@ -1,10 +1,9 @@
-import Image from 'next/image';
 import Link from 'next/link';
-import { Terminal, Code, Shield, BookOpen, Cpu, ArrowRight } from 'lucide-react';
+import { Terminal, Code, Shield, BookOpen, ArrowRight } from 'lucide-react';
+import ThemedHeroImage from '@/components/ThemedHeroImage';
 import BentoCard from '@/components/BentoCard';
 import SketchyHighlight from '@/components/SketchyHighlight';
 import { getAllPosts } from '@/lib/mdx';
-import { prefixPath } from '@/lib/utils';
 
 export default function Home() {
   // Pull real guide data instead of hardcoded content
@@ -49,8 +48,7 @@ export default function Home() {
           </h1>
 
           <p style={{ fontSize: '1.125rem', color: 'var(--on-surface-variant)', maxWidth: '480px', lineHeight: 1.7 }}>
-            Cryptographic identity, policy-as-code enforcement, and tamper-evident 
-            audit trails for distributed AI agent workflows.
+            Zero Trust execution lineage for AI agentic workflows. Cryptographically signed audit trails via Merkle DAG Passports and policy-as-code enforcement (OPA/Cedar).
           </p>
 
           <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
@@ -63,21 +61,7 @@ export default function Home() {
           </div>
         </div>
         
-        <div className="kest-glow" style={{ 
-          position: 'relative', 
-          borderRadius: 'var(--radius-xl)', 
-          overflow: 'hidden',
-          aspectRatio: '1/1',
-          boxShadow: 'var(--shadow-l4)'
-        }}>
-          <Image 
-            src={prefixPath('/hero.png')} 
-            alt="Kest — cryptographic lineage visualization" 
-            fill 
-            style={{ objectFit: 'cover' }}
-            priority
-          />
-        </div>
+        <ThemedHeroImage />
       </section>
 
       {/* ═══════════════════════════════════════════════
