@@ -36,10 +36,12 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       { url: `${basePath}/favicon.ico`, sizes: 'any' },
-      { url: `${basePath}/icon.png`, type: 'image/png', sizes: '512x512' },
+      { url: `${basePath}/icon-32.png`, type: 'image/png', sizes: '32x32' },
+      { url: `${basePath}/icon-192.png`, type: 'image/png', sizes: '192x192' },
+      { url: `${basePath}/icon-512.png`, type: 'image/png', sizes: '512x512' },
     ],
     apple: [
-      { url: `${basePath}/apple-icon.png`, type: 'image/png', sizes: '512x512' },
+      { url: `${basePath}/apple-icon.png`, type: 'image/png', sizes: '180x180' },
     ],
   },
   manifest: `${basePath}/manifest.webmanifest`,
@@ -58,7 +60,19 @@ export const metadata: Metadata = {
         url: `${baseUrl}/opengraph-image.png`,
         width: 1200,
         height: 630,
-        alt: 'Kest — Key Trust. Verified Lineage for AI.',
+        alt: 'Kest — Key Trust (Scratchpad Identity)',
+      },
+      {
+        url: `${baseUrl}/opengraph-image-obsidian.png`,
+        width: 1200,
+        height: 630,
+        alt: 'Kest — Key Trust (Obsidian Identity)',
+      },
+      {
+        url: `${baseUrl}/opengraph-image-detailed.png`,
+        width: 1200,
+        height: 630,
+        alt: 'Kest — Key Trust (Detailed Merkle DAG)',
       },
     ],
   },
