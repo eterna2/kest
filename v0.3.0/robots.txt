@@ -1,0 +1,4 @@
+User-Agent: *
+Allow: /
+
+Sitemap: https://eterna2.github.io/kest/v0.3.0/sitemap.xml
