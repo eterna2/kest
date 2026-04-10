@@ -1,0 +1,4 @@
+User-Agent: *
+Allow: /
+
+Sitemap: https://eterna2.github.io/kest/preview/fix-metadata-path-resolution/sitemap.xml
