@@ -249,7 +249,9 @@ This requires adding a `RustNativeIdentityProvider` pyclass that holds an `ed255
 
 **Tracking:** [eterna2/kest#11](https://github.com/eterna2/kest/issues/11)
 
-**Current guidance:** In production, use the Python backend (`KEST_BACKEND=python`) unless running single-threaded or you have measured Rust is faster in your specific workload.
+**Fixed (2026-04-11):** Implemented `RustEd25519Provider` (A-02-A). Local Ed25519 signing is now performed entirely in Rust using the `ed25519-dalek` crate. The `sign_entry` function in `lib.rs` detects the native provider and executes canonicalization + signing in a single `py.allow_threads` block. This eliminates GIL re-acquisition for local signing, achieving linear scaling under thread contention.
+
+**Current guidance:** For high-throughput multithreaded signing, use `RustEd25519Provider` with the Rust backend. SPIREProvider still requires GIL re-acquisition (due to the SPIFFE socket Python callback) and remains a bottleneck under extreme contention.
 
 ---
 

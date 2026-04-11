@@ -63,6 +63,66 @@ class LocalEd25519Provider(StaticIdentity):
         super().__init__(principal)
 
 
+class RustEd25519Provider(IdentityProvider):
+    """
+    GIL-free Ed25519 provider for production Rust backend use.
+
+    Wraps a Rust-native identity provider for high-performance signing.
+    """
+
+    def __init__(
+        self,
+        private_key_bytes: bytes,
+        principal: str = "spiffe://kest.internal/local-workload",
+    ):
+        """
+        Initializes the Rust-native Ed25519 provider.
+
+        Args:
+            private_key_bytes: 32-byte Ed25519 private key.
+            principal: The principal ID for this provider.
+        """
+        from kest.core._core import RustNativeIdentityProvider as _RustNativeProvider
+
+        self.principal = principal
+        self._inner = _RustNativeProvider(private_key_bytes)
+
+    def get_identity(self) -> str:
+        """Returns the principal ID."""
+        return self.principal
+
+    def sign(self, payload: bytes) -> str:
+        """
+        Signs the payload using the Rust-native provider.
+
+        Note: When using the Rust backend, this method is bypassed by sign_entry
+        for a GIL-free path. This implementation remains for compatibility with
+        the Python backend or direct calls.
+        """
+        header = {"alg": "EdDSA", "typ": "JWS", "kid": self.principal}
+        header_b64 = (
+            base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
+        )
+        payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
+        signing_input = f"{header_b64}.{payload_b64}"
+
+        # Use the inner Rust provider to sign
+        sig_b64 = self._inner.sign_payload(signing_input.encode())
+
+        return f"{header_b64}.{payload_b64}.{sig_b64}"
+
+    def attest(self, entry_id: str) -> str:
+        """Satisfies IdentityProvider protocol for policy evaluation."""
+        return entry_id
+
+    def sign_payload(self, payload: bytes) -> str:
+        """
+        Aliased bridge method for signing payloads.
+        In RustEd25519Provider, this directly calls the native Rust signer.
+        """
+        return self._inner.sign_payload(payload)
+
+
 class MockIdentityProvider(IdentityProvider):
     """
     Dummy provider for unit testing without cryptographic overhead.
