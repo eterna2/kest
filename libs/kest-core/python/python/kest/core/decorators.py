@@ -314,7 +314,7 @@ def _execute_core_logic(
     current_node_trust = self_score if is_root else 100
 
     # Fix 1: Use cached passport properties instead of O(n) inline parsing
-    parent_taints: set = set()
+    parent_taints: frozenset = frozenset()
     if not is_root:
         parent_scores = passport.trust_scores
         parent_taints = passport.accumulated_taints
@@ -324,8 +324,8 @@ def _execute_core_logic(
     if trust_override is not None:
         current_node_trust = trust_override
 
-    # Calculate new accumulated taints
-    current_accumulated = parent_taints.copy()
+    # Calculate new accumulated taints (mutable copy for add/remove operations)
+    current_accumulated = set(parent_taints)
     if added_taints:
         current_accumulated.update(added_taints)
     if removed_taints:

@@ -81,6 +81,7 @@ Standard trust scores for root nodes based on their origin. Scores are **integer
 |---|---|---|
 | `entries` | `List[str]` | Ordered list of JWS signatures (the Merkle chain) |
 | `trust_scores` | `List[int]` | Trust score of each entry (cached, O(1) after first read) |
-| `accumulated_taints` | `set` | Union of all taints across all entries (cached) |
+| `accumulated_taints` | `frozenset` | Union of all taints across all entries (O(1) after `add_signature`) |
+| `min_trust_score` | `int` | Minimum trust score across all entries (O(1) after `add_signature`) |
 
-> **Performance note:** `accumulated_taints` and `trust_scores` are read from a parsed-entries cache. The cache is invalidated on every `add_signature()` call. See [GitHub #12](https://github.com/eterna2/kest/issues/12) for planned O(1) incremental accumulation.
+> **Performance note:** `accumulated_taints` and `min_trust_score` are maintained incrementally in `add_signature()` and return in O(1). `trust_scores` uses a version-counted parsed-entries cache with O(1) invalidation check. The `Passport` class uses `__slots__` for reduced memory footprint. See [GitHub #12](https://github.com/eterna2/kest/issues/12).

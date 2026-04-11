@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, TypedDict
 
 
-@dataclass
+@dataclass(slots=True)
 class Passport:
     """
     Represents a verifiable execution graph (lineage).
@@ -20,14 +20,31 @@ class Passport:
 
     entries: List[str] = field(default_factory=list)
 
-    # --- Fix 1: parsed_entries cache ---
-    # Invalidated in add_signature() to stay consistent.
-    _entries_snapshot: List[str] = field(
-        default_factory=list, repr=False, compare=False
-    )
+    # --- A-03-I: version counter for O(1) cache invalidation ---
+    _version: int = field(default=0, repr=False, compare=False)
+    _cache_version: int = field(default=-1, repr=False, compare=False)
     _parsed_cache: Optional[List[Dict[str, Any]]] = field(
         default=None, repr=False, compare=False
     )
+
+    # --- A-03-II: incrementally-updated aggregate caches ---
+    _taints_cache: frozenset = field(
+        default_factory=frozenset, repr=False, compare=False
+    )
+    _min_trust_cache: int = field(default=100, repr=False, compare=False)
+
+    def __post_init__(self):
+        """Rebuild incremental caches from initial entries (handles merge, deserialize, direct construction)."""
+        if self.entries:
+            taints: set = set()
+            min_trust = 100
+            for entry in self.entries:
+                payload = self._decode_payload(entry)
+                taints.update(payload.get("taints", []))
+                min_trust = min(min_trust, payload.get("trust_score", 100))
+            self._taints_cache = frozenset(taints)
+            self._min_trust_cache = min_trust
+            self._version = len(self.entries)
 
     @staticmethod
     def _decode_payload(jws: str) -> Dict[str, Any]:
@@ -43,10 +60,10 @@ class Passport:
             return {}
 
     def _get_parsed_entries(self) -> List[Dict[str, Any]]:
-        """Return parsed passport payloads, rebuilding cache only when entries changed."""
-        if self._parsed_cache is None or self._entries_snapshot != self.entries:
+        """Return parsed passport payloads, rebuilding cache only when version changed."""
+        if self._parsed_cache is None or self._cache_version != self._version:
             self._parsed_cache = [self._decode_payload(e) for e in self.entries]
-            self._entries_snapshot = list(self.entries)
+            self._cache_version = self._version
         return self._parsed_cache
 
     @property
@@ -55,12 +72,14 @@ class Passport:
         return [e.get("trust_score", 0) for e in self._get_parsed_entries()]
 
     @property
-    def accumulated_taints(self) -> set:
-        """Return the union of taints across all passport entries (O(1) after first call)."""
-        taints: set = set()
-        for e in self._get_parsed_entries():
-            taints.update(e.get("taints", []))
-        return taints
+    def accumulated_taints(self) -> frozenset:
+        """Return the union of taints across all passport entries (O(1))."""
+        return self._taints_cache
+
+    @property
+    def min_trust_score(self) -> int:
+        """Return the minimum trust score across all entries (O(1))."""
+        return self._min_trust_cache
 
     @staticmethod
     def merge(*passports: "Passport") -> "Passport":
@@ -89,9 +108,15 @@ class Passport:
         Args:
             signature: The JWS-formatted audit entry string.
         """
+        payload = self._decode_payload(signature)
         self.entries.append(signature)
-        # Invalidate parse cache so next access re-parses
-        self._parsed_cache = None
+        # A-03-I: O(1) cache invalidation via version counter
+        self._version += 1
+        # A-03-II: O(1) incremental taint/trust aggregation
+        self._taints_cache = self._taints_cache | frozenset(payload.get("taints", []))
+        self._min_trust_cache = min(
+            self._min_trust_cache, payload.get("trust_score", 100)
+        )
 
     def serialize(self) -> str:
         """
