@@ -22,7 +22,7 @@ spiffe = [
 ]
 aws = [
     "boto3>=1.28.0",
-    "aioboto3>=11.0.0",
+    "aioboto3>=15.5.0",
 ]
 opa = [
     "opa-python-client>=1.0.0",
