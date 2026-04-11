@@ -70,3 +70,47 @@ def test_rfc_8785_canonicalization():
     # Hash check
     digest = hashlib.sha256(serialized_str.encode("utf-8")).hexdigest()
     assert digest == "939a97e9ea233522cd47c4aa938648d983462dc91a34f82ea1ac00ca00d2c879"
+
+
+def test_rust_vs_python_jws_interop():
+    """
+    F-INTER-XX: Both Rust and Pure-Python backends MUST produce exactly the same JWS layout
+    given the same inputs, ensuring perfect interoperability.
+    """
+    import pytest
+    from kest.core.identity import MockIdentityProvider
+    import uuid_utils
+
+    try:
+        from kest.core._core import KestEntry as RustEntry, sign_entry as sign_rust
+    except ImportError:
+        pytest.skip("Rust backend not available")
+
+    from kest.core._core_py import KestEntry as PyEntry, sign_entry as sign_py
+
+    entry_id = str(uuid_utils.uuid7())
+
+    rust_entry = RustEntry(
+        entry_id=entry_id,
+        operation="interop",
+        classification="system",
+        trust_score=100,
+        parent_ids=["0"],
+        labels={"foo": "bar"}
+    )
+
+    py_entry = PyEntry(
+        entry_id=entry_id,
+        operation="interop",
+        classification="system",
+        trust_score=100,
+        parent_ids=["0"],
+        labels={"foo": "bar"}
+    )
+
+    provider = MockIdentityProvider()
+    rust_jws = sign_rust(rust_entry, provider)
+    py_jws = sign_py(py_entry, provider)
+
+    assert rust_jws == py_jws, "Rust and Python JWS outputs MUST match exactly"
+

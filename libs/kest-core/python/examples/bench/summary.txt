@@ -1,0 +1,14 @@
++----------------+---------+-----------------------+
+| Benchmark      | rust    | python                |
++================+=========+=======================+
+| entry_create   | 800 ns  | 809 ns: 1.01x slower  |
++----------------+---------+-----------------------+
+| canonical_json | 3.89 us | 3.98 us: 1.02x slower |
++----------------+---------+-----------------------+
+| chain_10       | 276 us  | 281 us: 1.02x slower  |
++----------------+---------+-----------------------+
+| Geometric mean | (ref)   | 1.01x slower          |
++----------------+---------+-----------------------+
+
+Benchmark hidden because not significant (1): sign_entry
+Ignored benchmarks (1) of examples/bench/python.json: chain_100

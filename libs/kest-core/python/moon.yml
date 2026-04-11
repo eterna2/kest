@@ -54,4 +54,12 @@ tasks:
       - 'check'
     args:
       - 'path'
-
+  bench:
+    script: 'bash examples/bench/run_all.sh'
+    deps:
+      - 'check'
+    inputs:
+      - 'examples/bench/**/*.py'
+      - 'examples/bench/**/*.sh'
+      - 'python/**/*.py'
+      - 'src/**/*.rs'

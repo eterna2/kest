@@ -13,7 +13,7 @@ import uuid
 import pytest
 
 from kest.core import LocalEd25519Provider, MockIdentityProvider, SimpleCache
-from kest.core._core import KestEntry
+from kest.core import KestEntry
 from kest.core.models import (
     ORIGIN_TRUST_MAP,
     BaggageManager,
@@ -46,7 +46,7 @@ def _decode_jws_payload(jws: str) -> dict:
 
 def _sign(entry: KestEntry) -> str:
     provider = MockIdentityProvider()
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     return sign_entry(entry, provider)
 
@@ -142,7 +142,7 @@ def test_entry_id_uuid_v7_format():
 
     from unittest.mock import patch
 
-    original_sign = __import__("kest.core._core", fromlist=["sign_entry"]).sign_entry
+    original_sign = __import__("kest.core", fromlist=["sign_entry"]).sign_entry
 
     def capturing_sign(entry, provider):
         captured_ids.append(entry.entry_id)
@@ -214,7 +214,7 @@ def test_passport_verifier_root_sentinel_never_hashed():
     NOT verified as SHA-256.  A single-entry passport with parent_ids=["0"] must pass.
     """
     provider = LocalEd25519Provider(principal="spiffe://test/root")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     entry = KestEntry(
         entry_id=str(uuid.uuid4()),
@@ -235,7 +235,7 @@ def test_passport_verifier_rejects_broken_merkle_link():
     F-PA-06, F-PA-05: broken parent_ids hash raises ValueError.
     """
     provider = LocalEd25519Provider(principal="spiffe://test/tamper")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     # Entry 1 — valid root
     e1 = KestEntry(
@@ -279,7 +279,7 @@ def test_passport_verifier_three_hop_chain():
     End-to-end: 3-hop chain with real Ed25519 keys must pass.
     """
     provider = LocalEd25519Provider(principal="spiffe://test/3hop")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     entries = []
     last_hash = "0"

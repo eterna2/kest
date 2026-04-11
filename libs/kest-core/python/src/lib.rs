@@ -142,6 +142,58 @@ impl KestEntry {
     }
 
     #[getter]
+    fn schema_version(&self) -> String {
+        self.inner.schema_version.clone()
+    }
+
+    #[getter]
+    fn classification(&self) -> String {
+        match self.inner.classification {
+            kest_core_rs::models::KestClassification::System => "system".to_string(),
+            kest_core_rs::models::KestClassification::Data => "data".to_string(),
+            kest_core_rs::models::KestClassification::Critic => "critic".to_string(),
+            kest_core_rs::models::KestClassification::Snapshot => "snapshot".to_string(),
+            kest_core_rs::models::KestClassification::Sanitizer => "sanitizer".to_string(),
+        }
+    }
+
+    #[getter]
+    fn parent_ids(&self) -> Vec<String> {
+        self.inner.parent_ids.clone()
+    }
+
+    #[getter]
+    fn labels(&self) -> std::collections::BTreeMap<String, String> {
+        self.inner.labels.clone()
+    }
+
+    #[getter]
+    fn timestamp_ms(&self) -> u64 {
+        self.inner.timestamp_ms
+    }
+
+    #[getter]
+    fn input_hash(&self) -> String {
+        self.inner.input_hash.clone()
+    }
+
+    #[getter]
+    fn content_hash(&self) -> String {
+        self.inner.content_hash.clone()
+    }
+
+    #[getter]
+    fn environment(&self) -> std::collections::BTreeMap<String, String> {
+        self.inner.environment.clone()
+    }
+
+    #[getter]
+    fn otel_context(&self) -> std::collections::BTreeMap<String, String> {
+        self.inner.otel_context.clone()
+    }
+
+
+    #[getter]
     fn trust_score(&self) -> i32 {
         self.inner.trust_score
     }
