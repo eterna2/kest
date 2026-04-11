@@ -1,5 +1,0 @@
-1:"$Sreact.fragment"
-2:I[39756,["/kest/preview/chore-consolidated-dep-updates-20260411/_next/static/chunks/05657w1gx6.-5.js","/kest/preview/chore-consolidated-dep-updates-20260411/_next/static/chunks/114vggoq28h-..js"],"default"]
-3:I[37457,["/kest/preview/chore-consolidated-dep-updates-20260411/_next/static/chunks/05657w1gx6.-5.js","/kest/preview/chore-consolidated-dep-updates-20260411/_next/static/chunks/114vggoq28h-..js"],"default"]
-4:[]
-0:{"rsc":["$","$1","c",{"children":[null,["$","$L2",null,{"parallelRouterKey":"children","template":["$","$L3",null,{}]}]]}],"isPartial":false,"staleTime":300,"varyParams":"$W4","buildId":"hjr3Kkd3gO_3fyiInaahJ"}
