@@ -1,4 +1,5 @@
 import asyncio
+import concurrent.futures
 import functools
 import hashlib
 import inspect
@@ -109,6 +110,43 @@ _POLICY_CACHE = _PolicyDecisionCache(
     maxsize=1024,
     ttl_seconds=float(os.getenv("KEST_POLICY_CACHE_TTL", "5.0")),
 )
+
+
+# ---------------------------------------------------------------------------
+# Fix 6: Bounded Signing Thread Pool
+# ---------------------------------------------------------------------------
+
+# Singleton executor for CPU-bound signing and packing work, shared across all @kest_verified calls.
+_SIGN_EXECUTOR: Optional[concurrent.futures.ThreadPoolExecutor] = None
+_SIGN_EXECUTOR_LOCK = Lock()
+
+
+def _get_sign_executor() -> concurrent.futures.ThreadPoolExecutor:
+    """
+    Get or create the bounded thread pool for signing operations.
+
+    Worker count defaults to min(4, cpu_count) but can be overridden via KEST_SIGN_WORKERS.
+    """
+    global _SIGN_EXECUTOR
+    if _SIGN_EXECUTOR is not None:
+        return _SIGN_EXECUTOR
+
+    with _SIGN_EXECUTOR_LOCK:
+        if _SIGN_EXECUTOR is None:
+            env_workers = os.getenv("KEST_SIGN_WORKERS")
+            if env_workers:
+                try:
+                    workers = int(env_workers)
+                except ValueError:
+                    workers = min(4, os.cpu_count() or 1)
+            else:
+                workers = min(4, os.cpu_count() or 1)
+
+            _SIGN_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
+                max_workers=workers,
+                thread_name_prefix="kest-sign",
+            )
+        return _SIGN_EXECUTOR
 
 
 def invalidate_policy_cache() -> None:
@@ -508,8 +546,11 @@ def kest_verified(
                     raise PermissionError(f"Kest policies {policies} denied execution")
 
                 # Fix 6: Offload CPU-bound signing + baggage packing to thread pool
-                # This unblocks the event loop during Ed25519/canonicalization work
-                new_ctx = await asyncio.to_thread(
+                # This unblocks the event loop during Ed25519/canonicalization work.
+                # We use a bounded executor to prevent thread exhaustion (SPEC A-01-I).
+                loop = asyncio.get_running_loop()
+                new_ctx = await loop.run_in_executor(
+                    _get_sign_executor(),
                     _execute_core_post_auth,
                     state,
                     func.__name__,
