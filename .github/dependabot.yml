@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # GitHub Actions — pin and keep action SHAs up to date
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "github-actions"
+
+  # Rust / Cargo (kest-core native Rust extension)
+  - package-ecosystem: "cargo"
+    directory: "/libs/kest-core/python"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "rust"
+
+  # Python (pip/uv ecosystem)
+  - package-ecosystem: "pip"
+    directory: "/libs/kest-core/python"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "python"
+
+  # Node / Bun (website)
+  - package-ecosystem: "npm"
+    directory: "/website"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+      - "frontend"

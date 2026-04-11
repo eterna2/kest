@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 
 
 /// Converts a Python dict representing a PolicyContext into the Rust PolicyContext struct.
-fn py_dict_to_policy_context(py: Python<'_>, dict: &Bound<'_, PyDict>) -> PolicyContext {
+fn py_dict_to_policy_context(_py: Python<'_>, dict: &Bound<'_, PyDict>) -> PolicyContext {
     let get_str_vec = |key: &str| -> Vec<String> {
         dict.get_item(key)
             .ok()
@@ -233,7 +233,7 @@ impl KestEntry {
             if let Some(a) = &dv.approver {
                 dd.set_item("approver", a).unwrap();
             }
-            dd.to_object(py)
+            dd.into_pyobject(py).unwrap().into_any().unbind()
         }).collect();
         d.set_item("deviations", dev_list)?;
         Ok(d.into())
@@ -264,7 +264,7 @@ fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult
 
     // Re-acquire GIL to call the Python identity provider's sign_payload.
     let signature = Python::with_gil(|py2| {
-        let py_bytes = pyo3::types::PyBytes::new_bound(py2, signing_input.as_bytes());
+        let py_bytes = pyo3::types::PyBytes::new(py2, signing_input.as_bytes());
         provider
             .call_method1(py2, "sign_payload", (py_bytes,))
             .and_then(|r| r.extract::<String>(py2))
