@@ -3,6 +3,7 @@
 [![PyPI version](https://img.shields.io/pypi/v/kest.svg)](https://pypi.org/project/kest/)
 [![CI](https://github.com/eterna2/kest/actions/workflows/ci.yml/badge.svg)](https://github.com/eterna2/kest/actions/workflows/ci.yml)
 [![Coveralls](https://coveralls.io/repos/github/eterna2/kest/badge.svg?branch=main)](https://coveralls.io/github/eterna2/kest?branch=main)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/eterna2/kest/badge)](https://scorecard.dev/viewer/?uri=github.com/eterna2/kest)
 [![Documentation](https://img.shields.io/badge/docs-stable-brightgreen)](https://eterna2.github.io/kest/)
 
 > 📖 **[Full documentation → eterna2.github.io/kest](https://eterna2.github.io/kest/)**  
