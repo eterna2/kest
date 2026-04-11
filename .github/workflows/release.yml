@@ -88,12 +88,11 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4
+      - uses: actions/download-artifact@v8.0.1
         with:
+          name: wheels
           path: dist
-          pattern: wheels-*
-          merge-multiple: true
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@76f52bc884231f62b9a034ebfe128415bbaabdfc  # v1.12.4
+        uses: pypa/gh-action-pypi-publish@v2.0.0
         with:
           packages-dir: dist
