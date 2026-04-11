@@ -6,16 +6,22 @@ on:
       - main
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write  # coveralls status check
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           fetch-depth: 0
 
       - name: Install proto
-        uses: moonrepo/setup-proto@v1.1.1
+        uses: moonrepo/setup-proto@f03c0e4aa1026f17d6e82d04cf1c30aab0a51a8a  # v1.1.1
 
       - name: Install dependencies
         run: proto install
@@ -24,6 +30,6 @@ jobs:
         run: moon run kest-core-python:test
 
       - name: Coveralls
-        uses: coverallsapp/github-action@v2
+        uses: coverallsapp/github-action@5cbfd81b66ca5d10c19b062c04de0199c215fb6e  # v2
         with:
           file: libs/kest-core/python/coverage.xml

@@ -17,8 +17,7 @@ on:
       - ".github/scripts/gen-pages-index.sh"
 
 permissions:
-  contents: write      # push to gh-pages branch
-  pull-requests: write # post preview URL comment
+  contents: read
 
 # One preview per PR — cancel stale builds when a new commit is pushed.
 concurrency:
@@ -37,23 +36,28 @@ jobs:
   deploy-preview:
     if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write      # push to gh-pages branch
+      pull-requests: write # post preview URL comment
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       # Derive a URL-safe folder name from the branch name.
       # e.g. "feat/my-feature" → "feat-my-feature"
       - name: Compute branch slug
         id: slug
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
+          BRANCH="$HEAD_REF"
           SLUG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
           echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
           echo "Preview folder: preview/$SLUG"
 
       - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6  # v2
         with:
           bun-version: latest
 
@@ -68,7 +72,7 @@ jobs:
         run: bun run build
 
       - name: Deploy to gh-pages (subfolder)
-        uses: peaceiris/actions-gh-pages@v4
+        uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e  # v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./website/out
@@ -78,7 +82,7 @@ jobs:
 
       # Regenerate root splash page so new preview appears in the index.
       - name: Checkout gh-pages for index update
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: gh-pages
           path: gh-pages-branch
@@ -109,7 +113,7 @@ jobs:
 
       # Post or update a single comment on the PR with the live URL.
       - name: Comment preview URL on PR
-        uses: thollander/actions-comment-pull-request@v3
+        uses: thollander/actions-comment-pull-request@24bffb9b452ba05a4f3f77933840a6a841d1b32b  # v3
         with:
           message: |
             ### 🔍 Site Preview Deployed
@@ -131,21 +135,25 @@ jobs:
   cleanup-preview:
     if: github.event.action == 'closed'
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout source (for gen-pages-index.sh)
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
 
       - name: Checkout gh-pages branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
         with:
           ref: gh-pages
           path: gh-pages-branch
 
       - name: Compute branch slug
         id: slug
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
+          BRANCH="$HEAD_REF"
           SLUG=$(echo "$BRANCH" | tr '/' '-' | tr '_' '-' | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9-]//g')
           echo "slug=$SLUG" >> "$GITHUB_OUTPUT"
 

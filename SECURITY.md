@@ -24,13 +24,15 @@ cpe:2.3:a:eterna2:kest:0.3.0:*:*:*:*:*:*:*
 
 ## Reporting a Vulnerability
 
-Security issues should be reported securely so they can be addressed before public disclosure.
+Security issues should be reported **privately** so they can be addressed before public disclosure.
 
-1. **Do not** file a public issue for a security vulnerability.
-2. Please send a direct email or use the private vulnerability reporting feature on GitHub (if enabled on the repository) to discuss the vulnerability.
+1. **Do not** file a public GitHub issue for a security vulnerability.
+2. Use **[GitHub Private Vulnerability Reporting](https://github.com/eterna2/kest/security/advisories/new)** to disclose the issue confidentially. This is the preferred reporting path.
 3. Be sure to include:
    - A description of the vulnerability and its potential impact.
    - A proof-of-concept (POC) or detailed steps to reproduce.
    - The version of Kest you tested against.
 
-We will acknowledge receipt of the vulnerability and strive to send you regular updates about our progress until the issue is fixed.
+We will acknowledge receipt and send regular updates until the issue is resolved.
+
+> **Note**: Private vulnerability reporting must be enabled in the repository settings. If the link above is unavailable, please open a [GitHub Security Advisory](https://github.com/eterna2/kest/security/advisories) instead.
