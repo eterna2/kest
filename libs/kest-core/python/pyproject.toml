@@ -9,7 +9,7 @@ requires-python = ">=3.11"
 dependencies = [
     "opentelemetry-api>=1.31.0",
     "opentelemetry-sdk>=1.31.0",
-    "opentelemetry-exporter-otlp>=1.31.0",
+    "opentelemetry-exporter-otlp>=1.41.0",
     "httpx>=0.28.1",
     "uuid-utils>=0.9.0"
 ]
