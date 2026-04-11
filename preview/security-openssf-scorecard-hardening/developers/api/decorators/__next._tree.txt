@@ -1,0 +1,2 @@
+:HL["/kest/preview/security-openssf-scorecard-hardening/_next/static/chunks/06fcy~27nmahe.css","style"]
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"developers","param":null,"prefetchHints":0,"slots":{"children":{"name":"api","param":null,"prefetchHints":0,"slots":{"children":{"name":"slug","param":{"type":"d","key":"decorators","siblings":null},"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}}}}}},"staleTime":300,"buildId":"IX8JT6Qg774egZTiTfpd3"}
