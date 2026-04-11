@@ -184,14 +184,15 @@ A **Verification Hook** is the primary integration point that wraps business log
 | **F-CP-01** | The current Passport MUST be propagated between services using the [W3C Baggage](https://www.w3.org/TR/baggage/) HTTP header under the key `kest.passport`. |
 | **F-CP-02** | A **Server-Side Lineage Interceptor** (see §8.1) MUST extract the `baggage` header from incoming requests, parse `kest.passport`, and make the Passport available to the Verification Hook before it executes. The Interceptor MAY run in-process (e.g., as framework middleware) or out-of-process (e.g., as a sidecar proxy that intercepts HTTP/gRPC traffic). |
 | **F-CP-03** | An **Outbound Propagator** MUST serialize the current Passport to JSON and inject it into outgoing requests as a `baggage` header value. The Propagator MAY run in-process (e.g., as an HTTP client interceptor) or out-of-process (e.g., as a sidecar that intercepts egress traffic). |
-| **F-CP-04** | When the serialized Passport exceeds a configurable size threshold (default: 4096 bytes), the implementation MUST engage the **Claim Check** pattern: (a) store the full Passport in a configured `CacheProvider` under a UUID key; (b) propagate only `kest.claim_check=<uuid>` in the baggage header. The `CacheProvider` entry SHOULD have a configurable TTL long enough to outlive the full request chain, and implementations SHOULD document the risk of audit gaps if a claim check expires before collection. |
+| **F-CP-04** | When the serialized Passport exceeds a configurable size threshold (default: 4096 bytes), the implementation MUST first attempt to reduce the payload via zlib compression before engaging the Claim Check pattern (see F-CP-07 and F-CP-08). If no `CacheProvider` is configured and compression alone does not bring the payload within the threshold, the implementation MUST raise a configuration error rather than propagating an oversized header. |
 | **F-CP-05** | Upon receiving a `kest.claim_check` baggage key, the Server-Side Lineage Interceptor MUST retrieve the full Passport from the `CacheProvider` and restore it to the OTel context before the Verification Hook executes. |
 | **F-CP-06** | The following context accessor operations MUST be provided, reading from OTel Baggage: `get_current_user()`, `get_current_agent()`, `get_current_task()`, `get_current_jwt()`, `get_current_passport()`. Each returns the value or a null sentinel if absent. |
+| **F-CP-07** | When the serialized Passport exceeds the size threshold but its **zlib-compressed** form (using at minimum zlib level 1) is at or below the threshold, the implementation MUST propagate it as `kest.passport_z=<base64url(zlib(json))>` rather than engaging the Claim Check pattern. This avoids an external cache dependency for deep-but-typical call chains. The `kest.passport_z` key takes precedence over `kest.passport` when both would be within threshold. |
+| **F-CP-08** | A conformant implementation MUST be able to **consume** `kest.passport_z` — i.e., decode base64url and decompress with zlib — even if it does not produce it. An implementation that encounters `kest.passport_z` and cannot decompress it MUST raise an error rather than silently skipping the passport. |
 
 > **Informative note — Sidecar deployment pattern:** The Server-Side Lineage Interceptor, the Outbound Propagator, and the Verification Hook are defined as logical components; they do not need to reside in the same process as the application being protected. In environments where instrumentation of application code is not practical (e.g., legacy services, third-party containers), all three components MAY be deployed as a **sidecar proxy** (such as Envoy or a custom proxy) that intercepts inbound and outbound HTTP/gRPC traffic. The sidecar extracts and injects `kest.passport` baggage on ingress and egress, and invokes the Verification Hook against the policy engine on the workload's behalf. The contract — `KestEntry` production, Passport signing, and policy evaluation — is identical regardless of deployment topology.
 
-> **Recommended — OTel Collector claim-check reconciliation:** When the Claim Check pattern (F-CP-04) is in use, OTel records flowing through the pipeline may carry `kest.claim_check` references instead of the full serialized Passport. A Kest-aware OTel Collector pipeline SHOULD include a **rehydration processor** that resolves these references against the `CacheProvider` before the audit records are written to long-term storage. This ensures that persisted audit logs are always self-contained — containing the complete Merkle-linked Passport — rather than dangling UUID references that become unresolvable after the cache TTL expires. The rehydration step SHOULD be the final transform in the collector pipeline, immediately before the exporter. Implementations that expose a collector extension or plugin SHOULD document the configuration interface for this processor.
-
+> **Recommended — OTel Collector claim-check reconciliation:** When the Claim Check pattern (F-CP-04/F-CP-08) is in use, OTel records flowing through the pipeline may carry `kest.claim_check` references instead of the full serialized Passport. A Kest-aware OTel Collector pipeline SHOULD include a **rehydration processor** that resolves these references against the `CacheProvider` before the audit records are written to long-term storage. This ensures that persisted audit logs are always self-contained — containing the complete Merkle-linked Passport — rather than dangling UUID references that become unresolvable after the cache TTL expires. The rehydration step SHOULD be the final transform in the collector pipeline, immediately before the exporter. Implementations that expose a collector extension or plugin SHOULD document the configuration interface for this processor.
 
 ### 2.9 Telemetry Emission
 
@@ -877,7 +878,8 @@ When making outbound HTTP calls to downstream services, the implementation MUST 
 | Baggage Key | Set By | Consumed By |
 |---|---|---|
 | `kest.passport` | Server-Side Lineage Interceptor, Verification Hook | Downstream Verification Hook, Lineage Interceptor |
-| `kest.claim_check` | `BaggageManager` (when passport > 4 KB) | Lineage Interceptor |
+| `kest.passport_z` | `BaggageManager` (when passport > threshold but compresses below it) | Lineage Interceptor (MUST decompress) |
+| `kest.claim_check` | `BaggageManager` (when compressed passport still > threshold) | Lineage Interceptor |
 | `kest.user` | Server-Side Identity Interceptor or explicit parameter | Verification Hook context, policy engine |
 | `kest.agent` | Server-Side Identity Interceptor or explicit parameter | Verification Hook context, policy engine |
 | `kest.task` | Server-Side Identity Interceptor or explicit parameter | Verification Hook context, policy engine |
@@ -900,21 +902,30 @@ This ordering ensures that JWT-validated identity always takes precedence over u
 
 > **Note:** In frameworks where middleware ordering is reversed (e.g., Python ASGI adds middleware in LIFO order), the Lineage Interceptor MUST be registered last and the Identity Interceptor first.
 
-### 8.3 Claim Check Pattern
+### 8.6 Claim Check Pattern
+
+The three-tier baggage storage strategy, applied in priority order:
 
 ```
 store_passport(passport, cache, threshold=4096):
   serialized = passport.serialize()   // JSON string
   if len(serialized) <= threshold:
-    return {"kest.passport": serialized}
-  else:
-    claim_id = generate_uuid_v4()
-    cache.set(claim_id, serialized, ttl=300)  // 5 min TTL
-    return {"kest.claim_check": claim_id}
+    return {"kest.passport": serialized}         // Tier 1: inline
+
+  compressed = base64url(zlib_compress(serialized, level=1))
+  if len(compressed) <= threshold:
+    return {"kest.passport_z": compressed}       // Tier 2: compressed inline
+
+  claim_id = generate_uuid_v4()
+  cache.set(claim_id, serialized, ttl=300)        // 5 min TTL
+  return {"kest.claim_check": claim_id}           // Tier 3: claim check
 
 restore_passport(baggage, cache):
   if "kest.passport" in baggage:
     return Passport.deserialize(baggage["kest.passport"])
+  if "kest.passport_z" in baggage:
+    serialized = zlib_decompress(base64url_decode(baggage["kest.passport_z"]))
+    return Passport.deserialize(serialized)
   if "kest.claim_check" in baggage:
     serialized = cache.get(baggage["kest.claim_check"])
     if serialized is null:
@@ -1162,10 +1173,12 @@ External auditors can verify the audit trail without access to the original serv
 - **Required behaviour**: Raise an error during initialization or during `sign()`. The Verification Hook MUST propagate this error upward, preventing execution of the protected operation.
 - **No fallback signing**: The implementation MUST NOT fall back to an unsigned audit entry.
 
-### 11.3 Oversized Passport (Claim Check)
+### 11.3 Oversized Passport (Three-Tier Propagation)
 
-- **Condition**: Serialized Passport exceeds 4096 bytes (configurable).
-- **Required behaviour**: Engage the Claim Check pattern (§8.3). Store full Passport in `CacheProvider`. Propagate only `kest.claim_check=<uuid>`. If no `CacheProvider` is configured, raise a configuration error.
+- **Condition**: Serialized Passport exceeds the size threshold (default: 4096 bytes).
+- **Required behaviour (in order)**:
+  1. Compress with zlib (level 1 minimum) and encode as base64url. If the compressed form fits in the threshold, propagate as `kest.passport_z=<value>` (**F-CP-07**).
+  2. If even the compressed form exceeds the threshold: store the full Passport in `CacheProvider` under a UUID key and propagate as `kest.claim_check=<uuid>` (**F-CP-04/F-CP-08**). If no `CacheProvider` is configured at this point, raise a configuration error.
 
 ### 11.4 Claim Check Not Found
 
