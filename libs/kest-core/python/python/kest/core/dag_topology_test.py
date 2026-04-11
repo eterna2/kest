@@ -8,13 +8,13 @@ from opentelemetry import baggage
 from opentelemetry import context as otel_context
 
 from kest.core import (
+    KestEntry,
     LocalEd25519Provider,
     MockIdentityProvider,
     MockPolicyEngine,
     configure,
     kest_verified,
 )
-from kest.core import KestEntry
 from kest.core.models import BaggageManager, Passport, PassportVerifier
 
 

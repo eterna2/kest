@@ -16,8 +16,6 @@ sidebarCode: |
 
 The `kest.core.models` module defines the core data structures used by Kest to represent execution lineage and trust.
 
-The `kest.core.models` module defines the core data structures used by Kest to represent execution lineage and trust.
-
 ---
 
 ### `Passport`
@@ -48,19 +46,41 @@ Uses a "weakest link" model: the current trust is the minimum of parent trust sc
 
 ### `BaggageManager`
 
-Handles the hybrid propagation of lineage data in **OpenTelemetry (OTel) Baggage**.
+Handles the hybrid propagation of lineage data in **OpenTelemetry (OTel) Baggage** using a three-tier strategy:
 
-#### Hybrid Pattern
-- **Inline Propagation**: For small passports, data is stored directly in the baggage headers.
-- **Claim-Check Pattern**: For larger lineages, the manager stores the data in an external cache and propagates only a `claim_id` to avoid exceeding HTTP header limits.
+| Tier | Baggage Key | Condition |
+|---|---|---|
+| 1 — Inline | `kest.passport` | Passport ≤ 4 KB uncompressed |
+| 2 — Compressed Inline | `kest.passport_z` | zlib-compressed size ≤ 4 KB |
+| 3 — Claim Check | `kest.claim_check` | Exceeds both thresholds |
+
+This handles chains from 1 to 50+ hops without exceeding HTTP header limits. A 10-hop chain (~5 KB raw) compresses to ~1.5 KB and propagates inline as `kest.passport_z`, avoiding the cache lookup entirely.
+
+Consumers **MUST** handle all three tiers. Producers **MAY** skip Tier 2 and fall directly to Tier 3.
 
 ---
 
-### `SOURCE_TRUST_MAP`
+### `ORIGIN_TRUST_MAP` / `SOURCE_TRUST_MAP`
 
-Standard trust scores for root nodes based on their origin:
-- `system`: 1.0
-- `verified_rag`: 0.9
-- `third_party_api`: 0.6
-- `user_input`: 0.4
-- `llm`: 0.0
+Standard trust scores for root nodes based on their origin. Scores are **integers (0–100)** as of v0.3.0.
+
+| Origin | Score |
+|---|---|
+| `system` / `internal` | `100` |
+| `verified_rag` | `90` |
+| `third_party_api` | `60` |
+| `user_input` | `40` |
+| `internet` | `10` |
+| `llm` | `0` |
+
+`SOURCE_TRUST_MAP` is retained as a backward-compatibility alias for `ORIGIN_TRUST_MAP`.
+
+### `Passport` Properties
+
+| Property | Type | Description |
+|---|---|---|
+| `entries` | `List[str]` | Ordered list of JWS signatures (the Merkle chain) |
+| `trust_scores` | `List[int]` | Trust score of each entry (cached, O(1) after first read) |
+| `accumulated_taints` | `set` | Union of all taints across all entries (cached) |
+
+> **Performance note:** `accumulated_taints` and `trust_scores` are read from a parsed-entries cache. The cache is invalidated on every `add_signature()` call. See [GitHub #12](https://github.com/eterna2/kest/issues/12) for planned O(1) incremental accumulation.

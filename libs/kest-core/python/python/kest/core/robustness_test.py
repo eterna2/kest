@@ -12,12 +12,14 @@ from kest.core import (
     configure,
     kest_verified,
 )
+from kest.core.decorators import invalidate_policy_cache
 
 
 def test_robust_merkle_chain_verification():
     """
     Verifies that a 3-hop execution chain produces a cryptographically sound Merkle lineage.
     """
+    invalidate_policy_cache()
     # 1. Setup with real keys
     provider = LocalEd25519Provider(principal="spiffe://kest.internal/robust-test")
     configure(engine=MockPolicyEngine(), identity=provider, clear=True)
@@ -32,7 +34,8 @@ def test_robust_merkle_chain_verification():
 
     @kest_verified(policy="hop3")
     def hop3():
-        return baggage.get_baggage("kest.passport")
+        # Use BaggageManager.unpack to support both plain and compressed formats
+        return BaggageManager.unpack(baggage.get_baggage).serialize()
 
     # 2. Execute 3-hop chain
     passport_json = hop1()
@@ -49,12 +52,13 @@ def test_tamper_detection():
     """
     Verifies that modifying the baggage between hops breaks the Merkle chain.
     """
+    invalidate_policy_cache()
     provider = LocalEd25519Provider()
     configure(engine=MockPolicyEngine(), identity=provider, clear=True)
 
     @kest_verified(policy="legal")
     def legal_step():
-        return baggage.get_baggage("kest.passport")
+        return BaggageManager.unpack(baggage.get_baggage).serialize()
 
     # 1. Generate legitimate first entry
     legal_step()

@@ -8,20 +8,21 @@
 //   3. Trust score >= 10 (OBO token from internet-originated flow)
 //   4. The delegated scopes include "read:data" (minimum required scope)
 //
-// Context keys (from CedarLocalEngine._flatten):
-//   context["trust_score"]      = int  (10 for internet entry, 100 for internal)
-//   context["principal_user"]   = original delegating user (alice)
-//   context["principal_agent"]  = acting agent identity (kest-agent)
-//   context["principal_scope"]  = OAuth scope string from OBO token
-//                                 (e.g. "openid profile roles read:data write:data")
+// Context keys (spec-compliant names per SPEC-v0.3.0 §8.4):
+//   context["trust_score"] = int  (10 for internet entry, 100 for internal)
+//   context["user"]        = original delegating user (alice), from kest.user baggage
+//   context["agent"]       = acting agent identity (kest-agent), from kest.agent baggage
+//   context["scope"]       = raw OAuth scope string from OBO token (impl extension via kest.scope)
+//                            e.g. "openid profile roles read:data write:data"
+//   context["task"]        = same as scope (spec alias, from kest.task baggage)
 
 // Permit if all conditions met: trust, user, agent, and required scope.
 permit(principal, action, resource) when {
     context["trust_score"] >= 10 &&
-    context has "principal_user" &&
-    context["principal_user"] != "" &&
-    context has "principal_agent" &&
-    context["principal_agent"] != "" &&
-    context has "principal_scope" &&
-    context["principal_scope"] like "*read:data*"
+    context has "user" &&
+    context["user"] != "" &&
+    context has "agent" &&
+    context["agent"] != "" &&
+    context has "scope" &&
+    context["scope"] like "*read:data*"
 };

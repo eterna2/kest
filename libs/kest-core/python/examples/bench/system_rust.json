@@ -1,0 +1,73 @@
+{
+  "backend": "rust",
+  "L1_baggage": {
+    "1": {
+      "pack_ms": 0.004672490031225607,
+      "unpack_ms": 0.0025713699869811535,
+      "raw_bytes": 1775,
+      "packed_bytes": 1775,
+      "tier": "inline \u2713"
+    },
+    "5": {
+      "pack_ms": 0.04207366997434292,
+      "unpack_ms": 0.018373409984633327,
+      "raw_bytes": 8875,
+      "packed_bytes": 1672,
+      "tier": "compressed \u2713"
+    },
+    "10": {
+      "pack_ms": 0.052453879980021156,
+      "unpack_ms": 0.03506889996060636,
+      "raw_bytes": 17750,
+      "packed_bytes": 1916,
+      "tier": "compressed \u2713"
+    },
+    "25": {
+      "pack_ms": 0.18516370000725146,
+      "unpack_ms": 0.08083417997113429,
+      "raw_bytes": 44375,
+      "packed_bytes": 3268,
+      "tier": "compressed \u2713"
+    },
+    "50": {
+      "pack_ms": 0.19197991998225916,
+      "unpack_ms": 0.11124235999886878,
+      "raw_bytes": 88750,
+      "packed_bytes": 3840,
+      "tier": "compressed \u2713"
+    },
+    "claim_check_at_hop": null
+  },
+  "L2_decorator": {
+    "baseline_ms": 6.050002411939203e-05,
+    "no_policy_ms": 0.1793126800475875,
+    "cedar_cold_ms": 56.08743800257798,
+    "cedar_warm_ms": 0.20725346999824978,
+    "rego_cold_ms": 6.128913999418728,
+    "rego_warm_ms": 0.17892834002850577
+  },
+  "L3_policy": {
+    "cedar_ops_per_sec": 20471.0,
+    "rego_ops_per_sec": 628318.6666666666,
+    "sign_ops_per_sec": 14861.333333333334
+  },
+  "L4_multihop": {
+    "3": {
+      "total_ms": 0.4191536200232804,
+      "per_hop_ms": 0.13971787334109345
+    },
+    "5": {
+      "total_ms": 0.798971799958963,
+      "per_hop_ms": 0.1597943599917926
+    },
+    "10": {
+      "total_ms": 1.8517694200272672,
+      "per_hop_ms": 0.18517694200272672
+    }
+  },
+  "L4_merge": {
+    "2": 0.0007958900096127763,
+    "5": 0.0015165899822022766,
+    "10": 0.0027694199525285512
+  }
+}

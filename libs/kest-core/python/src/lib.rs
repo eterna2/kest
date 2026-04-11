@@ -3,8 +3,8 @@ use pyo3::types::{PyDict, PyList};
 use kest_core_rs::models::{
     KestEntry as CoreEntry, KestClassification, KestRuntime, PolicyContext, PolicyDeviation,
 };
-use kest_core_rs::crypto::{IdentityProvider as CoreIdentityProvider, CryptoError};
 use std::collections::BTreeMap;
+
 
 /// Converts a Python dict representing a PolicyContext into the Rust PolicyContext struct.
 fn py_dict_to_policy_context(py: Python<'_>, dict: &Bound<'_, PyDict>) -> PolicyContext {
@@ -240,35 +240,39 @@ impl KestEntry {
     }
 }
 
-// Internal adapter to use a Python object as a Rust IdentityProvider
-struct PyIdentityProvider {
-    inner: PyObject,
-}
 
-impl CoreIdentityProvider for PyIdentityProvider {
-    fn verify_svid(&self, svid: &str) -> Result<String, CryptoError> {
-        Python::with_gil(|py| {
-            let res = self.inner.call_method1(py, "verify_svid", (svid,))
-                .map_err(|e| CryptoError::SigningFailed(e.to_string()))?;
-            res.extract::<String>(py).map_err(|e| CryptoError::SigningFailed(e.to_string()))
-        })
-    }
-
-    fn sign_payload(&self, payload: &[u8]) -> Result<String, CryptoError> {
-        Python::with_gil(|py| {
-            let res = self.inner.call_method1(py, "sign_payload", (payload,))
-                .map_err(|e| CryptoError::SigningFailed(e.to_string()))?;
-            res.extract::<String>(py).map_err(|e| CryptoError::SigningFailed(e.to_string()))
-        })
-    }
-}
 
 #[pyfunction]
-fn sign_entry(entry: &KestEntry, provider: PyObject) -> PyResult<String> {
-    let adapter = PyIdentityProvider { inner: provider };
-    kest_core_rs::crypto::sign_kest_entry(&entry.inner, &adapter)
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e.to_string()))
+fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult<String> {
+    use base64::Engine;
+
+    // Clone the inner Rust struct so we can drop the GIL safely.
+    let inner = entry.inner.clone();
+
+    // Release the GIL for the heavy canonicalization work (pure Rust, no Python objects).
+    let signing_input = py.allow_threads(|| -> Result<String, String> {
+        let json_val = serde_json::to_value(&inner)
+            .map_err(|e| e.to_string())?;
+        let canonical = kest_core_rs::canonical::to_canonical_string(&json_val)
+            .map_err(|e| e)?;
+        let header = serde_json::json!({"alg":"EdDSA","typ":"JWS"});
+        let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .encode(serde_jcs::to_string(&header).unwrap());
+        let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(canonical);
+        Ok(format!("{}.{}", header_b64, payload_b64))
+    }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+
+    // Re-acquire GIL to call the Python identity provider's sign_payload.
+    let signature = Python::with_gil(|py2| {
+        let py_bytes = pyo3::types::PyBytes::new_bound(py2, signing_input.as_bytes());
+        provider
+            .call_method1(py2, "sign_payload", (py_bytes,))
+            .and_then(|r| r.extract::<String>(py2))
+    })?;
+
+    Ok(format!("{}.{}", signing_input, signature))
 }
+
 
 #[pyfunction]
 fn version() -> PyResult<String> {

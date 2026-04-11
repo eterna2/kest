@@ -1,9 +1,11 @@
-import base64
+import asyncio
 import functools
 import hashlib
+import inspect
 import json
 import os
-import inspect
+import time
+from threading import Lock
 from typing import Any, List, Optional, Union
 
 import opentelemetry.context as otel_context
@@ -24,14 +26,131 @@ from kest.core.models import (
 tracer = trace.get_tracer(__name__)
 
 
-# SHARED LAB FILE: To ensure Merkle chain links in the lab where OTel propagation is failing
+# ---------------------------------------------------------------------------
+# Fix 2: Policy Decision Cache
+# ---------------------------------------------------------------------------
+
+
+class _PolicyDecisionCache:
+    """
+    Thread-safe TTL-based LRU cache for policy decisions.
+
+    Key: (principal, trust_score, classification, tuple(sorted policy names),
+          principal_user, principal_agent, principal_scope)
+
+    The key includes all Keycloak identity attributes to prevent cross-request
+    cache collisions: e.g., the same SPIRE workload serving requests from different
+    Keycloak users, different scopes, or with/without a bearer token, will each
+    maintain a separate cached decision.
+
+    TTL defaults to 5 seconds -- appropriate for real-time enforcement while
+    avoiding evaluation on every call.
+    """
+
+    def __init__(self, maxsize: int = 1024, ttl_seconds: float = 5.0):
+        self._cache: dict = {}
+        self._maxsize = maxsize
+        self._ttl = ttl_seconds
+        self._lock = Lock()
+
+    def _make_key(self, context: dict, policy_names: list) -> tuple:
+        return (
+            context.get("principal", ""),
+            context.get("trust_score", 0),
+            context.get("classification", ""),
+            tuple(sorted(policy_names)),
+            # Include per-request identity context so that requests from the same
+            # workload (same SPIRE SVID) but different Keycloak users, agents, or scopes
+            # — or with/without a JWT — do not share a cached policy decision.
+            # Keys use spec-compliant names (SPEC-v0.3.0 §8.4).
+            context.get("user", ""),
+            context.get("agent", ""),
+            context.get("task", ""),
+        )
+
+    def get_or_evaluate(
+        self,
+        engine: PolicyEngine,
+        entry_id: str,
+        policy_names: list,
+        context: dict,
+    ) -> bool:
+        key = self._make_key(context, policy_names)
+        now = time.monotonic()
+
+        with self._lock:
+            cached = self._cache.get(key)
+            if cached is not None:
+                decision, ts = cached
+                if (now - ts) < self._ttl:
+                    return decision
+
+        # Cache miss or expired: evaluate
+        result = engine.evaluate(entry_id, list(policy_names), context)
+
+        with self._lock:
+            if len(self._cache) >= self._maxsize:
+                # Evict oldest entry
+                oldest = next(iter(self._cache))
+                del self._cache[oldest]
+            self._cache[key] = (result, now)
+
+        return result
+
+    def invalidate(self) -> None:
+        """Clear all cached decisions (e.g., after policy reload)."""
+        with self._lock:
+            self._cache.clear()
+
+
+# Module-level cache instance, shared across all decorated functions.
+# TTL is configurable via KEST_POLICY_CACHE_TTL env var (default 5s).
+_POLICY_CACHE = _PolicyDecisionCache(
+    maxsize=1024,
+    ttl_seconds=float(os.getenv("KEST_POLICY_CACHE_TTL", "5.0")),
+)
+
+
+def invalidate_policy_cache() -> None:
+    """
+    Invalidate all cached policy decisions.
+
+    Call this after hot-reloading policies or in tests to ensure a clean state.
+    """
+    _POLICY_CACHE.invalidate()
+
+
+# Lab fallback: filesystem-backed Merkle chain tracking.
+# ONLY active when KEST_LAB_FALLBACK=true — MUST NOT be set in production.
+# See spec/learnings/v0.3.0/LEARNINGS.md §D-04 for context.
+_LAB_FALLBACK_ENABLED = os.getenv("KEST_LAB_FALLBACK", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
 _LAB_AUDIT_FILE = "/workspace/app/lab_audit.json"
+
+
+def _get_baggage(key: str) -> Any:
+    """
+    Read a value from the current OTel Baggage context.
+
+    This is the canonical way to read Kest identity/context keys within core.
+    It replaces the previous LabFallbackBaggageProvider.get_baggage() helper,
+    which coupled core logic to the lab's global _LAB_BAGGAGE_STORE dict.
+
+    All consumers of kest.user / kest.agent / kest.task etc. must use this.
+    """
+    return baggage.get_baggage(key, context=otel_context.get_current())
+
 
 class LabFallbackBaggageProvider:
     """Internal helper to manage shared lab state and fallbacks for baggage propagation."""
-    
+
     @staticmethod
     def append_audit(signature: str):
+        if not _LAB_FALLBACK_ENABLED:
+            return
         try:
             data = []
             if os.path.exists(_LAB_AUDIT_FILE):
@@ -48,6 +167,8 @@ class LabFallbackBaggageProvider:
 
     @staticmethod
     def update_chain(service_name: str, sig_hash: str):
+        if not _LAB_FALLBACK_ENABLED:
+            return
         try:
             path = f"/workspace/app/last_hash_{service_name}.txt"
             with open(path, "w") as f:
@@ -57,6 +178,8 @@ class LabFallbackBaggageProvider:
 
     @staticmethod
     def get_parent_hash(service_name: str) -> str:
+        if not _LAB_FALLBACK_ENABLED:
+            return "0"
         try:
             target = (
                 "hop1"
@@ -74,9 +197,11 @@ class LabFallbackBaggageProvider:
                 return f.read().strip()
         except Exception:
             return "0"
-            
+
     @staticmethod
     def get_passport_entries() -> list:
+        if not _LAB_FALLBACK_ENABLED:
+            return []
         try:
             if os.path.exists(_LAB_AUDIT_FILE):
                 with open(_LAB_AUDIT_FILE, "r") as f:
@@ -85,44 +210,34 @@ class LabFallbackBaggageProvider:
             pass
         return []
 
-    @staticmethod
-    def get_baggage(key: str, span=None) -> Any:
-        import kest.core.ext
-        current_ctx = otel_context.get_current()
-        val = baggage.get_baggage(key, context=current_ctx)
-        if not val:
-            current_span = span or trace.get_current_span(current_ctx)
-            span_ctx = current_span.get_span_context() if current_span else None
-            trace_id = span_ctx.trace_id if span_ctx and span_ctx.is_valid else None
-            if trace_id:
-                with kest.core.ext._LAB_LOCK:
-                    lab_data = kest.core.ext._LAB_BAGGAGE_STORE.get(trace_id, {})
-                    val = lab_data.get(key)
-        return val
-
 
 def get_active_engine() -> Optional[PolicyEngine]:
     import kest.core
+
     return getattr(kest.core, "_active_engine", None)
 
 
 def get_active_identity() -> Optional[IdentityProvider]:
     import kest.core
+
     return getattr(kest.core, "_active_identity", None)
 
 
 def get_active_cache() -> Optional[Any]:
     import kest.core
+
     return getattr(kest.core, "_active_cache", None)
 
 
 def get_active_enterprise_policies() -> List[str]:
     import kest.core
+
     return getattr(kest.core, "_active_enterprise_policies", [])
 
 
 def get_active_deviations() -> List[Any]:
     import kest.core
+
     return getattr(kest.core, "_active_deviations", [])
 
 
@@ -145,7 +260,9 @@ def _build_mapped_context(func, context_map, args, kwargs):
                 mapped_context[ctx_key] = val
                 if persist:
                     mapped_labels[ctx_key] = (
-                        str(val) if not isinstance(val, (int, float, bool, str)) else val
+                        str(val)
+                        if not isinstance(val, (int, float, bool, str))
+                        else val
                     )
     return mapped_context, mapped_labels
 
@@ -174,7 +291,7 @@ def _execute_core_logic(
     if not active_eng:
         raise PermissionError("No PolicyEngine configured")
 
-    raw_tips = LabFallbackBaggageProvider.get_baggage("kest.chain_tip")
+    raw_tips = _get_baggage("kest.chain_tip")
     parent_hashes = (
         [t.strip() for t in raw_tips.split(",")] if raw_tips and raw_tips != "0" else []
     )
@@ -187,7 +304,7 @@ def _execute_core_logic(
     if not parent_hashes:
         parent_hashes = ["0"]
 
-    passport = BaggageManager.unpack(LabFallbackBaggageProvider.get_baggage, cache=cache)
+    passport = BaggageManager.unpack(_get_baggage, cache=cache)
     if not passport.entries and parent_hashes != ["0"]:
         passport.entries = LabFallbackBaggageProvider.get_passport_entries()
 
@@ -195,22 +312,12 @@ def _execute_core_logic(
     evaluator = trust_evaluator or DefaultTrustEvaluator()
     self_score = ORIGIN_TRUST_MAP.get(origin, 100) if origin else 100
     current_node_trust = self_score if is_root else 100
-    
-    parent_taints = set()
-    if not is_root:
-        parent_scores = []
-        for sig in passport.entries:
-            try:
-                p_b64 = sig.split(".")[1]
-                p_b64 += "=" * ((4 - len(p_b64) % 4) % 4)
-                p_data = json.loads(base64.urlsafe_b64decode(p_b64))
-                parent_scores.append(p_data.get("trust_score", 0))
 
-                # Accumulate taints from parents
-                p_accumulated = p_data.get("taints", [])
-                parent_taints.update(p_accumulated)
-            except Exception:
-                pass
+    # Fix 1: Use cached passport properties instead of O(n) inline parsing
+    parent_taints: set = set()
+    if not is_root:
+        parent_scores = passport.trust_scores
+        parent_taints = passport.accumulated_taints
         if trust_override is None:
             current_node_trust = evaluator.calculate(self_score, parent_scores)
 
@@ -245,11 +352,14 @@ def _execute_core_logic(
         "is_root": is_root,
         "origin": origin,
         "trust_score": current_node_trust,
-        "principal_user": LabFallbackBaggageProvider.get_baggage("kest.principal_user", span) or "",
-        "principal_agent": LabFallbackBaggageProvider.get_baggage("kest.principal_agent", span) or "",
-        "principal_scope": LabFallbackBaggageProvider.get_baggage("kest.principal_scope", span) or "",
+        # Spec-compliant keys (SPEC-v0.3.0 §9.2, §8.4)
+        "user": _get_baggage("kest.user") or "",
+        "agent": _get_baggage("kest.agent") or "",
+        "task": _get_baggage("kest.task") or "",
+        # Implementation extension: raw OAuth scope for Cedar ABAC checks
+        "scope": _get_baggage("kest.scope") or "",
     }
-    
+
     # Needs to be provided by caller logic:
     # We must actually evaluate engine here.
     return {
@@ -282,14 +392,15 @@ def _execute_core_post_auth(
     if span_ctx and span_ctx.is_valid:
         labels["trace_id"] = f"{span_ctx.trace_id:032x}"
 
-    tracking_id = LabFallbackBaggageProvider.get_baggage("kest.trace_id", span)
+    tracking_id = _get_baggage("kest.trace_id")
     if tracking_id:
         labels["kest.trace_id"] = tracking_id
     if mapped_labels:
         labels.update(mapped_labels)
 
-    principal_user = LabFallbackBaggageProvider.get_baggage("kest.principal_user", span)
-    principal_agent = LabFallbackBaggageProvider.get_baggage("kest.principal_agent", span)
+    # Spec §2.7 F-IC-04: embed user/agent in labels as kest.identity JSON string
+    principal_user = _get_baggage("kest.user")
+    principal_agent = _get_baggage("kest.agent")
     if principal_user or principal_agent:
         labels["kest.identity"] = json.dumps(
             {"user": principal_user or "", "agent": principal_agent or ""}
@@ -304,7 +415,9 @@ def _execute_core_post_auth(
         labels=labels,
         added_taints=added_taints or [],
         removed_taints=removed_taints or [],
-        taints=list(state["current_accumulated"]) if state["current_accumulated"] else [],
+        taints=list(state["current_accumulated"])
+        if state["current_accumulated"]
+        else [],
         policy_context={
             "enterprise_policies": get_active_enterprise_policies(),
             "platform_policies": [],
@@ -355,29 +468,54 @@ def kest_verified(
 
         @functools.wraps(func)
         async def async_wrapper(*args, **kwargs):
-            mapped_context, mapped_labels = _build_mapped_context(func, context_map, args, kwargs)
-            state = _execute_core_logic(
-                func.__name__, policies, origin, trust_evaluator, trust_override,
-                added_taints, removed_taints, context_map, args, kwargs, engine, identity
+            mapped_context, mapped_labels = _build_mapped_context(
+                func, context_map, args, kwargs
             )
-            
+            state = _execute_core_logic(
+                func.__name__,
+                policies,
+                origin,
+                trust_evaluator,
+                trust_override,
+                added_taints,
+                removed_taints,
+                context_map,
+                args,
+                kwargs,
+                engine,
+                identity,
+            )
+
             span = state["span"]
             with trace.use_span(span, end_on_exit=True):
                 ctx_to_eval = state["ctx_to_eval"]
                 ctx_to_eval.update(mapped_context)
 
-                allowed = state["active_eng"].evaluate(
+                # Fix 2: Policy decision cache (TTL=5s, key=principal+trust_score+policies)
+                allowed = _POLICY_CACHE.get_or_evaluate(
+                    state["active_eng"],
                     entry_id=state["entry_id"],
                     policy_names=state["policies"],
                     context=ctx_to_eval,
                 )
                 span.set_attribute("kest.allowed", allowed)
                 if not allowed:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, "Kest policy denied execution"))
+                    span.set_status(
+                        trace.Status(
+                            trace.StatusCode.ERROR, "Kest policy denied execution"
+                        )
+                    )
                     raise PermissionError(f"Kest policies {policies} denied execution")
 
-                new_ctx = _execute_core_post_auth(
-                    state, func.__name__, added_taints, removed_taints, mapped_labels
+                # Fix 6: Offload CPU-bound signing + baggage packing to thread pool
+                # This unblocks the event loop during Ed25519/canonicalization work
+                new_ctx = await asyncio.to_thread(
+                    _execute_core_post_auth,
+                    state,
+                    func.__name__,
+                    added_taints,
+                    removed_taints,
+                    mapped_labels,
                 )
                 token = otel_context.attach(new_ctx)
                 try:
@@ -387,25 +525,43 @@ def kest_verified(
 
         @functools.wraps(func)
         def sync_wrapper(*args, **kwargs):
-            mapped_context, mapped_labels = _build_mapped_context(func, context_map, args, kwargs)
-            state = _execute_core_logic(
-                func.__name__, policies, origin, trust_evaluator, trust_override,
-                added_taints, removed_taints, context_map, args, kwargs, engine, identity
+            mapped_context, mapped_labels = _build_mapped_context(
+                func, context_map, args, kwargs
             )
-            
+            state = _execute_core_logic(
+                func.__name__,
+                policies,
+                origin,
+                trust_evaluator,
+                trust_override,
+                added_taints,
+                removed_taints,
+                context_map,
+                args,
+                kwargs,
+                engine,
+                identity,
+            )
+
             span = state["span"]
             with trace.use_span(span, end_on_exit=True):
                 ctx_to_eval = state["ctx_to_eval"]
                 ctx_to_eval.update(mapped_context)
 
-                allowed = state["active_eng"].evaluate(
+                # Fix 2: Policy decision cache (TTL=5s, key=principal+trust_score+policies)
+                allowed = _POLICY_CACHE.get_or_evaluate(
+                    state["active_eng"],
                     entry_id=state["entry_id"],
                     policy_names=state["policies"],
                     context=ctx_to_eval,
                 )
                 span.set_attribute("kest.allowed", allowed)
                 if not allowed:
-                    span.set_status(trace.Status(trace.StatusCode.ERROR, "Kest policy denied execution"))
+                    span.set_status(
+                        trace.Status(
+                            trace.StatusCode.ERROR, "Kest policy denied execution"
+                        )
+                    )
                     raise PermissionError(f"Kest policies {policies} denied execution")
 
                 new_ctx = _execute_core_post_auth(

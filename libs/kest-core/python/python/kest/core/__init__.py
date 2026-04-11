@@ -8,8 +8,8 @@ This package provides the core Python implementation of Kest, including:
 - Distributed propagation via OpenTelemetry.
 """
 
-from typing import TYPE_CHECKING, Any, Literal
 import os as _os
+from typing import TYPE_CHECKING, Any, Literal
 
 _BackendName = Literal["rust", "python"]
 _ACTIVE_BACKEND: _BackendName = "rust"
@@ -22,30 +22,41 @@ else:
     sign_entry = None
     version = None
 
+
 def _load_backend(name: _BackendName) -> None:
     global KestEntry, sign_entry, version, _ACTIVE_BACKEND
     if name == "python":
-        from kest.core._core_py import KestEntry as _K, sign_entry as _S, version as _V
+        from kest.core._core_py import KestEntry as _K
+        from kest.core._core_py import sign_entry as _S
+        from kest.core._core_py import version as _V
     else:
         try:
-            from kest.core._core import KestEntry as _K, sign_entry as _S, version as _V
+            from kest.core._core import KestEntry as _K
+            from kest.core._core import sign_entry as _S
+            from kest.core._core import version as _V
         except ImportError:
-            from kest.core._core_py import KestEntry as _K, sign_entry as _S, version as _V
+            from kest.core._core_py import KestEntry as _K
+            from kest.core._core_py import sign_entry as _S
+            from kest.core._core_py import version as _V
+
             name = "python"
     KestEntry = _K
     sign_entry = _S
     version = _V
     _ACTIVE_BACKEND = name
 
+
 def set_backend(name: _BackendName) -> None:
     _load_backend(name)
+
 
 def get_backend() -> _BackendName:
     return _ACTIVE_BACKEND
 
-_load_backend(_os.environ.get("KEST_BACKEND", "rust").lower()) # type: ignore
+
+_load_backend(_os.environ.get("KEST_BACKEND", "rust").lower())  # type: ignore
 from kest.core.cache import CacheProvider, SimpleCache
-from kest.core.decorators import kest_verified
+from kest.core.decorators import invalidate_policy_cache, kest_verified
 from kest.core.engine import (
     AVPPolicyEngine,
     CedarLocalEngine,
@@ -171,4 +182,7 @@ __all__ = [
     "get_backend",
     "set_backend",
     "register_origin_trust",
+    # Operations
+    "sign_entry",
+    "invalidate_policy_cache",
 ]

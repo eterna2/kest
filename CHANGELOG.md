@@ -6,6 +6,70 @@ All notable changes to this project will be documented in this file.
 
 > **v0.3.0 is a complete architectural rewrite.** The package (formerly a pure-Python prototype) is rebuilt from the ground up as a polyglot toolkit with a high-performance Rust core, replacing all v0.2.x internals. Applications upgrading from v0.2.x must migrate to the new API.
 
+### 🔐 Security Hardening (2026-04-11)
+
+Production-grade fixes applied to the core library after the initial v0.3.0 release. All changes are backwards-compatible.
+
+#### B-01: Policy Decision Cache — Cross-Request Identity Collision (fixed)
+
+The `_PolicyDecisionCache` used a cache key of `(entry_id, frozenset(policy_names))`. This allowed a policy decision for one identity (user/agent/task) to be served to a different identity within the same TTL window.
+
+- **Fix:** Cache key expanded to `(user, agent, task, frozenset(policy_names), frozenset(context_items))`. Decisions are now strictly isolated per identity tuple.
+- **New env var:** `KEST_POLICY_CACHE_TTL` (float, default `5.0`) — configures the TTL in seconds. Set to `0` to disable caching entirely.
+- **New public API:** `invalidate_policy_cache()` — flushes the cache immediately for security-sensitive revocation scenarios.
+- **Tests:** `policy_decision_cache_test.py` — `test_cache_key_isolation_by_user`, `test_invalidate_clears_module_cache`, `test_ttl_zero_disables_caching`.
+
+#### R-02: `_get_baggage()` Decoupled from Global Lab State (fixed)
+
+`_get_baggage()` in `decorators.py` was reading from a module-level `_LAB_BAGGAGE_STORE` dict as a secondary fallback. This created a data race under async concurrency (no per-request isolation) and coupled core logic to lab-specific infrastructure.
+
+- **Fix:** `_get_baggage()` now reads exclusively from `baggage.get_baggage()` (OpenTelemetry context). `_LAB_BAGGAGE_STORE` is used only by `KestHttpxInterceptor` for outbound injection.
+- **Tests:** `decorators_baggage_test.py` — `test_get_baggage_reads_only_from_otel_context`, `test_get_baggage_isolation_between_async_tasks`.
+
+#### R-03: Unverified JWT Decoding Guard (fixed)
+
+`KestIdentityMiddleware` silently decoded JWTs with `verify=False` when no `jwks_uri` was configured, making JWT signature verification optional.
+
+- **Fix:** Startup now raises `RuntimeError` if `KEST_INSECURE_NO_VERIFY=true` is not explicitly set and no `jwks_uri` is provided. Silent unverified decoding is eliminated.
+- **New env var:** `KEST_INSECURE_NO_VERIFY` (bool, default `false`) — must be explicitly set to allow unsigned JWTs (dev/test only).
+- **Tests:** `ext_test.py` — `test_middleware_raises_without_jwks_uri`, `test_middleware_accepts_insecure_flag`.
+
+#### D-01: Baggage Key Naming Aligned with Spec (fixed)
+
+Baggage keys were using non-spec names (`kest.principal_user`, `kest.workload_agent`). Now aligned with SPEC-v0.3.0 §8.4:
+
+| Old key | New key |
+|---|---|
+| `kest.principal_user` | `kest.user` |
+| `kest.workload_agent` | `kest.agent` |
+| `kest.scope` (inconsistent) | `kest.task` |
+
+> ⚠️ **Rolling upgrade caution:** Old containers emit the old key names. New containers read the new names. Rebuild all lab containers together after upgrading.
+
+#### D-02: Three-Tier Baggage Propagation (`kest.passport_z`) Formalized
+
+Compressed inline baggage (`kest.passport_z`) was an implementation extension without spec coverage. This tier is now normative in SPEC-v0.3.0 §8.6:
+
+| Tier | Key | Condition |
+|---|---|---|
+| 1 — Inline | `kest.passport` | Passport ≤ 4 KB uncompressed |
+| 2 — Compressed Inline | `kest.passport_z` | Compressed size ≤ 4 KB |
+| 3 — Claim Check | `kest.claim_check` | Both above thresholds exceeded |
+
+Consumers **MUST** be able to decompress `kest.passport_z` (zlib, base64url). Producers **MAY** use Tier 2.
+
+---
+
+### ⚠️ Known Limitations (tracked for v0.4.0)
+
+| Issue | Description | Tracking |
+|---|---|---|
+| **Rust backend GIL cliff** | Rust `sign_entry` re-acquires the GIL for `sign_payload` callbacks, degrading ~94% under multi-threaded load. **Use `KEST_BACKEND=python` in production.** | [#11](https://github.com/eterna2/kest/issues/11) |
+| **Unbounded signing thread pool** | `asyncio.to_thread` in `async_wrapper` uses an unbounded pool; can exhaust OS threads under extreme spike load. | [#10](https://github.com/eterna2/kest/issues/10) |
+| **Passport cache O(n) invalidation** | Cache validity check uses list equality (O(n)); taint accumulation re-scans all entries per read. | [#12](https://github.com/eterna2/kest/issues/12) |
+
+---
+
 ### 💯 Trust Score Model — Integer (0–100)
 
 The trust score type has been **migrated from `float` (0.0–1.0) to `int` (0–100)**. This is a breaking change from v0.2.x.

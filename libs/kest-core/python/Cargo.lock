@@ -207,8 +207,10 @@ dependencies = [
 name = "kest-core-py"
 version = "0.3.0"
 dependencies = [
+ "base64",
  "kest-core-rs",
  "pyo3",
+ "serde_jcs",
  "serde_json",
 ]
 

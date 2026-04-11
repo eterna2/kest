@@ -126,15 +126,18 @@ def transform_record(record: dict) -> dict:
 
 Under the hood, all helpers call `baggage.get_baggage(key)` using the current OpenTelemetry context:
 
-| Helper | Baggage Key |
-|---|---|
-| `get_current_user()` | `kest.user` |
-| `get_current_agent()` | `kest.agent` |
-| `get_current_task()` | `kest.task` |
-| `get_current_jwt()` | `kest.jwt` |
-| `get_current_passport()` | `kest.passport` |
+| Helper | Baggage Key | Set by |
+|---|---|---|
+| `get_current_user()` | `kest.user` | `KestIdentityMiddleware` (JWT `sub` claim) |
+| `get_current_agent()` | `kest.agent` | `KestIdentityMiddleware` (JWT `client_id` claim) |
+| `get_current_task()` | `kest.task` | `KestIdentityMiddleware` (JWT `scope` claim) |
+| `get_current_jwt()` | `kest.jwt` | `KestIdentityMiddleware` |
+| `get_current_passport()` | `kest.passport` | `@kest_verified` decorator |
+| — | `kest.passport_z` | `@kest_verified` (compressed inline, Tier 2) |
+| — | `kest.claim_check` | `@kest_verified` (Claim Check UUID, Tier 3) |
+| — | `kest.chain_tip` | `@kest_verified` (SHA-256 of last entry) |
 
-These keys are set by `KestMiddleware`, `KestIdentityMiddleware`, and the `@kest_verified` decorator automatically. You can also set them manually using `baggage.set_baggage()` if you have a non-standard propagation path.
+> **Hardening note (2026-04-11):** Baggage keys were renamed for spec compliance. Old key names (`kest.principal_user`, `kest.workload_agent`, `kest.scope`) are no longer written. Rebuild all services together when upgrading.
 
 ---
 

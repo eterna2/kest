@@ -62,6 +62,7 @@ if [ $FOR_COUNT -eq $max_retries ]; then
   echo "Warning: Cedar Agent not reachable at ${CEDAR_URL}, skipping policy upload."
 else
   echo "--- 5a. Uploading Cedar Policies ---"
+  CEDAR_UPLOAD_ERRORS=0
   for policy_file in cedar/policies/*.cedar; do
     policy_id=$(basename "${policy_file}" .cedar)
     policy_content=$(cat "${policy_file}")
@@ -70,11 +71,23 @@ else
       -H "Content-Type: application/json" \
       -d "{\"content\": $(echo "$policy_content" | python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')}")
     if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
-      echo "  ✓ Uploaded policy: ${policy_id}"
+      # Verify the policy was actually stored (idempotency check)
+      verify_status=$(curl -s -o /tmp/cedar_verify.txt -w "%{http_code}" \
+        "${CEDAR_URL}/v1/policies/${policy_id}")
+      if [ "$verify_status" -eq 200 ]; then
+        echo "  ✓ Uploaded & verified: ${policy_id}"
+      else
+        echo "  ✗ Upload succeeded but GET verification failed for ${policy_id} (HTTP ${verify_status})"
+        CEDAR_UPLOAD_ERRORS=$((CEDAR_UPLOAD_ERRORS + 1))
+      fi
     else
       echo "  ✗ Failed to upload ${policy_id} (HTTP ${http_status}): $(cat /tmp/cedar_resp.txt)"
+      CEDAR_UPLOAD_ERRORS=$((CEDAR_UPLOAD_ERRORS + 1))
     fi
   done
+  if [ "$CEDAR_UPLOAD_ERRORS" -gt 0 ]; then
+    echo "  ⚠ ${CEDAR_UPLOAD_ERRORS} Cedar policy upload(s) failed — authorization may not work correctly."
+  fi
 fi
 
 echo "--- 6. Waiting for Keycloak to be ready ---"

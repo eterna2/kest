@@ -42,8 +42,13 @@ Use `@brainstorming` and `@writing-plans` for all significant engineering tasks 
 > The source of truth for the core toolkit design and its implementation path is located in:
 > - **Design Document**: [libs/kest-core/DESIGN.md](libs/kest-core/DESIGN.md)
 > - **Implementation Plan**: [libs/kest-core/PLAN.md](libs/kest-core/PLAN.md)
+> - **Spec**: [spec/SPEC-v0.3.0.md](spec/SPEC-v0.3.0.md) — normative requirements
+> - **Implementation Learnings**: [spec/learnings/v0.3.0/LEARNINGS.md](spec/learnings/v0.3.0/LEARNINGS.md) — **read this before any kest-core task**
 > 
 > All related development MUST reference and align with these documents. If any changes occur during implementation, these documents MUST be updated accordingly to reflect the current state and future path.
+>
+> The learnings document records bugs, spec deviations, performance findings, lab gotchas, and test patterns discovered during development. After fixing a bug or making a non-trivial decision, append an entry to the learnings document.
+
 
 ## 🏗 Architectural Principles
 Refer to the `@principles`, `@architecture`, and `@chub` skills for foundational mandates, design guidance, and API specifications. 

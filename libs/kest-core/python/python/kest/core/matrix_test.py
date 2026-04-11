@@ -1,3 +1,6 @@
+import hashlib
+import os
+
 import opentelemetry.context as otel_context
 from opentelemetry import baggage
 
@@ -8,6 +11,15 @@ from kest.core import (
     configure,
     kest_verified,
 )
+from kest.core.decorators import invalidate_policy_cache
+
+
+def _rand_hex(n: int) -> str:
+    """Return n hex chars derived from independent SHA-256 hashes (incompressible)."""
+    return "".join(
+        hashlib.sha256(f"{i}{os.urandom(8).hex()}".encode()).hexdigest()
+        for i in range((n // 64) + 1)
+    )[:n]
 
 
 def test_matrix_multi_policy_allow():
@@ -27,6 +39,7 @@ def test_matrix_multi_policy_allow():
 
 def test_matrix_task_level_override():
     # Scenario: Task-level engine override
+    invalidate_policy_cache()
     global_engine = MockPolicyEngine(allow_all=False)
     task_engine = MockPolicyEngine(allow_all=True)
 
@@ -53,7 +66,8 @@ def test_matrix_trust_bootstrap_internet():
 
 
 def test_matrix_hybrid_baggage_claim_check():
-    # Scenario: Baggage > 4KB triggers Claim Check
+    # Scenario: Baggage > 4KB (incompressible) triggers Claim Check
+    invalidate_policy_cache()
     cache = SimpleCache()
     configure(
         engine=MockPolicyEngine(),
@@ -62,8 +76,9 @@ def test_matrix_hybrid_baggage_claim_check():
         clear=True,
     )
 
-    # Mock a large passport by manually setting baggage
-    large_data = "x" * 5000
+    # Use incompressible data: each JWS entry is ~1775 bytes of base64 + JSON
+    # Multiple large random entries force the packed size > 4KB even after zlib compression
+    large_data = _rand_hex(6400)  # ~6KB of high-entropy data (incompressible)
     ctx = baggage.set_baggage("kest.passport", f'["{large_data}"]')
     token = otel_context.attach(ctx)
 

@@ -78,15 +78,18 @@ def test_rust_vs_python_jws_interop():
     given the same inputs, ensuring perfect interoperability.
     """
     import pytest
-    from kest.core.identity import MockIdentityProvider
     import uuid_utils
 
+    from kest.core.identity import MockIdentityProvider
+
     try:
-        from kest.core._core import KestEntry as RustEntry, sign_entry as sign_rust
+        from kest.core._core import KestEntry as RustEntry
+        from kest.core._core import sign_entry as sign_rust
     except ImportError:
         pytest.skip("Rust backend not available")
 
-    from kest.core._core_py import KestEntry as PyEntry, sign_entry as sign_py
+    from kest.core._core_py import KestEntry as PyEntry
+    from kest.core._core_py import sign_entry as sign_py
 
     entry_id = str(uuid_utils.uuid7())
 
@@ -96,7 +99,7 @@ def test_rust_vs_python_jws_interop():
         classification="system",
         trust_score=100,
         parent_ids=["0"],
-        labels={"foo": "bar"}
+        labels={"foo": "bar"},
     )
 
     py_entry = PyEntry(
@@ -105,7 +108,7 @@ def test_rust_vs_python_jws_interop():
         classification="system",
         trust_score=100,
         parent_ids=["0"],
-        labels={"foo": "bar"}
+        labels={"foo": "bar"},
     )
 
     provider = MockIdentityProvider()
@@ -113,4 +116,3 @@ def test_rust_vs_python_jws_interop():
     py_jws = sign_py(py_entry, provider)
 
     assert rust_jws == py_jws, "Rust and Python JWS outputs MUST match exactly"
-

@@ -35,7 +35,7 @@ def test_distributed_e2e():
         os.remove("chain_tips.json")
 
     # --- Obtain a Keycloak JWT for alice ---
-    # workload_user_policy requires a non-empty principal_user (from JWT).
+    # workload_user_policy requires a non-empty user (kest.user baggage, from JWT).
     keycloak_url = os.getenv("KEYCLOAK_URL", "http://keycloak:8080")
     realm = os.getenv("KEYCLOAK_REALM", "kest-lab")
     try:

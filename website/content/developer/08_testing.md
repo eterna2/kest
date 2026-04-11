@@ -49,13 +49,14 @@ from kest.core import configure, kest_verified, MockPolicyEngine
 
 @pytest.fixture(autouse=True)
 def setup_kest():
-    """Configure Kest for testing before each test."""
+    """Reset Kest state between tests."""
+    from kest.core import invalidate_policy_cache
+    invalidate_policy_cache()   # flush policy decision cache
     configure(
         engine=MockPolicyEngine(allow=True),
-        clear=True,  # Reset state between tests
     )
     yield
-    configure(clear=True)
+    invalidate_policy_cache()
 
 def test_process_payment_success():
     @kest_verified(policy="kest/allow_trusted", source_type="internal")
@@ -201,8 +202,22 @@ moon run kest-core-python:test && moon run kest-core-python:test-live
 ```
 
 Current suite health:
-- **124/124** unit tests passing
+- **136/136** unit tests passing (124 original + 12 security hardening)
 - **17/17** integration tests passing
+
+### Security and Hardening Tests
+
+The 2026-04-11 security hardening added 12 targeted unit tests across three files:
+
+| File | Tests | Covers |
+|---|---|---|
+| `policy_decision_cache_test.py` | 5 | B-01: cache key isolation by user/agent/task, TTL=0, invalidation |
+| `decorators_baggage_test.py` | 4 | R-02: baggage reads from OTel context only, no global dict coupling |
+| `ext_test.py` | 3 | D-01: spec-compliant baggage key names; R-03: JWT verification guard |
+
+Key patterns (see [LEARNINGS.md §10 — T-09](../../../spec/learnings/v0.3.0/LEARNINGS.md)):
+- When testing `KestIdentityMiddleware`, the `app` argument **must** be a genuine `async def` coroutine (not a `Mock()`) so that baggage reads from the OTel context propagate correctly.
+- Call `invalidate_policy_cache()` in every test fixture — cached decisions from one test leak across process-shared sessions.
 
 ---
 

@@ -12,8 +12,7 @@ import uuid
 
 import pytest
 
-from kest.core import LocalEd25519Provider, MockIdentityProvider, SimpleCache
-from kest.core import KestEntry
+from kest.core import KestEntry, LocalEd25519Provider, MockIdentityProvider, SimpleCache
 from kest.core.models import (
     ORIGIN_TRUST_MAP,
     BaggageManager,
@@ -402,32 +401,64 @@ def test_baggage_manager_inline_below_threshold():
     assert "kest.claim_check" not in packed
 
 
-def test_baggage_manager_claim_check_above_threshold():
-    """F-CP-04: passports ≥ 4096 bytes MUST use claim-check pattern."""
+def test_baggage_manager_compressed_above_threshold():
+    """F-CP-04 (updated): Compressible data >4096 bytes uses kest.passport_z (compressed inline)."""
     cache = SimpleCache()
-    # Build a passport whose serialized form is > 4096 bytes
+    # Repetitive data compresses well — should fit inline as kest.passport_z
     big_sig = "x" * 5000
     large_passport = Passport(entries=[big_sig])
     packed = BaggageManager.pack(large_passport, cache=cache)
-    assert "kest.claim_check" in packed, (
-        "F-CP-04: claim_check key absent for large passport"
+    # With compression, repetitive data should fit inline
+    assert "kest.passport_z" in packed or "kest.claim_check" in packed, (
+        "Large passport must use either compressed-inline or claim-check"
     )
     assert "kest.passport" not in packed, (
-        "F-CP-04: inline passport must not be in header when claim-check used"
+        "Plain inline must not be used when data is over threshold"
     )
-    # Verify it was stored in cache
+
+    # Must round-trip correctly
+    def mock_getter(key):
+        return packed.get(key)
+
+    restored = BaggageManager.unpack(mock_getter, cache=cache)
+    assert restored.entries == [big_sig]
+
+
+def test_baggage_manager_claim_check_incompressible():
+    """F-CP-04: Truly incompressible payloads that remain >4KB after compression use claim-check."""
+    import base64 as _b64
+    import os as _os
+
+    cache = SimpleCache()
+    # Each os.urandom(32) chunk is 32 bytes of max-entropy data; base64-encoded = 44 chars.
+    # Concatenating 200 unique random chunks = ~8800 chars — all high-entropy, incompressible.
+    random_chunk = "".join(
+        _b64.urlsafe_b64encode(_os.urandom(32)).decode() for _ in range(200)
+    )  # ~8800 chars, near-random base64 → compresses to ~8700 bytes (still >>4096)
+    large_passport = Passport(entries=[random_chunk])
+    packed = BaggageManager.pack(large_passport, cache=cache)
+    # This should trigger claim-check because compressed form is still >4096 bytes
+    assert "kest.claim_check" in packed, (
+        "F-CP-04: incompressible large passport must use claim-check"
+    )
+    assert "kest.passport" not in packed
+    # Verify stored in cache
     claim_id = packed["kest.claim_check"]
     cached = cache.get(f"kest.claim.{claim_id}")
     assert cached is not None
     recovered = Passport.deserialize(cached)
-    assert recovered.entries == [big_sig]
+    assert recovered.entries == [random_chunk]
 
 
 def test_baggage_manager_claim_check_restore():
     """F-CP-05: interceptor MUST retrieve passport from cache on kest.claim_check."""
+    import hashlib as _hashlib
+    import os as _os
+
     cache = SimpleCache()
-    big_sig = "y" * 5000
-    large_passport = Passport(entries=[big_sig])
+    # Use incompressible data to force claim-check
+    random_chunk = _hashlib.sha256(_os.urandom(1024)).hexdigest() * 100  # ~6400 bytes
+    large_passport = Passport(entries=[random_chunk])
     packed = BaggageManager.pack(large_passport, cache=cache)
 
     # Simulate receiving the baggage
@@ -435,4 +466,4 @@ def test_baggage_manager_claim_check_restore():
         return packed.get(key)
 
     restored = BaggageManager.unpack(mock_getter, cache=cache)
-    assert restored.entries == [big_sig]
+    assert restored.entries == [random_chunk]

@@ -82,10 +82,11 @@ app = FastAPI()
 # KestMiddleware is added LAST → runs OUTERMOST (first): propagates incoming W3C baggage
 #   (kest.chain_tip, kest.passport, etc.) from kest-agent into OTel context.
 # KestIdentityMiddleware is added FIRST → runs INNER (second): extracts identity from the
-#   JWT in Authorization header → overwrites kest.principal_user/principal_agent/principal_scope with the JWT-derived
+# KestIdentityMiddleware is added FIRST → runs INNER (second): extracts identity from the
+#   JWT in Authorization header → writes kest.user/kest.agent/kest.task baggage with JWT-derived
 #   values, which take precedence over whatever the caller forwarded in the baggage header.
 #
-# Result: kest.principal_agent = azp from the OBO token = "kest-agent" ✓
+# Result: kest.agent = azp from the OBO token = "kest-agent" ✓
 app.add_middleware(
     KestIdentityMiddleware,
     jwks_uri=JWKS_URI,
@@ -138,8 +139,8 @@ async def delegate_handler(request: Request):
       act.sub = alice    (original delegating user)
 
     KestIdentityMiddleware on hop1 will extract:
-      kest.principal_user  = alice        (from act.sub)
-      kest.principal_agent = kest-agent   (from sub)
+      kest.user   = alice        (from act.sub)
+      kest.agent  = kest-agent   (from sub)
     """
     auth = request.headers.get("Authorization", "")
     if not auth.startswith("Bearer "):
@@ -168,8 +169,9 @@ async def call_hop1_as_agent(obo_token: str):
     delegation_policy using the agent's own SPIFFE identity before
     forwarding with the OBO JWT.
     """
-    # Read kest.principal_user from OTel baggage (set by KestIdentityMiddleware from OBO JWT)
-    resolved_user = baggage.get_baggage("kest.principal_user")
+    # Read kest.user from OTel baggage (set by KestIdentityMiddleware from OBO JWT)
+    # Spec-compliant key: SPEC-v0.3.0 §8.4
+    resolved_user = baggage.get_baggage("kest.user")
     print(f"[{SERVICE_NAME}] Calling hop1 as agent, delegating for user={resolved_user}.")
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         response = await client.get(
@@ -234,7 +236,7 @@ async def _delegate_to_gateway_logic(obo_token: str):
       2. Extracts the task token from the response
       3. Calls kest-gateway /execute-task with the task token
     """
-    resolved_user = baggage.get_baggage("kest.principal_user")
+    resolved_user = baggage.get_baggage("kest.user")  # spec-compliant (SPEC-v0.3.0 §8.4)
     print(f"[{SERVICE_NAME}] /delegate-to-gateway — delegating for user={resolved_user!r}")
 
     # Inject W3C traceparent and baggage so gateway continues the trace

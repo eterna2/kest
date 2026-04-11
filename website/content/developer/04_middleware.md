@@ -44,15 +44,28 @@ Host: service-b.internal
 baggage: kest.passport=["header.payload.sig1","header.payload.sig2"],kest.lineage_root=abc123
 ```
 
-### Claim Check Headers
+### Baggage Propagation Tiers
 
-When the Passport exceeds the configured size limit (default: 4KB), the middleware handles Claim Check references:
+Kest uses a three-tier strategy to propagate the Passport without exceeding HTTP header limits:
+
+| Tier | Header key | When used |
+|---|---|---|
+| 1 — Inline | `kest.passport` | Passport ≤ 4 KB uncompressed |
+| 2 — Compressed Inline | `kest.passport_z` | zlib-compressed Passport ≤ 4 KB |
+| 3 — Claim Check | `kest.claim_check` | Exceeds both thresholds |
+
+A 10-hop chain (~5 KB raw) typically compresses to ~1.5 KB and travels as `kest.passport_z` without any cache dependency. Only incompressible or very deep chains (50+ hops) use the Claim Check path.
 
 ```http
-baggage: kest.claim_check=550e8400-e29b-41d4-a716-446655440000
-```
+# Tier 1 — small passport, inline
+baggage: kest.passport=%5B%22header.payload.sig%22%5D,kest.chain_tip=abc123
 
-The middleware retrieves the full Passport from the configured `CacheProvider` and restores the context as if the full Passport had been passed.
+# Tier 2 — compressed inline (zlib, base64url)
+baggage: kest.passport_z=eJyLjgUAAX8Bf...,kest.chain_tip=abc123
+
+# Tier 3 — claim check UUID
+baggage: kest.claim_check=550e8400-e29b-41d4-a716-446655440000,kest.chain_tip=abc123
+```
 
 ## KestIdentityMiddleware — Token Extraction
 
@@ -61,10 +74,15 @@ If your gateway authenticates users via JWT (from Keycloak, Auth0, etc.), `KestI
 ```python
 from kest.core.ext import KestIdentityMiddleware
 
-app.add_middleware(KestIdentityMiddleware)
+app.add_middleware(
+    KestIdentityMiddleware,
+    jwks_uri="https://keycloak.internal/realms/kest/protocol/openid-connect/certs"
+)
 ```
 
-This stores the JWT claims in the OTel context so that `@kest_verified` functions can access them via the `user` parameter without explicit extraction.
+This stores the JWT claims in the OTel context so that `@kest_verified` functions can access them via `get_current_user()` / `get_current_agent()` / `get_current_task()` without explicit extraction.
+
+> ⚠️ **JWT verification guard:** If `jwks_uri` is not provided, `KestIdentityMiddleware` raises `RuntimeError` on the first request to prevent silent unverified JWT decoding. In development, set `KEST_INSECURE_NO_VERIFY=true` to bypass this guard.
 
 ## Middleware Ordering
 
@@ -149,6 +167,13 @@ sequenceDiagram
     participant Cache as CacheProvider
     participant B as Service B
 
+    Note over A: Tier 1 (small): inline
+    A->>B: baggage: kest.passport=[...]
+
+    Note over A: Tier 2 (medium): compressed inline
+    A->>B: baggage: kest.passport_z=eJy...
+
+    Note over A: Tier 3 (large): claim check
     A->>Cache: store(uuid, serialized_passport)
     A->>B: baggage: kest.claim_check={uuid}
     B->>Cache: retrieve(uuid)

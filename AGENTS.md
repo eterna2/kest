@@ -67,6 +67,33 @@ The repository is a polyglot toolkit (monorepo). Libraries are split functionall
 4. **Agent Skills (`.agents/skills/`)**: Contains explicit details on orchestrating the stack (Moonrepo) and maintaining system principles.
 5. **Ad-hoc Testing (`scratchpad/`)**: Unversioned sandbox for intermediate testing and notebook drafts.
 
+## 📐 Specification & Implementation Learnings
+
+> [!IMPORTANT]
+> **Mandatory Pre-Task Step**: Before working on ANY component of `libs/kest-core/`, read the version-specific learnings document for the current spec. This is not optional — it documents known bugs, spec deviations, performance cliffs, and lab gotchas that make Kest behave non-obviously.
+
+### How to Navigate
+
+| Document | Purpose | When to Read |
+|---|---|---|
+| [`spec/SPEC-v0.3.0.md`](spec/SPEC-v0.3.0.md) | Normative requirements — the "what" | When unclear on expected behaviour |
+| [`spec/learnings/v0.3.0/LEARNINGS.md`](spec/learnings/v0.3.0/LEARNINGS.md) | Agent-discovered runtime findings — the "why the spec alone isn't enough" | **Before every task on `kest-core`** |
+| [`libs/kest-core/DESIGN.md`](libs/kest-core/DESIGN.md) | Architecture design decisions | When making structural changes |
+| [`libs/kest-core/PLAN.md`](libs/kest-core/PLAN.md) | Current implementation roadmap | When planning new work |
+
+### When to Update Learnings
+
+After resolving any bug or making any non-trivial decision, add an entry to `spec/learnings/<version>/LEARNINGS.md`:
+- **Bugs fixed**: Document root cause, impact, and fix. Include file and line references.
+- **Spec deviations**: Document what the impl does differently and why.
+- **Production risks**: Document under §9 of LEARNINGS.
+- **Test gotchas**: Document under §10 of LEARNINGS.
+
+> [!CAUTION]
+> **Never modify a published spec file** (e.g., `spec/SPEC-v0.3.0.md`). The spec is immutable once published. All corrections and clarifications go into `spec/learnings/`.
+
+
+
 ## Community Skills Library
 This repository natively supports the [antigravity-awesome-skills](https://github.com/sickn33/antigravity-awesome-skills) library, giving AI agents access to over 1,300+ community skills.
 To provision these skills into your local environment without polluting the Git repository:

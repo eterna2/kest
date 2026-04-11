@@ -1,3 +1,6 @@
+import hashlib
+import os
+
 import opentelemetry.context as otel_context
 from opentelemetry import baggage
 
@@ -10,13 +13,25 @@ from kest.core import (
     configure,
     kest_verified,
 )
+from kest.core.decorators import invalidate_policy_cache
+
+
+def _incompressible_signature(target_bytes: int = 6400) -> str:
+    """Generate an incompressible, URL-safe string of approximately target_bytes length."""
+    chunk = hashlib.sha256(os.urandom(32)).hexdigest()  # 64 chars, high entropy
+    repeats = (target_bytes // len(chunk)) + 1
+    # Mix different hashes to prevent any repetition pattern
+    return "".join(
+        hashlib.sha256(f"{i}{chunk}".encode()).hexdigest() for i in range(repeats)
+    )[:target_bytes]
 
 
 def test_full_claim_check_lifecycle():
     """
-    Requirement 2.1: Transition to Claim Check Pattern when Passport > 4KB.
+    Requirement 2.1: Transition to Claim Check Pattern when Passport > 4KB (incompressible).
     We test the pack -> cache -> unpack flow.
     """
+    invalidate_policy_cache()
     # 1. Setup with a shared cache
     shared_cache = SimpleCache()
     configure(
@@ -26,8 +41,8 @@ def test_full_claim_check_lifecycle():
         clear=True,
     )
 
-    # 2. Hop 1: Generates a LARGE passport
-    large_signature = "x" * 5000
+    # 2. Use an incompressible large signature that exceeds 4KB even after compression
+    large_signature = _incompressible_signature(6400)
 
     @kest_verified(policy="p1")
     def hop1():
@@ -39,7 +54,7 @@ def test_full_claim_check_lifecycle():
 
     packed_baggage = hop1()
 
-    # Verify Hop 1 used a claim check
+    # Verify Hop 1 used a claim check (incompressible data stays >4KB even compressed)
     assert "kest.claim_check" in packed_baggage
     assert "kest.passport" not in packed_baggage
 
@@ -72,6 +87,7 @@ def test_claim_check_failure_no_cache():
     """
     F-GC-01: Verify fail-secure behavior when cache is missing for a claim check.
     """
+    invalidate_policy_cache()
     configure(
         engine=MockPolicyEngine(),
         identity=MockIdentityProvider(),
@@ -98,6 +114,7 @@ def test_claim_check_expired_ttl_fails_closed():
     F-GC-02: If the Cache TTL expires... the claim check fails.
     The implementation MUST fail securely.
     """
+    invalidate_policy_cache()
     shared_cache = SimpleCache()
     configure(
         engine=MockPolicyEngine(),

@@ -1,15 +1,18 @@
-from dataclasses import dataclass, field, asdict
-from typing import Any, Optional, Dict, List
-import time
 import base64
 import json
+import time
+from dataclasses import asdict, dataclass, field
+from typing import Any, Dict, List, Optional
+
 import rfc8785
 
 # Ensure version matches Cargo.toml
 VERSION = "0.3.0"
 
+
 def version() -> str:
     return VERSION
+
 
 @dataclass
 class KestEntry:
@@ -49,7 +52,7 @@ class KestEntry:
             "platform_policies": pc.get("platform_policies", []),
             "app_policies": pc.get("app_policies", []),
             "function_policies": pc.get("function_policies", []),
-            "deviations": pc.get("deviations", [])
+            "deviations": pc.get("deviations", []),
         }
 
         # Internal initialized fields (similar to Rust)
@@ -84,6 +87,7 @@ class KestEntry:
     def metadata(self) -> Optional[Any]:
         return self._metadata
 
+
 def sign_entry(entry: KestEntry, provider: Any) -> str:
     payload_dict = {
         "added_taints": entry.added_taints,
@@ -99,29 +103,33 @@ def sign_entry(entry: KestEntry, provider: Any) -> str:
         "parent_ids": entry.parent_ids,
         "policy_context": entry.policy_context,
         "removed_taints": entry.removed_taints,
-        "runtime": {
-            "name": entry.runtime_name,
-            "version": entry.runtime_version
-        },
+        "runtime": {"name": entry.runtime_name, "version": entry.runtime_version},
         "schema_version": entry.schema_version,
         "taints": entry.taints,
         "timestamp_ms": entry.timestamp_ms,
-        "trust_score": entry.trust_score
+        "trust_score": entry.trust_score,
     }
 
     # Canonicalize and b64 encode payload
     canonical_payload = rfc8785.dumps(payload_dict)
-    payload_b64 = base64.urlsafe_b64encode(canonical_payload).decode("ascii").rstrip("=")
+    payload_b64 = (
+        base64.urlsafe_b64encode(canonical_payload).decode("ascii").rstrip("=")
+    )
 
     # Header
     header = {"alg": "EdDSA", "typ": "JWS"}
-    header_b64 = base64.urlsafe_b64encode(json.dumps(header, separators=(",", ":")).encode("ascii")).decode("ascii").rstrip("=")
-
+    header_b64 = (
+        base64.urlsafe_b64encode(
+            json.dumps(header, separators=(",", ":")).encode("ascii")
+        )
+        .decode("ascii")
+        .rstrip("=")
+    )
 
     # Sign
     signing_input = f"{header_b64}.{payload_b64}"
     signature_bytes = provider.sign_payload(signing_input.encode("utf-8"))
-    
+
     # Check if signature_bytes is already returning a base64 string or bytes...
     # In Rust `PyIdentityProvider`, it returns a String which is technically base64url encoded already, wait.
     # The pure python implementation needs to just concatenate it.
@@ -129,6 +137,10 @@ def sign_entry(entry: KestEntry, provider: Any) -> str:
         sig_str = signature_bytes
     else:
         # if it's raw bytes, we must encode it. But `MockProvider` returns str, and `SPIREProvider.sign_payload` returns str?
-        sig_str = signature_bytes.decode() if isinstance(signature_bytes, bytes) else str(signature_bytes)
+        sig_str = (
+            signature_bytes.decode()
+            if isinstance(signature_bytes, bytes)
+            else str(signature_bytes)
+        )
 
     return f"{signing_input}.{sig_str}"

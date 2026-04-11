@@ -1,5 +1,6 @@
 import base64
 import json
+import os
 import threading
 
 import httpx
@@ -117,23 +118,34 @@ class KestHttpxInterceptor:
 
 class KestIdentityMiddleware:
     """
-    FastAPI (ASGI) Middleware that extracts principal identity from incoming JWT tokens.
+    FastAPI (ASGI) Middleware that extracts principal identity from incoming JWT tokens
+    and writes the resolved claims to OTel Baggage using the spec-compliant key names
+    defined in SPEC-v0.3.0.md §8.2 and §8.4:
 
     For standard tokens:
-        - kest.principal_user  = <user_claim> (default: preferred_username or sub)
-        - kest.principal_agent = azp or client_id (the application presenting the token)
+        - kest.user   = <user_claim> (default: preferred_username or sub)
+        - kest.agent  = azp or client_id (the application presenting the token)
 
     For OBO tokens (RFC 8693 — 'act' claim present):
-        - kest.principal_user  = act.sub (the original delegating user)
-        - kest.principal_agent = sub     (the service that performed the OBO exchange)
+        - kest.user   = act.sub (the original delegating user)
+        - kest.agent  = sub     (the service that performed the OBO exchange)
 
-    Also populates:
-        - kest.principal_scope  = scope  (full scope string, used for policy enforcement)
-        - kest.principal_roles  = JSON-encoded realm_access.roles list
+    Also populates (spec §8.4):
+        - kest.task   = scope   (OAuth scope string — mapped to spec's kest.task)
+        - kest.jwt    = <raw JWT string>
+
+    Implementation extension (beyond spec, documented in learnings D-02):
+        - kest.scope  = scope   (raw OAuth scope — alias kept for Cedar policies
+                                 that need the verbatim scope value, e.g. "task:process-data")
+        - kest.roles  = JSON-encoded realm_access.roles list
 
     Verification mode:
         - If jwks_uri is provided, JWTs are verified with PyJWT (pyjwt[crypto] required).
-        - If jwks_uri is None, tokens are decoded without signature verification (dev mode).
+        - If jwks_uri is None, tokens are decoded WITHOUT signature verification.
+          This is ONLY permitted in development/test. You MUST explicitly acknowledge
+          this risk by setting KEST_INSECURE_NO_VERIFY=true in the environment.
+          In production, always set KEYCLOAK_JWKS_URI (or equivalent) so that jwks_uri
+          is provided and signatures are verified.
     """
 
     def __init__(
@@ -151,6 +163,21 @@ class KestIdentityMiddleware:
                 print(
                     "[Kest.IdentityMiddleware] WARNING: pyjwt[crypto] not installed. "
                     "Falling back to unverified JWT decoding. Do not use in production."
+                )
+        else:
+            # No JWKS URI supplied — tokens will be decoded without signature verification.
+            # This is a critical security risk in production. Require explicit opt-in.
+            _insecure_ok = os.environ.get("KEST_INSECURE_NO_VERIFY", "").lower() in (
+                "1",
+                "true",
+                "yes",
+            )
+            if not _insecure_ok:
+                raise RuntimeError(
+                    "[Kest] KestIdentityMiddleware: jwks_uri is None, which disables JWT "
+                    "signature verification. This MUST NOT be used in production. "
+                    "To allow unverified JWT decoding in a dev/test environment, "
+                    "set the environment variable: KEST_INSECURE_NO_VERIFY=true"
                 )
 
     def _decode_token(self, token: str) -> dict:
@@ -211,20 +238,22 @@ class KestIdentityMiddleware:
                 scope_str = str(claims.get("scope", ""))
                 roles: list = claims.get("realm_access", {}).get("roles", [])
 
+                # --- Spec-compliant baggage keys (SPEC-v0.3.0 §8.2, §8.4) ---
                 if user:
-                    ctx = baggage.set_baggage("kest.principal_user", user, context=ctx)
+                    ctx = baggage.set_baggage("kest.user", user, context=ctx)
                 if agent:
-                    ctx = baggage.set_baggage(
-                        "kest.principal_agent", agent, context=ctx
-                    )
+                    ctx = baggage.set_baggage("kest.agent", agent, context=ctx)
                 if scope_str:
-                    ctx = baggage.set_baggage(
-                        "kest.principal_scope", scope_str, context=ctx
-                    )
+                    # kest.task = scope (spec §8.4: JWT scope → kest.task)
+                    ctx = baggage.set_baggage("kest.task", scope_str, context=ctx)
+                    # kest.scope = verbatim OAuth scope (impl extension, see LEARNINGS D-02)
+                    ctx = baggage.set_baggage("kest.scope", scope_str, context=ctx)
                 if roles:
                     ctx = baggage.set_baggage(
-                        "kest.principal_roles", json.dumps(roles), context=ctx
+                        "kest.roles", json.dumps(roles), context=ctx
                     )
+                # kest.jwt = raw token (spec §8.4)
+                ctx = baggage.set_baggage("kest.jwt", token, context=ctx)
 
                 print(
                     f"[Kest.IdentityMiddleware] Extracted principal: "
