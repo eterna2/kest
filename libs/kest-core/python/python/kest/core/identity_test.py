@@ -6,7 +6,7 @@ import opentelemetry.context as otel_context
 import pytest
 from opentelemetry import baggage
 
-from kest.core.decorators import _LAB_AUDIT_FILE, kest_verified
+from kest.core.decorators import _LAB_AUDIT_FILE, invalidate_policy_cache, kest_verified
 from kest.core.engine import PolicyEngine
 from kest.core.identity import StaticIdentity
 
@@ -26,9 +26,11 @@ class MockEngine(PolicyEngine):
 
 @pytest.fixture
 def clean_lab():
+    invalidate_policy_cache()  # clear policy decision cache between tests
     if os.path.exists(_LAB_AUDIT_FILE):
         os.remove(_LAB_AUDIT_FILE)
     yield
+    invalidate_policy_cache()
     if os.path.exists(_LAB_AUDIT_FILE):
         os.remove(_LAB_AUDIT_FILE)
 
@@ -47,16 +49,16 @@ def clean_global_config():
 
 def test_identity_propagation_explicit(clean_lab):
     """
-    Tests that principal_user and principal_agent set via OTel baggage
-    are propagated into the engine context and captured in the audit trail.
+    Tests that user and agent set via OTel baggage (spec-compliant kest.user/agent keys,
+    per SPEC-v0.3.0 §8.4) are propagated into the engine context and captured in the audit trail.
     """
     engine = MockEngine()
     identity = StaticIdentity("test-workload")
 
-    # Inject user/agent via OTel baggage (the new API — no inline decorator params)
-    ctx = baggage.set_baggage("kest.principal_user", "alice")
-    ctx = baggage.set_baggage("kest.principal_agent", "bot-1", context=ctx)
-    ctx = baggage.set_baggage("kest.principal_scope", "upload", context=ctx)
+    # Inject user/agent via OTel baggage (spec-compliant key names)
+    ctx = baggage.set_baggage("kest.user", "alice")
+    ctx = baggage.set_baggage("kest.agent", "bot-1", context=ctx)
+    ctx = baggage.set_baggage("kest.task", "upload", context=ctx)
     token = otel_context.attach(ctx)
 
     try:
@@ -67,12 +69,12 @@ def test_identity_propagation_explicit(clean_lab):
 
         my_func()
 
-        # Verify context passed to engine — flat keys
+        # Verify context passed to engine — flat keys (spec-compliant)
         ctx_engine = engine.last_context
         assert ctx_engine is not None
-        assert ctx_engine["principal_user"] == "alice"
-        assert ctx_engine["principal_agent"] == "bot-1"
-        assert ctx_engine["principal_scope"] == "upload"
+        assert ctx_engine["user"] == "alice"
+        assert ctx_engine["agent"] == "bot-1"
+        assert ctx_engine["task"] == "upload"
 
         # Verify audit trail
         if os.path.exists(_LAB_AUDIT_FILE):
@@ -94,14 +96,14 @@ def test_identity_propagation_baggage(clean_lab):
     engine = MockEngine()
     identity = StaticIdentity("test-workload")
 
-    # Mock OTel baggage (ensure chaining)
-    ctx = baggage.set_baggage("kest.principal_user", "bob")
-    ctx = baggage.set_baggage("kest.principal_agent", "proxy-1", context=ctx)
+    # Mock OTel baggage using spec-compliant keys (SPEC-v0.3.0 §8.4)
+    ctx = baggage.set_baggage("kest.user", "bob")
+    ctx = baggage.set_baggage("kest.agent", "proxy-1", context=ctx)
     token = otel_context.attach(ctx)
 
     try:
         # Verify baggage is readable here
-        assert baggage.get_baggage("kest.principal_user") == "bob"
+        assert baggage.get_baggage("kest.user") == "bob"
 
         @kest_verified(policy="test", engine=engine, identity=identity)
         def my_func():
@@ -112,8 +114,8 @@ def test_identity_propagation_baggage(clean_lab):
         # Verify context passed to engine from baggage
         ctx_engine = engine.last_context
         assert ctx_engine is not None
-        assert ctx_engine["principal_user"] == "bob"
-        assert ctx_engine["principal_agent"] == "proxy-1"
+        assert ctx_engine["user"] == "bob"
+        assert ctx_engine["agent"] == "proxy-1"
     finally:
         otel_context.detach(token)
 
@@ -193,11 +195,13 @@ class DenyEngine(PolicyEngine):
 
 @pytest.mark.asyncio
 async def test_async_identity_propagation_explicit(clean_lab):
-    """Async @kest_verified correctly propagates baggage identity to the engine."""
+    """Async @kest_verified correctly propagates baggage identity to the engine (spec key: kest.user)."""
     engine = MockEngine()
     identity = StaticIdentity("async-workload")
 
-    ctx = baggage.set_baggage("kest.principal_user", "async-alice")
+    ctx = baggage.set_baggage(
+        "kest.user", "async-alice"
+    )  # spec-compliant (SPEC-v0.3.0 §8.4)
     token = otel_context.attach(ctx)
 
     try:
@@ -211,7 +215,7 @@ async def test_async_identity_propagation_explicit(clean_lab):
 
         ctx_engine = engine.last_context
         assert ctx_engine is not None
-        assert ctx_engine["principal_user"] == "async-alice"
+        assert ctx_engine["user"] == "async-alice"  # spec-compliant ctx key
     finally:
         otel_context.detach(token)
 

@@ -56,7 +56,7 @@ app.add_middleware(
 async def permission_error_handler(request: Request, exc: PermissionError):
     """
     Map @kest_verified PermissionError (policy denial or missing identity) to 403.
-    This includes requests with invalid JWTs where kest.principal_user is empty.
+    This includes requests with invalid JWTs where kest.user is empty.
     """
     return JSONResponse(status_code=403, content={"detail": str(exc)})
 
@@ -107,7 +107,7 @@ configure(engine=policy_engine, identity=identity_provider)
 async def root_handler(request: Request):
     """
     Entry point. KestIdentityMiddleware and KestMiddleware have already
-    extracted all JWT claims and W3C baggage (kest.principal_user/agent/scope)
+    extracted all JWT claims and W3C baggage (kest.user/agent/task)
     into the OTel context. We anchor the trace from the remote parent, then hand off.
     """
     # Only use the trace context (traceparent) for remote parent continuation;

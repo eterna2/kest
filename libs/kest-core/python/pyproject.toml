@@ -33,6 +33,9 @@ cedar = [
 rego = [
     "regopy>=0.3.0",
 ]
+python-backend = [
+    "rfc8785>=0.1.0",
+]
 
 [tool.maturin]
 features = ["pyo3/extension-module"]
@@ -55,6 +58,7 @@ dev = [
     "boto3>=1.28.0",
     "moto[kms,sts]>=5.0.0",
     "regopy>=0.3.0",
+    "pyperf>=2.6.0",
 ]
 
 [tool.pytest.ini_options]

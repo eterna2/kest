@@ -11,7 +11,7 @@ Full flow this service implements:
   4. POST /execute-task — @kest_verified enforces task_policy
      • Verifies token carries exactly "task:process-data"
      • Signs a KestEntry (audit entry #3 in the chain)
-     • Calls hop1 with the task token embedded as kest.principal_scope baggage
+     • Calls hop1 with the task token embedded as kest.task baggage
 
 This service demonstrates Approach A from docs/GATEWAY_E2E.md:
   - Gateway self-signs task tokens with its own LocalEd25519Provider
@@ -106,13 +106,12 @@ app = FastAPI(
     ),
 )
 
-# Middleware order: FastAPI processes middleware LIFO (last added = outermost = first to run).
 # KestMiddleware is added LAST → runs OUTERMOST (first): propagates incoming W3C baggage
 #   (kest.chain_tip, kest.passport, etc.) from kest-agent into OTel context.
 # KestIdentityMiddleware is added FIRST → runs INNER (second): extracts identity from the
-#   OBO JWT in Authorization header → overwrites kest.principal_user/principal_agent/principal_scope with JWT-derived values.
+#   OBO JWT in Authorization header → writes kest.user/kest.agent/kest.task baggage per spec.
 #
-# Result: kest.principal_agent = azp from the OBO token = "kest-agent" ✓
+# Result: kest.agent = azp from the OBO token = "kest-agent" ✓
 #         kest.chain_tip = from incoming baggage header ✓ (set by KestMiddleware first)
 app.add_middleware(
     KestIdentityMiddleware,
@@ -211,8 +210,8 @@ async def authorise_handler(request: Request):
 
     Receives an OBO token from kest-agent. KestIdentityMiddleware has already:
       - Verified the OBO JWT signature against Keycloak JWKS
-      - Extracted kest.principal_user (alice), kest.principal_agent (kest-agent), kest.principal_scope (scope)
-        into OTel baggage
+      - Extracted kest.user (alice), kest.agent (kest-agent), kest.task/scope (scope)
+        into OTel baggage (spec-compliant keys, SPEC-v0.3.0 §8.4)
 
     This endpoint:
       1. Enforces gateway_policy (scope check + dual-identity via @kest_verified)
@@ -234,14 +233,14 @@ async def _authorise_logic():
     @kest_verified-decorated logic for /authorise.
 
     gateway_policy enforces:
-      - context["principal_user"] != ""
-      - context["principal_agent"] != ""
-      - context["principal_scope"] contains "read:data"
+      - context["user"] != ""
+      - context["agent"] != ""
+      - context["scope"] contains "read:data"
     """
     try:
-        user = str(baggage.get_baggage("kest.principal_user") or "")
-        agent = str(baggage.get_baggage("kest.principal_agent") or "")
-        scope = str(baggage.get_baggage("kest.principal_scope") or "")
+        user = str(baggage.get_baggage("kest.user") or "")    # spec §8.4
+        agent = str(baggage.get_baggage("kest.agent") or "")   # spec §8.4
+        scope = str(baggage.get_baggage("kest.scope") or "")   # impl extension (raw OAuth scope)
 
         print(
             f"[{SERVICE_NAME}] /authorise — user={user!r}, agent={agent!r}, scope={scope!r}"
@@ -281,7 +280,7 @@ async def execute_task_handler(request: Request):
     Step 2 of the gateway flow.
 
     Receives the narrow task token (from /authorise response).
-    KestIdentityMiddleware has already injected kest.principal_scope=task:process-data
+    KestIdentityMiddleware has already injected kest.task=task:process-data
     into OTel baggage (the gateway sets this itself before forwarding).
 
     This endpoint:
@@ -301,15 +300,16 @@ async def execute_task_handler(request: Request):
     delegated_user = token_claims.get("delegated_user", "")
     delegated_agent = token_claims.get("delegated_agent", "")
 
-    # Store task scope in request-local baggage so task_policy and
-    # CedarLocalEngine pick it up as context["principal_scope"].
+    # Store task scope in request-local baggage (spec-compliant keys, SPEC-v0.3.0 §8.4)
+    # so task_policy and CedarLocalEngine pick up context["task"] == "task:process-data".
     import opentelemetry.context as otel_context
     from opentelemetry import baggage as otel_baggage
 
     ctx = otel_context.get_current()
-    ctx = otel_baggage.set_baggage("kest.principal_scope", task_scope, context=ctx)
-    ctx = otel_baggage.set_baggage("kest.principal_user", delegated_user, context=ctx)
-    ctx = otel_baggage.set_baggage("kest.principal_agent", delegated_agent, context=ctx)
+    ctx = otel_baggage.set_baggage("kest.task", task_scope, context=ctx)          # spec key
+    ctx = otel_baggage.set_baggage("kest.scope", task_scope, context=ctx)         # impl extension
+    ctx = otel_baggage.set_baggage("kest.user", delegated_user, context=ctx)     # spec key
+    ctx = otel_baggage.set_baggage("kest.agent", delegated_agent, context=ctx)   # spec key
     token = otel_context.attach(ctx)
     try:
         return await _execute_task_logic(task_token, delegated_user, delegated_agent)
@@ -326,7 +326,7 @@ async def _execute_task_logic(task_token: str, delegated_user: str, delegated_ag
     @kest_verified-decorated logic for /execute-task.
 
     task_policy enforces:
-      - context["principal_scope"] == "task:process-data"
+      - context["task"] == "task:process-data"
       - context["trust_score"] >= 50 (internal origin)
     """
     try:
@@ -335,7 +335,7 @@ async def _execute_task_logic(task_token: str, delegated_user: str, delegated_ag
         )
 
         # Forward to hop1, embedding the task token in Authorization
-        # and propagating current OTel baggage (which carries kest.principal_scope)
+        # and propagating current OTel baggage (which carries kest.task)
         all_baggage = baggage.get_all()
         baggage_header = ",".join(f"{k}={v}" for k, v in all_baggage.items())
 

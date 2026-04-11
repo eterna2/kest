@@ -1,3 +1,7 @@
+import base64
+import json
+import os
+
 import httpx
 import opentelemetry.context as otel_context
 import pytest
@@ -7,6 +11,7 @@ from kest.core.ext import (
     _LAB_BAGGAGE_STORE,
     _LAB_LOCK,
     KestHttpxInterceptor,
+    KestIdentityMiddleware,
     KestMiddleware,
 )
 
@@ -144,3 +149,107 @@ def test_interceptor_no_context():
     # Verify it doesn't crash when no context is active
     modified_request = interceptor(request)
     assert "baggage" not in modified_request.headers
+
+
+# ---------------------------------------------------------------------------
+# Helpers for KestIdentityMiddleware tests
+# ---------------------------------------------------------------------------
+
+
+def _make_jwt(claims: dict) -> str:
+    """Produce a structurally valid but *unverified* JWT for unit tests."""
+    header = base64.urlsafe_b64encode(b'{"alg":"none"}').rstrip(b"=").decode()
+    payload = (
+        base64.urlsafe_b64encode(json.dumps(claims).encode()).rstrip(b"=").decode()
+    )
+    return f"{header}.{payload}.fakesig"
+
+
+async def _noop_receive():
+    return {}
+
+
+async def _noop_send(msg):
+    pass
+
+
+# ---------------------------------------------------------------------------
+# D-01: KestIdentityMiddleware writes spec-compliant baggage keys
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_identity_middleware_writes_spec_keys():
+    """
+    D-01: A JWT decoded by KestIdentityMiddleware must populate
+    kest.user / kest.agent / kest.task — NOT the old principal_user names.
+    """
+    captured: dict = {}
+
+    async def inner_app(scope, receive, send):
+        # KestIdentityMiddleware attaches the OTel context before calling
+        # self.app, so baggage is readable here.
+        captured.update(baggage.get_all())
+
+    os.environ["KEST_INSECURE_NO_VERIFY"] = "true"
+    try:
+        mw = KestIdentityMiddleware(app=inner_app, jwks_uri=None)
+        token = _make_jwt(
+            {
+                "preferred_username": "alice",
+                "azp": "my-client",
+                "scope": "read:data",
+            }
+        )
+        scope = {
+            "type": "http",
+            "headers": [(b"authorization", f"Bearer {token}".encode())],
+        }
+        await mw(scope, _noop_receive, _noop_send)
+    finally:
+        del os.environ["KEST_INSECURE_NO_VERIFY"]
+
+    # Spec-compliant keys must be present
+    assert captured.get("kest.user") == "alice", (
+        f"Expected kest.user=alice, got {captured}"
+    )
+    assert captured.get("kest.agent") == "my-client", (
+        f"Expected kest.agent=my-client, got {captured}"
+    )
+    assert captured.get("kest.task") == "read:data", (
+        f"Expected kest.task=read:data, got {captured}"
+    )
+
+    # Old non-spec keys must NOT be present (regression guard for D-01)
+    assert "kest.principal_user" not in captured
+    assert "kest.principal_agent" not in captured
+    assert "kest.principal_scope" not in captured
+
+
+# ---------------------------------------------------------------------------
+# R-03: JWT verification gate
+# ---------------------------------------------------------------------------
+
+
+def test_identity_middleware_no_jwks_no_env_raises():
+    """
+    R-03: Constructing KestIdentityMiddleware with jwks_uri=None and without
+    KEST_INSECURE_NO_VERIFY=true must raise RuntimeError immediately.
+    """
+    os.environ.pop("KEST_INSECURE_NO_VERIFY", None)
+    with pytest.raises(RuntimeError, match="KEST_INSECURE_NO_VERIFY"):
+        KestIdentityMiddleware(app=lambda s, r, sd: None, jwks_uri=None)
+
+
+def test_identity_middleware_no_jwks_with_env_succeeds():
+    """
+    R-03: Constructing KestIdentityMiddleware with jwks_uri=None IS allowed
+    when KEST_INSECURE_NO_VERIFY=true — the guard must not interfere with
+    explicitly acknowledged insecure dev/test mode.
+    """
+    os.environ["KEST_INSECURE_NO_VERIFY"] = "true"
+    try:
+        mw = KestIdentityMiddleware(app=lambda s, r, sd: None, jwks_uri=None)
+        assert mw._jwks_client is None  # confirmed unverified path
+    finally:
+        del os.environ["KEST_INSECURE_NO_VERIFY"]

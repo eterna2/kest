@@ -1,17 +1,18 @@
 # Kest: Zero Trust Execution Lineage
 
 [![PyPI version](https://img.shields.io/pypi/v/kest.svg)](https://pypi.org/project/kest/)
+[![Documentation](https://img.shields.io/badge/docs-stable-brightgreen)](https://eterna2.github.io/kest/)
 [![CI](https://github.com/eterna2/kest/actions/workflows/ci.yml/badge.svg)](https://github.com/eterna2/kest/actions/workflows/ci.yml)
 [![Coveralls](https://coveralls.io/repos/github/eterna2/kest/badge.svg?branch=main)](https://coveralls.io/github/eterna2/kest?branch=main)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/eterna2/kest/badge)](https://scorecard.dev/viewer/?uri=github.com/eterna2/kest)
-[![Documentation](https://img.shields.io/badge/docs-stable-brightgreen)](https://eterna2.github.io/kest/)
+[![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12453/badge)](https://www.bestpractices.dev/projects/12453)
 
 > 📖 **[Full documentation → eterna2.github.io/kest](https://eterna2.github.io/kest/)**  
 > 📐 **[Kest v0.3.0 Specification → spec/SPEC-v0.3.0.md](./spec/SPEC-v0.3.0.md)** · [Rendered on website →](https://eterna2.github.io/kest/)
 
 **Kest** is a Zero Trust execution lineage framework for Python agentic workflows and data pipelines. Every function call decorated with `@kest_verified` produces a cryptographically signed audit entry that is chained into a tamper-evident **Merkle DAG Passport**. The Passport propagates automatically across distributed hops via OpenTelemetry baggage, giving you verifiable, non-repudiable lineage across any number of services.
 
-> v0.3.0 is a complete rewrite. The signing and hashing primitives are implemented in Rust (via PyO3) for correctness and performance. See the [Changelog](CHANGELOG.md) for the full list of changes from v0.2.x.
+> v0.3.0 is a complete rewrite. The signing and hashing primitives are implemented in Rust (via PyO3) for correctness and performance. A **security hardening patch** (2026-04-11) fixed cross-request identity collision in the policy cache, decoupled baggage reads from global lab state, and added a JWT verification guard to `KestIdentityMiddleware`. See the [Changelog](CHANGELOG.md) for the full list of changes.
 
 ---
 
@@ -20,12 +21,13 @@
 | Capability | Description |
 |---|---|
 | **Merkle DAG Lineage** | Every execution step is hashed and chained. Tampering with any node invalidates the entire chain. |
-| **CARTA Trust Scores** | Numeric trust propagates through the DAG. One untrusted node degrades all downstream scores. |
+| **CARTA Trust Scores** | Numeric trust (0–100) propagates through the DAG. One untrusted node degrades all downstream scores. |
 | **Taint Propagation** | Risk labels (`added_taints` / `removed_taints`) accumulate across the chain. |
 | **Policy Enforcement** | Pluggable engines: OPA, Cedar, AWS AVP, or in-process Rego / Cedar — all before the function runs. |
 | **Multi-hop OBO** | `KestMiddleware` + `KestHttpxInterceptor` thread the Passport through HTTP service boundaries automatically. |
+| **Three-Tier Baggage** | Inline → Compressed Inline (`kest.passport_z`) → Claim Check. Handles chains from 1 to 50+ hops without header bloat. |
 | **Identity Flexibility** | SPIRE/SPIFFE, AWS STS, Bedrock Agents, OIDC JWTs, or a local Ed25519 ephemeral key. |
-| **Rust Core** | RFC 8785 canonicalization + ED25519 signing via PyO3. No Python-level signing primitives. |
+| **Rust Core** | RFC 8785 canonicalization + ED25519 signing via PyO3. Use `KEST_BACKEND=python` for multithreaded production (GIL cliff — see [#11](https://github.com/eterna2/kest/issues/11)). |
 
 ---
 
@@ -271,7 +273,60 @@ kest/
 
 ---
 
-## Gateway Delegation Flow (Advanced)
+## Production Notes
+
+### Backend Selection
+
+The Rust backend (`KEST_BACKEND=rust`, default when compiled) re-acquires the GIL to call `sign_payload` on Python identity providers. Under multithreaded load this causes ~94% throughput degradation (see [#11](https://github.com/eterna2/kest/issues/11)):
+
+```bash
+# Recommended for production until #11 is resolved
+export KEST_BACKEND=python
+```
+
+### Policy Cache
+
+Policy decisions are cached for 5 seconds by default (TTL configurable):
+
+```bash
+# Reduce TTL for high-sensitivity services
+export KEST_POLICY_CACHE_TTL=1.0
+
+# Disable caching entirely (e.g., revocation-critical paths)
+export KEST_POLICY_CACHE_TTL=0
+```
+
+For immediate revocation, call `invalidate_policy_cache()` from your application:
+
+```python
+from kest.core import invalidate_policy_cache
+invalidate_policy_cache()   # flushes all cached decisions
+```
+
+### JWT Verification (`KestIdentityMiddleware`)
+
+`KestIdentityMiddleware` requires a `jwks_uri` to verify JWT signatures. Without it, the middleware raises `RuntimeError` at startup (on the first request). To allow unsigned JWTs in development:
+
+```bash
+export KEST_INSECURE_NO_VERIFY=true   # dev/test only — never in production
+```
+
+### Baggage Key Names
+
+As of v0.3.0 security hardening, baggage keys are aligned with the spec:
+
+| Baggage Key | Description |
+|---|---|
+| `kest.passport` | Inline Passport (JWS chain, ≤ 4 KB) |
+| `kest.passport_z` | Compressed inline Passport (zlib+base64url, ≤ 4 KB compressed) |
+| `kest.claim_check` | Claim Check UUID (when Passport exceeds both thresholds) |
+| `kest.chain_tip` | SHA-256 of the last entry (for quick chain validation) |
+| `kest.user` | User subject from JWT `sub` claim |
+| `kest.agent` | Agent/service identity from JWT `client_id` claim |
+| `kest.task` | Task scope from JWT `scope` claim |
+
+> ⚠️ Old containers (pre-hardening) write `kest.principal_user` / `kest.workload_agent`. Rebuild all services together when upgrading.
+
 
 The most complete flow Kest supports is a **human → agent → gateway → task** delegation chain:
 

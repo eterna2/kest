@@ -8,13 +8,13 @@ from opentelemetry import baggage
 from opentelemetry import context as otel_context
 
 from kest.core import (
+    KestEntry,
     LocalEd25519Provider,
     MockIdentityProvider,
     MockPolicyEngine,
     configure,
     kest_verified,
 )
-from kest.core._core import KestEntry
 from kest.core.models import BaggageManager, Passport, PassportVerifier
 
 
@@ -62,7 +62,7 @@ def test_verify_fan_in_topology():
     B -> C
     """
     provider = LocalEd25519Provider(principal="spiffe://test/dag")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     # 1. Create Root A
     e_a = KestEntry(
@@ -109,7 +109,7 @@ def test_verify_diamond_topology():
     A -> C -> D
     """
     provider = LocalEd25519Provider(principal="spiffe://test/diamond")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     # A
     e_a = KestEntry(
@@ -165,7 +165,7 @@ def test_verify_skip_connection():
     A -> C
     """
     provider = LocalEd25519Provider(principal="spiffe://test/skip")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     e_a = KestEntry(
         entry_id=str(uuid.uuid4()),
@@ -213,7 +213,7 @@ def test_decorator_merges_multiple_tips():
     """
     # 1. Create two independent signatures to act as tips
     provider = LocalEd25519Provider(principal="spiffe://test/decorator")
-    from kest.core._core import sign_entry
+    from kest.core import sign_entry
 
     e1 = KestEntry(
         entry_id=str(uuid.uuid4()),

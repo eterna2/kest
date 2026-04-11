@@ -78,7 +78,7 @@ async def test_direct_user_flow_alice(wait_for_audit):
     assert "next" in data
 
     # Get alice's UUID from her JWT — kest-cli doesn't emit preferred_username,
-    # so KestIdentityMiddleware falls back to sub (UUID) as kest.principal_user.
+    # so KestIdentityMiddleware falls back to sub (UUID) as kest.user.
     alice_uuid = decode_jwt_payload(alice_token).get("sub")
 
     # Verify the audit trail records alice's identity (as UUID)
@@ -177,7 +177,7 @@ async def test_invalid_jwt_rejected():
 async def test_no_jwt_rejected():
     """
     Unauthenticated requests (no Authorization header) must be denied by policy.
-    workload_user_policy requires a non-empty principal_user, so anonymous requests
+    workload_user_policy requires a non-empty user (kest.user baggage), so anonymous requests
     should be denied by Cedar (403 from @kest_verified PermissionError →
     or a policy deny response from the sidecar).
     """

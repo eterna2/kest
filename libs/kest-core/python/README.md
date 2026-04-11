@@ -146,5 +146,31 @@ moon run kest-core-python:viz -- kest_audit.json
 
 The output can be rendered in any Markdown viewer or the [Mermaid Live Editor](https://mermaid.live/).
 
+## Performance
+
+Kest ships two backends for the core cryptographic engine:
+
+| Backend | How to activate | Use case |
+|---|---|---|
+| **Rust** (default) | `KEST_BACKEND=rust` or `kest.core.set_backend("rust")` | Production; highest throughput |
+| **Python** | `KEST_BACKEND=python` or `kest.core.set_backend("python")` | sdist installs, debugging, environments without a Rust toolchain |
+
+### Benchmark Summary
+
+Representative results on a reference host (see [`examples/bench/BENCHMARK.md`](examples/bench/BENCHMARK.md) for full details):
+
+| Benchmark | Rust backend | Python backend | Speedup |
+|---|---|---|---|
+| `entry_create` | 0.80 µs | 0.81 µs | 1.01x slower |
+| `sign_entry` | 24.70 µs | 24.70 µs | ~1.0x |
+| `canonical_json` | 3.89 µs | 3.98 µs | 1.02x slower |
+| `chain_10` | 276 µs | 281 µs | 1.02x slower |
+| `chain_100` | 2.79 ms | 2.79 ms | ~1.0x |
+
+### Running Benchmarks
+```bash
+moon run kest-core-python:bench
+```
+
 ## Documentation
 For full documentation, architecture deep dives, and compliance frameworks mapping, please visit the [Official Kest Documentation Site](https://eterna2.github.io/kest/).

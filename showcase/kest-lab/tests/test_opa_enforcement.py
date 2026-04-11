@@ -10,8 +10,8 @@ async def test_opa_policy_enforcement():
     identities and trust scores on the 0-100 integer scale.
 
     The rego policy (kest.rego) uses:
-      - trust_score >= 50 for machine-to-machine (no principal_user)
-      - trust_score >= 10 when principal_user is present
+      - trust_score >= 50 for machine-to-machine (no user)
+      - trust_score >= 10 when user is present (spec key: input.user per SPEC-v0.3.0 §8.4)
     """
     opa_url = "http://opa:8181/v1/data/kest"
 
@@ -27,7 +27,7 @@ async def test_opa_policy_enforcement():
         assert res_pass.status_code == 200
         assert res_pass.json().get("result", {}).get("allow") is True
 
-        # Negative Match - trust score below both thresholds (no principal_user)
+        # Negative Match - trust score below both thresholds (no user)
         payload_fail = {
             "input": {
                 "principal": "spiffe://kest.internal/workload/hop2",
@@ -37,38 +37,38 @@ async def test_opa_policy_enforcement():
         res_fail = await client.post(opa_url, json=payload_fail)
         assert res_fail.status_code == 200
         assert res_fail.json().get("result", {}).get("allow") is False, (
-            f"trust_score=5 should be denied without principal_user, "
+            f"trust_score=5 should be denied without user, "
             f"got: {res_fail.json()}"
         )
 
-        # Edge case: trust_score=20 with principal_user present should be allowed
+        # Edge case: trust_score=20 with user present should be allowed
         # (>= 10 threshold with user identity)
         payload_user = {
             "input": {
                 "principal": "spiffe://kest.internal/workload/hop2",
                 "trust_score": 20,
-                "principal_user": "alice",
+                "user": "alice",
             }
         }
         res_user = await client.post(opa_url, json=payload_user)
         assert res_user.status_code == 200
         assert res_user.json().get("result", {}).get("allow") is True, (
-            f"trust_score=20 with principal_user should be allowed, "
+            f"trust_score=20 with user should be allowed, "
             f"got: {res_user.json()}"
         )
 
-        # Edge case: trust_score=5 with principal_user should also be denied
+        # Edge case: trust_score=5 with user should also be denied
         # (below the 10 threshold)
         payload_user_low = {
             "input": {
                 "principal": "spiffe://kest.internal/workload/hop2",
                 "trust_score": 5,
-                "principal_user": "alice",
+                "user": "alice",
             }
         }
         res_user_low = await client.post(opa_url, json=payload_user_low)
         assert res_user_low.status_code == 200
         assert res_user_low.json().get("result", {}).get("allow") is False, (
-            f"trust_score=5 with principal_user should still be denied, "
+            f"trust_score=5 with user should still be denied, "
             f"got: {res_user_low.json()}"
         )

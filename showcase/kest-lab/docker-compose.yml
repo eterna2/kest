@@ -46,7 +46,7 @@ services:
   # --- OPA: Policy as Code (Rego) ---
   opa:
     image: openpolicyagent/opa:latest
-    command: ["run", "--server", "--log-level=debug", "--addr", ":8181", "/policies"]
+    command: ["run", "--server", "--log-level=info", "--addr", ":8181", "--watch", "/policies"]
     volumes:
       - ./opa/policies:/policies
     ports:
@@ -91,6 +91,7 @@ services:
       - NEXT_HOP_URL=http://hop2:8000
       - PYTHONPATH=/libs/kest-core/python/python
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+      - KEST_LAB_FALLBACK=true
     command: ["sh", "-c", "pip install uv --quiet && uv sync --group test && /workspace/app/.venv/bin/python app.py"]
     ports:
       - "8000:8000"
@@ -110,6 +111,7 @@ services:
       - NEXT_HOP_URL=http://hop3:8000
       - PYTHONPATH=/libs/kest-core/python/python
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+      - KEST_LAB_FALLBACK=true
     ports: []
 
   hop3:
@@ -121,6 +123,7 @@ services:
       - NEXT_HOP_URL=none
       - PYTHONPATH=/libs/kest-core/python/python
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+      - KEST_LAB_FALLBACK=true
     ports: []
 
   # --- Mocked Agent: OBO Delegation Showcase ---
@@ -137,6 +140,8 @@ services:
       - KEYCLOAK_CLIENT_ID=kest-agent
       - KEYCLOAK_CLIENT_SECRET=kest-agent-secret
       - GATEWAY_URL=http://kest-gateway:8002
+      - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
+      - KEST_LAB_FALLBACK=true
     command: ["sh", "-c", "pip install uv --quiet && uv sync --group test && /workspace/app/.venv/bin/python agent.py"]
     ports:
       - "8001:8001"
@@ -155,6 +160,7 @@ services:
       - PYTHONPATH=/libs/kest-core/python/python
       - KEYCLOAK_JWKS_URI=http://keycloak:8080/realms/kest-lab/protocol/openid-connect/certs
       - TASK_TOKEN_TTL=300
+      - KEST_LAB_FALLBACK=true
     command: ["sh", "-c", "pip install uv --quiet && uv sync --group test && /workspace/app/.venv/bin/python gateway.py"]
     ports:
       - "8002:8002"

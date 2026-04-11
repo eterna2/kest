@@ -108,7 +108,7 @@ async def test_full_delegation_chain_alice(wait_for_audit):
     )
 
     # kest-cli does not emit preferred_username in the JWT, so KestIdentityMiddleware
-    # falls back to `sub` (UUID) as kest.principal_user for both direct tokens (agent side) and
+    # falls back to `sub` (UUID) as kest.user for both direct tokens (agent side) and
     # OBO act.sub (gateway side). All identity comparisons use the UUID.
     user_id = claims.get("sub")
 
@@ -144,7 +144,7 @@ async def test_full_delegation_chain_alice(wait_for_audit):
     assert "read:data" not in task_claims.get("scope", ""), (
         "Task token must NOT carry alice's full data scopes"
     )
-    # Gateway mints task token with delegated_user from kest.principal_user (= act.sub UUID from OBO token)
+    # Gateway mints task token with delegated_user from kest.user (= act.sub UUID from OBO token)
     assert task_claims.get("delegated_user") == user_id, (
         f"Expected delegated_user={user_id!r}, got {task_claims.get('delegated_user')!r}"
     )
@@ -181,7 +181,7 @@ async def test_gateway_denies_insufficient_scope():
     alice authenticates with only the default scopes (no read:data).
     kest-agent performs OBO exchange.
     kest-gateway /authorise checks gateway_policy:
-      forbid when context["principal_scope"] does not contain "read:data"
+      forbid when context["scope"] does not contain "read:data"
     Expectation: kest-gateway returns 403 or upstream kest-agent returns 4xx.
     """
     # Get alice's token WITHOUT requesting optional data scopes
@@ -224,7 +224,7 @@ async def test_task_token_cannot_access_authorise_endpoint():
     Flow F: A gateway-minted task token (scope: task:process-data) cannot be
     presented to /authorise to obtain a further task token.
 
-    gateway_policy requires context["principal_scope"] to contain "read:data".
+    gateway_policy requires context["scope"] to contain "read:data".
     A task token carries only "task:process-data", which does NOT satisfy this.
 
     This test validates that the gateway's token scope boundary is enforced:
@@ -302,7 +302,7 @@ async def test_audit_trail_integrity(wait_for_audit):
     payloads = all_audit_payloads(audit)
 
     # kest-cli omits preferred_username from JWTs; KestIdentityMiddleware falls back
-    # to sub (UUID) for kest.principal_user in all entries (direct token and OBO act.sub).
+    # to sub (UUID) for kest.user in all entries (direct token and OBO act.sub).
     user_id = decode_jwt_payload(alice_token).get("sub")
 
     # 1. Alice's UUID must appear in all audit entries

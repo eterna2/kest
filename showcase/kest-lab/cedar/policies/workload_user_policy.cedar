@@ -2,13 +2,13 @@
 //
 // Evaluated by CedarLocalEngine (cedarpy, in-process).
 //
-// Context keys provided by CedarLocalEngine._flatten (all scalar):
-//   context["principal"]       = SPIFFE ID string
-//   context["trust_score"]     = int (trust fraction * 100, e.g. 0.6 -> 60)
-//   context["principal_user"]  = human caller (kest.principal_user baggage)
-//   context["principal_agent"] = acting agent if OBO (kest.principal_agent baggage)
-//   context["principal_roles"] = JSON roles string (kest.principal_roles baggage)
-//   context["principal_scope"] = OAuth scope (kest.principal_scope baggage)
+// Context keys provided by CedarLocalEngine._flatten (all scalar).
+// Uses spec-compliant names per SPEC-v0.3.0 §8.4:
+//   context["principal"]   = SPIFFE ID string
+//   context["trust_score"] = int (trust fraction * 100, e.g. 0.6 -> 60)
+//   context["user"]        = human caller (from kest.user baggage)
+//   context["agent"]       = acting agent if OBO (from kest.agent baggage)
+//   context["task"]        = OAuth scope (from kest.task baggage)
 //
 // Trust score mapping (ORIGIN_TRUST_MAP * 100):
 //   system/internal  = 100    (fully trusted internal call)
@@ -22,6 +22,6 @@
 
 permit(principal, action, resource) when {
     context["trust_score"] >= 10 &&
-    context has "principal_user" &&
-    context["principal_user"] != ""
+    context has "user" &&
+    context["user"] != ""
 };
