@@ -32,7 +32,7 @@ cedar = [
     "cedarpy>=0.1.0",
 ]
 rego = [
-    "regopy>=0.3.0",
+    "regopy>=1.4.0",
 ]
 python-backend = [
     "rfc8785>=0.1.0",
@@ -58,7 +58,7 @@ dev = [
     "mypy>=1.9.0",
     "boto3>=1.28.0",
     "moto[kms,sts]>=5.0.0",
-    "regopy>=0.3.0",
+    "regopy>=1.4.0",
     "pyperf>=2.6.0",
 ]
 
