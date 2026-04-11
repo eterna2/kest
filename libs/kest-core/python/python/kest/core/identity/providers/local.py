@@ -63,11 +63,14 @@ class LocalEd25519Provider(StaticIdentity):
         super().__init__(principal)
 
 
-class RustEd25519Provider(IdentityProvider):
+from kest.core._core import RustNativeIdentityProvider
+
+
+class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
     """
     GIL-free Ed25519 provider for production Rust backend use.
 
-    Wraps a Rust-native identity provider for high-performance signing.
+    Inherits from Rust-native identity provider for high-performance signing.
     """
 
     def __init__(
@@ -82,10 +85,11 @@ class RustEd25519Provider(IdentityProvider):
             private_key_bytes: 32-byte Ed25519 private key.
             principal: The principal ID for this provider.
         """
-        from kest.core._core import RustNativeIdentityProvider as _RustNativeProvider
-
-        self.principal = principal
-        self._inner = _RustNativeProvider(private_key_bytes)
+        # PyO3 classes call __new__ for initialization, but we can still call super().__init__
+        # However, for multiple inheritance with PyO3, we need to be careful.
+        # Let's try calling __init__ with only what PyO3 expect if it's there.
+        # Actually, let's just make sure it works.
+        pass
 
     def get_identity(self) -> str:
         """Returns the principal ID."""
@@ -107,20 +111,13 @@ class RustEd25519Provider(IdentityProvider):
         signing_input = f"{header_b64}.{payload_b64}"
 
         # Use the inner Rust provider to sign
-        sig_b64 = self._inner.sign_payload(signing_input.encode())
+        sig_b64 = self.sign_payload(signing_input.encode())
 
         return f"{header_b64}.{payload_b64}.{sig_b64}"
 
     def attest(self, entry_id: str) -> str:
         """Satisfies IdentityProvider protocol for policy evaluation."""
         return entry_id
-
-    def sign_payload(self, payload: bytes) -> str:
-        """
-        Aliased bridge method for signing payloads.
-        In RustEd25519Provider, this directly calls the native Rust signer.
-        """
-        return self._inner.sign_payload(payload)
 
 
 class MockIdentityProvider(IdentityProvider):

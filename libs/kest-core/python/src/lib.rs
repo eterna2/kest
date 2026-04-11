@@ -55,18 +55,23 @@ pub struct KestEntry {
     pub inner: CoreEntry,
 }
 
-#[pyclass]
+#[pyclass(subclass)]
 pub struct RustNativeIdentityProvider {
     pub signing_key: SigningKey,
+    #[pyo3(get)]
+    pub principal: String,
 }
 
 #[pymethods]
 impl RustNativeIdentityProvider {
     #[new]
-    fn from_bytes(key_bytes: &[u8]) -> PyResult<Self> {
+    fn new(key_bytes: &[u8], principal: String) -> PyResult<Self> {
         let key_array: [u8; 32] = key_bytes.try_into()
             .map_err(|_| PyErr::new::<pyo3::exceptions::PyValueError, _>("Key must be 32 bytes"))?;
-        Ok(Self { signing_key: SigningKey::from_bytes(&key_array) })
+        Ok(Self {
+            signing_key: SigningKey::from_bytes(&key_array),
+            principal,
+        })
     }
 
     fn public_key_bytes(&self) -> Vec<u8> {
@@ -268,13 +273,19 @@ impl KestEntry {
 
 
 
-fn build_signing_input(inner: &CoreEntry) -> Result<String, String> {
+fn build_signing_input(inner: &CoreEntry, principal: Option<&str>) -> Result<String, String> {
     use base64::Engine;
     let json_val = serde_json::to_value(inner)
         .map_err(|e| e.to_string())?;
     let canonical = kest_core_rs::canonical::to_canonical_string(&json_val)
         .map_err(|e| e)?;
-    let header = serde_json::json!({"alg":"EdDSA","typ":"JWS"});
+
+    let header = if let Some(p) = principal {
+        serde_json::json!({"alg":"EdDSA","typ":"JWS", "kid": p})
+    } else {
+        serde_json::json!({"alg":"EdDSA","typ":"JWS"})
+    };
+
     let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(serde_jcs::to_string(&header).unwrap());
     let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(canonical);
@@ -289,15 +300,18 @@ fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult
     let inner = entry.inner.clone();
 
     // Check if provider is our native Rust provider (no GIL needed after this)
-    let native_key: Option<SigningKey> = provider.bind(py)
+    let native_provider: Option<(SigningKey, String)> = provider.bind(py)
         .downcast::<RustNativeIdentityProvider>()
         .ok()
-        .map(|p| p.borrow().signing_key.clone());
+        .map(|p| {
+            let p = p.borrow();
+            (p.signing_key.clone(), p.principal.clone())
+        });
 
-    if let Some(signing_key) = native_key {
+    if let Some((signing_key, principal)) = native_provider {
         // Entirely GIL-free path: canonicalize + sign in one allow_threads block
         let jws = py.allow_threads(|| -> Result<String, String> {
-            let signing_input = build_signing_input(&inner)?;
+            let signing_input = build_signing_input(&inner, Some(&principal))?;
             let sig = signing_key.sign(signing_input.as_bytes());
             let sig_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sig.to_bytes());
             Ok(format!("{}.{}", signing_input, sig_b64))
@@ -307,7 +321,7 @@ fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult
 
     // Fallback: Python provider path (GIL re-acquisition, existing behaviour)
     // Used for SPIREProvider and any custom Python providers.
-    let signing_input = py.allow_threads(|| build_signing_input(&inner))
+    let signing_input = py.allow_threads(|| build_signing_input(&inner, None))
         .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
 
     // Re-acquire GIL to call the Python identity provider's sign_payload.

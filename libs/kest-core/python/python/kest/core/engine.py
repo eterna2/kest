@@ -1,5 +1,4 @@
 import hashlib
-import re
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
@@ -626,8 +625,6 @@ class RegoLocalEngine(PolicyEngine):
         self._packages: Dict[str, str] = {}
         self._load_policies()
 
-    _REGO_PACKAGE_RE = re.compile(r"^\s*package\s+(.+)", re.MULTILINE)
-
     def _load_policies(self) -> None:
         """Pre-load all Rego modules and cache per-policy package paths."""
         from regopy import Interpreter
@@ -641,9 +638,10 @@ class RegoLocalEngine(PolicyEngine):
     @staticmethod
     def _parse_package(source: str, fallback: str) -> str:
         """Extract the dot-separated package path from a Rego source string."""
-        match = RegoLocalEngine._REGO_PACKAGE_RE.search(source)
-        if match:
-            return match.group(1).strip()
+        for line in source.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("package "):
+                return stripped[len("package ") :].strip()
         return fallback
 
     @staticmethod
