@@ -184,7 +184,7 @@ class MockIdentityProvider(IdentityProvider):
         )
         payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
         signing_input = f"{header_b64}.{payload_b64}".encode()
-        
+
         # Produce a deterministic, structurally valid base64url signature part.
         raw = hashlib.sha256(b"mock-key" + signing_input).digest()
         sig_b64 = base64.urlsafe_b64encode(raw).decode().rstrip("=")

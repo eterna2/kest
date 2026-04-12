@@ -1,13 +1,11 @@
-import json
 import os
-import uuid
 
-import kest.core._core_py
+import kest.core._core  # noqa: F401_py
 import pyperf
 import uuid_utils
 
 try:
-    import kest.core._core
+    import kest.core._core  # noqa: F401
 
     HAS_RUST = True
 except ImportError:
@@ -15,7 +13,7 @@ except ImportError:
 
 
 class MockProvider:
-    def sign_payload(self, payload: bytes) -> str:
+    def sign(self, payload: bytes) -> str:
         return "mock_signature_b64"
 
     def verify_svid(self, svid: str) -> str:
@@ -100,11 +98,11 @@ def main():
     runner.bench_func("chain_100", lambda: build_chain(KestEntry, sign_entry, 100))
 
     # 6. Passport verify 10
-    from kest.core.models import Passport, PassportVerifier
+    from kest.core.models import Passport
 
-    entries = build_chain(KestEntry, sign_entry, 10)
-    passport = Passport(entries=entries)
-    providers = {"mock_subject": provider}
+    _entries = build_chain(KestEntry, sign_entry, 10)
+    _passport = Passport(entries=_entries)
+    _providers = {"mock_subject": provider}
     # Mock PassportVerifier.verify so it actually works, but wait
     # We just bench the Passport verify on exactly one iteration
     pass

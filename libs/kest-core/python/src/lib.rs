@@ -85,6 +85,16 @@ impl RustNativeIdentityProvider {
     }
 }
 
+impl kest_core_rs::crypto::IdentityProvider for RustNativeIdentityProvider {
+    fn verify_svid(&self, _svid: &str) -> std::result::Result<String, kest_core_rs::crypto::CryptoError> {
+        Ok(self.principal.clone())
+    }
+
+    fn sign_payload(&self, payload: &[u8]) -> std::result::Result<String, kest_core_rs::crypto::CryptoError> {
+        Ok(Self::sign_payload(self, payload))
+    }
+}
+
 #[pymethods]
 impl KestEntry {
     #[new]
@@ -351,6 +361,8 @@ fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult
 }
 
 
+pub mod v2;
+
 #[pyfunction]
 fn version() -> PyResult<String> {
     Ok(env!("CARGO_PKG_VERSION").to_string())
@@ -362,5 +374,10 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(sign_entry, m)?)?;
     m.add_class::<KestEntry>()?;
     m.add_class::<RustNativeIdentityProvider>()?;
+    
+    let v2_module = PyModule::new(m.py(), "v2")?;
+    v2::register_v2_module(&v2_module)?;
+    m.add_submodule(&v2_module)?;
+    
     Ok(())
 }

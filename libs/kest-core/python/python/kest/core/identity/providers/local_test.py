@@ -25,11 +25,11 @@ def test_mock_identity_provider():
     # sign() now returns a full JWS (header.payload.signature)
     parts = sig.split(".")
     assert len(parts) == 3, "sign() must return a full JWS"
-    
+
     header = json.loads(
         base64.urlsafe_b64decode(parts[0] + "=" * (4 - len(parts[0]) % 4)).decode()
     )
     assert header["kid"] == "spiffe://test"
-    
+
     decoded_sig = base64.urlsafe_b64decode(parts[2] + "=" * (4 - len(parts[2]) % 4))
     assert len(decoded_sig) == 32, "Mock signature must be 32 bytes (SHA-256 output)"

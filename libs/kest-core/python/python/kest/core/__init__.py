@@ -55,9 +55,9 @@ def get_backend() -> _BackendName:
 
 
 _load_backend(_os.environ.get("KEST_BACKEND", "rust").lower())  # type: ignore
-from kest.core.cache import CacheProvider, SimpleCache
-from kest.core.decorators import invalidate_policy_cache, kest_verified
-from kest.core.engine import (
+from kest.core.cache import CacheProvider, SimpleCache  # noqa: E402
+from kest.core.decorators import invalidate_policy_cache, kest_verified  # noqa: E402
+from kest.core.engine import (  # noqa: E402
     AVPPolicyEngine,
     CedarLocalEngine,
     CedarPolicyEngine,
@@ -67,8 +67,8 @@ from kest.core.engine import (
     PolicyEngine,
     RegoLocalEngine,
 )
-from kest.core.ext import KestHttpxInterceptor, KestMiddleware
-from kest.core.identity import (
+from kest.core.ext import KestHttpxInterceptor, KestMiddleware  # noqa: E402
+from kest.core.identity import (  # noqa: E402
     AWSWorkloadIdentity,
     BedrockAgentIdentity,
     IdentityProvider,
@@ -81,7 +81,7 @@ from kest.core.identity import (
     StaticIdentity,
     get_default_identity,
 )
-from kest.core.models import (
+from kest.core.models import (  # noqa: E402
     BaggageManager,
     DefaultTrustEvaluator,
     Passport,

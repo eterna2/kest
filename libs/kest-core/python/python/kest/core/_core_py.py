@@ -111,6 +111,6 @@ def sign_entry(entry: KestEntry, provider: Any) -> str:
     # Canonicalize and b64 encode payload
     canonical_payload = rfc8785.dumps(payload_dict)
     # Use the public `sign` method of the identity provider
-    # By contract, IdentityProvider.sign takes the raw canonical bytes 
+    # By contract, IdentityProvider.sign takes the raw canonical bytes
     # and returns a complete JWS string (header.payload.signature)
     return provider.sign(canonical_payload)
