@@ -132,6 +132,17 @@ required a distributed cache backend on every request. Without one, the passport
 > - **Warm path**: With the policy decision cache, repeated calls to the same decorated function by the same principal reduce policy evaluation cost from ~0.6ms to essentially zero. At 10K RPS with the same workload identity, Cedar evaluation drops from 6M eval calls/min to only ~500 (cache misses on TTL expiry).
 > - **Net decorator overhead (warm)**: ~0.18ms — dominated by Ed25519 signing + baggage packing.
 
+### Scalability: @kest_verified (ops/sec vs. thread count)
+
+| Threads | Rust (ops/sec) | Rust v2 (ops/sec) | Python (ops/sec) |
+|---|---|---|---|
+| 1 | 5,233 | 3,857 | 10,042 |
+| 2 | 5,876 | 3,654 | 9,662 |
+| 4 | 5,200 | 3,686 | 7,459 |
+| 8 | 5,354 | 3,695 | 10,385 |
+
+> **Interpretation**: The pure Python backend currently leads in throughput because it avoids the PyO3 cross-boundary overhead (serializing/deserializing context to/from Rust structs) for this specific Mock workload. Rust v2 shows lower ops/sec currently due to the comprehensive FFI pipeline orchestrating baggage on every call even for a mock engine.
+
 ---
 
 ## L3: Policy Engine Throughput (4 threads)
@@ -223,3 +234,6 @@ KEST_BACKEND=rust   uv run python examples/bench/bench_system.py
 | `throughput_rust-v2.json` | L0 threading results, Rust v2 backend |
 | `system_rust.json` | L1–L4 system results, Rust backend |
 | `system_rust-v2.json` | L1–L4 system results, Rust v2 backend |
+| `decorator_throughput_rust.json` | L2 decorator throughput, Rust backend |
+| `decorator_throughput_python.json` | L2 decorator throughput, Python backend |
+| `decorator_throughput_rust-v2.json` | L2 decorator throughput, Rust v2 backend |

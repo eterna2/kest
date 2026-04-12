@@ -45,6 +45,18 @@ echo "[L0] Threading throughput (Rust v2 backend)..."
 KEST_BACKEND=rust-v2 uv run python examples/bench/bench_throughput.py
 
 
+echo ""
+echo "[L0] Decorator throughput (Rust backend)..."
+KEST_BACKEND=rust uv run python examples/bench/bench_decorator_throughput.py
+
+echo ""
+echo "[L0] Decorator throughput (Python backend)..."
+KEST_BACKEND=python uv run python examples/bench/bench_decorator_throughput.py
+
+echo ""
+echo "[L0] Decorator throughput (Rust v2 backend)..."
+KEST_BACKEND=rust-v2 uv run python examples/bench/bench_decorator_throughput.py
+
 # --- L1–L4: System benchmarks ---
 echo ""
 echo "[L1–L4] System benchmarks (Rust backend)..."
