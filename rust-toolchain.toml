@@ -1,0 +1,5 @@
+# Pins the Rust toolchain for the entire workspace.
+# This must match the `rust` version in `.prototools`.
+# Requires Rust >=1.85 for `edition2024` support (used by transitive deps like base64ct).
+[toolchain]
+channel = "1.88.0"
