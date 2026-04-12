@@ -4,6 +4,7 @@ import json
 
 from cryptography.hazmat.primitives.asymmetric import ed25519
 
+from kest.core._core import RustNativeIdentityProvider
 from kest.core.identity.base import IdentityProvider
 
 
@@ -63,15 +64,34 @@ class LocalEd25519Provider(StaticIdentity):
         super().__init__(principal)
 
 
-from kest.core._core import RustNativeIdentityProvider
-
 
 class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
     """
     GIL-free Ed25519 provider for production Rust backend use.
 
-    Inherits from Rust-native identity provider for high-performance signing.
+    Inherits from ``RustNativeIdentityProvider`` (a PyO3 native class) which
+    holds the ``ed25519-dalek`` ``SigningKey`` in Rust. When used with the Rust
+    backend, ``sign_entry`` detects this type via ``downcast::<RustNativeIdentityProvider>``
+    and performs the entire canonicalization + signing inside a single
+    ``py.allow_threads`` block — eliminating GIL re-acquisition.
+
+    When used with the Python backend, ``sign()`` is called directly and delegates
+    to the Rust ``sign_payload`` for the actual Ed25519 operation.
     """
+
+    def __new__(
+        cls,
+        private_key_bytes: bytes,
+        principal: str = "spiffe://kest.internal/local-workload",
+    ):
+        """
+        Allocates and initializes the underlying PyO3 Rust struct.
+
+        PyO3's ``#[new]`` maps to Python ``__new__``, not ``__init__``.
+        We must override ``__new__`` here to forward the arguments to the
+        Rust constructor, which allocates the ``SigningKey`` in Rust memory.
+        """
+        return RustNativeIdentityProvider.__new__(cls, private_key_bytes, principal)
 
     def __init__(
         self,
@@ -79,29 +99,30 @@ class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
         principal: str = "spiffe://kest.internal/local-workload",
     ):
         """
-        Initializes the Rust-native Ed25519 provider.
+        No-op — initialization is fully handled by ``__new__`` above.
 
-        Args:
-            private_key_bytes: 32-byte Ed25519 private key.
-            principal: The principal ID for this provider.
+        The Rust ``#[new]`` fn constructs the struct during ``__new__``.
+        ``super().__init__()`` would route to ``object.__init__()`` via MRO
+        (because PyO3's ``__init__`` is ``object.__init__``), so we skip it.
         """
-        # PyO3 classes call __new__ for initialization, but we can still call super().__init__
-        # However, for multiple inheritance with PyO3, we need to be careful.
-        # Let's try calling __init__ with only what PyO3 expect if it's there.
-        # Actually, let's just make sure it works.
-        pass
+        pass  # Rust struct initialized in __new__
 
     def get_identity(self) -> str:
-        """Returns the principal ID."""
+        """Returns the principal ID (exposed via #[pyo3(get)] on the Rust struct)."""
         return self.principal
 
     def sign(self, payload: bytes) -> str:
         """
-        Signs the payload using the Rust-native provider.
+        Signs a raw payload and returns a complete JWS string.
 
-        Note: When using the Rust backend, this method is bypassed by sign_entry
-        for a GIL-free path. This implementation remains for compatibility with
-        the Python backend or direct calls.
+        This is the Python-backend-compatible path. The Rust backend bypasses
+        this method entirely via the GIL-free ``sign_entry`` path.
+
+        Args:
+            payload: The raw bytes to sign (the canonicalized entry data).
+
+        Returns:
+            str: A complete JWS compact serialization (header.payload.sig).
         """
         header = {"alg": "EdDSA", "typ": "JWS", "kid": self.principal}
         header_b64 = (
@@ -110,13 +131,14 @@ class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
         payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
         signing_input = f"{header_b64}.{payload_b64}"
 
-        # Use the inner Rust provider to sign
+        # sign_payload is implemented in Rust (RustNativeIdentityProvider.sign_payload)
+        # and returns the base64url-encoded raw Ed25519 signature.
         sig_b64 = self.sign_payload(signing_input.encode())
 
         return f"{header_b64}.{payload_b64}.{sig_b64}"
 
     def attest(self, entry_id: str) -> str:
-        """Satisfies IdentityProvider protocol for policy evaluation."""
+        """Satisfies IdentityProvider protocol for policy evaluation (non-signing use)."""
         return entry_id
 
 

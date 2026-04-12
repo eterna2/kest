@@ -523,3 +523,36 @@ await mw(scope, noop_receive, noop_send)
 ```
 
 **Symptom if wrong:** Test passes trivially because `captured` is empty — the lambda was called but returned `None`, which is awaited without error, and no baggage was captured.
+
+---
+
+### T-10: PyO3 `#[pyclass(subclass)]` — Use `__new__` Not `__init__` in Python Subclasses
+
+**File:** `libs/kest-core/python/python/kest/core/identity/providers/local.py` — `RustEd25519Provider`
+
+PyO3's `#[new]` maps to Python `__new__`, **not** `__init__`. When a Python class subclasses a PyO3 `#[pyclass(subclass)]` (e.g., `RustNativeIdentityProvider`), calling `super().__init__(args...)` will **not** reach the Rust constructor — due to MRO, it routes through `IdentityProvider`, `ABC`, and reaches `object.__init__()`, which does not accept arguments.
+
+**Wrong approach (generates `TypeError: object.__init__() takes exactly one argument`):**
+
+```python
+class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
+    def __init__(self, private_key_bytes: bytes, principal: str):
+        super().__init__(private_key_bytes, principal)  # BUG: routes to object.__init__
+```
+
+**Correct approach — override `__new__` to invoke the Rust constructor:**
+
+```python
+class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
+    def __new__(cls, private_key_bytes: bytes, principal: str = "..."):
+        # Explicitly routes to the PyO3 #[new] constructor, bypassing MRO ambiguity.
+        return RustNativeIdentityProvider.__new__(cls, private_key_bytes, principal)
+
+    def __init__(self, private_key_bytes: bytes, principal: str = "..."):
+        pass  # No-op: __new__ handled all Rust initialization.
+```
+
+**Symptom:** `TypeError: object.__init__() takes exactly one argument (the instance to initialize)` when constructing any `RustEd25519Provider` instance.
+
+**Discovered during:** Rebase of PR #35 onto main (2026-04-12). Jules generated the subclass with `pass` in `__init__` (which avoids the TypeError but leaves the Rust struct uninitialized), and the initial fix attempt used `super().__init__()` which routes to `object.__init__()`.
+
