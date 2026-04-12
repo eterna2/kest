@@ -8,6 +8,10 @@ updates:
     labels:
       - "dependencies"
       - "github-actions"
+    groups:
+      github-actions-dependencies:
+        patterns:
+          - "*"
 
   # Rust / Cargo (kest-core native Rust extension)
   - package-ecosystem: "cargo"
@@ -17,6 +21,10 @@ updates:
     labels:
       - "dependencies"
       - "rust"
+    groups:
+      cargo-dependencies:
+        patterns:
+          - "*"
 
   # Python (pip/uv ecosystem)
   - package-ecosystem: "pip"
@@ -26,6 +34,10 @@ updates:
     labels:
       - "dependencies"
       - "python"
+    groups:
+      pip-dependencies:
+        patterns:
+          - "*"
 
   # Node / Bun (website)
   - package-ecosystem: "npm"
@@ -35,3 +47,7 @@ updates:
     labels:
       - "dependencies"
       - "frontend"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
