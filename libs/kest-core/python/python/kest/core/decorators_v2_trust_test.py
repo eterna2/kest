@@ -26,8 +26,8 @@ def setup_active_backends(monkeypatch):
     capture = CaptureEngine()
     engine = v2.RustPolicyEngine.foreign(capture.evaluate)
     provider = MockIdentityProvider()
-    monkeypatch.setattr("kest.core._active_engine_v2", engine, raising=False)
-    monkeypatch.setattr("kest.core._active_identity_v2", provider, raising=False)
+    monkeypatch.setattr("kest.core._active_engine", engine, raising=False)
+    monkeypatch.setattr("kest.core._active_identity", provider, raising=False)
     yield capture
     service = os.getenv("SERVICE_NAME", "unknown")
     if os.path.exists(f"/tmp/.kest_lab_{service}.json"):
