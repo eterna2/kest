@@ -14,6 +14,11 @@ mod tests {
         labels.insert("env".to_string(), "prod".to_string());
 
         let entry = KestEntry {
+            schema_version: "0.3.0".to_string(),
+            runtime: crate::models::KestRuntime {
+                name: "kest-rust".to_string(),
+                version: "0.1.0".to_string(),
+            },
             entry_id: "018e8a3a-1a3b-7000-8000-000000000001".to_string(),
             parent_ids: vec!["parent-1".to_string()],
             classification: KestClassification::System,
@@ -23,6 +28,7 @@ mod tests {
             content_hash: "content-hash".to_string(),
             environment: BTreeMap::new(),
             otel_context,
+            policy_context: crate::models::PolicyContext::default(),
             labels,
             added_taints: vec!["taint-1".to_string()],
             removed_taints: vec![],
@@ -52,6 +58,10 @@ mod tests {
             "operation",
             "otel_context",
             "parent_ids",
+            "policy_context",
+            "removed_taints",
+            "runtime",
+            "schema_version",
             "taints",
             "timestamp_ms",
             "trust_score",
