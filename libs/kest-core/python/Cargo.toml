@@ -8,11 +8,11 @@ name = "_core"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = { version = "0.24", features = ["abi3-py311"] }
+pyo3 = { version = "0.28", features = ["abi3-py311"] }
 kest-core-rs = { path = "../rust" }
 serde_json = "1.0"
 base64 = "0.22"
-serde_jcs = "0.1"
+serde_jcs = "0.2"
 
 [features]
 extension-module = ["pyo3/extension-module"]
