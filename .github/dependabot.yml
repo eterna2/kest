@@ -4,7 +4,7 @@ updates:
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     labels:
       - "dependencies"
       - "github-actions"
@@ -12,12 +12,14 @@ updates:
       github-actions-dependencies:
         patterns:
           - "*"
+    # Security updates are handled separately and trigger faster via GitHub's
+    # automatic security update PRs (not governed by this schedule).
 
   # Rust / Cargo (kest-core native Rust extension)
   - package-ecosystem: "cargo"
     directory: "/libs/kest-core/python"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     labels:
       - "dependencies"
       - "rust"
@@ -30,7 +32,7 @@ updates:
   - package-ecosystem: "pip"
     directory: "/libs/kest-core/python"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     labels:
       - "dependencies"
       - "python"
@@ -43,7 +45,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/website"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     labels:
       - "dependencies"
       - "frontend"
