@@ -1,8 +1,10 @@
-import os
 import concurrent.futures
+import os
 from unittest.mock import patch
-from kest.core.decorators import _get_sign_executor
+
 import kest.core.decorators
+from kest.core.decorators import _get_sign_executor
+
 
 def test_executor_singleton():
     """Verify that _get_sign_executor returns the same instance across calls."""
@@ -11,6 +13,7 @@ def test_executor_singleton():
     assert exec1 is exec2
     assert isinstance(exec1, concurrent.futures.ThreadPoolExecutor)
     assert exec1._thread_name_prefix == "kest-sign"
+
 
 def test_executor_worker_count_default():
     """Verify default worker count is min(4, cpu_count)."""
@@ -24,6 +27,7 @@ def test_executor_worker_count_default():
     executor = _get_sign_executor()
     assert executor._max_workers == expected
 
+
 def test_executor_worker_count_env_var():
     """Verify worker count can be overridden via KEST_SIGN_WORKERS."""
     # Reset singleton for testing
@@ -33,6 +37,7 @@ def test_executor_worker_count_env_var():
     with patch.dict(os.environ, {"KEST_SIGN_WORKERS": "10"}):
         executor = _get_sign_executor()
         assert executor._max_workers == 10
+
 
 def test_executor_invalid_env_var_fallback():
     """Verify fallback to default if KEST_SIGN_WORKERS is invalid."""

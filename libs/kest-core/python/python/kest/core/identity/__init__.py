@@ -7,6 +7,7 @@ from kest.core.identity.providers.lazy import LazySigningProvider
 from kest.core.identity.providers.local import (
     LocalEd25519Provider,
     MockIdentityProvider,
+    RustEd25519Provider,
     StaticIdentity,
 )
 from kest.core.identity.providers.oidc import OIDCIdentity
@@ -58,6 +59,7 @@ __all__ = [
     "OIDCIdentity",
     "StaticIdentity",
     "LocalEd25519Provider",
+    "RustEd25519Provider",
     "MockIdentityProvider",
     "LazySigningProvider",
 ]

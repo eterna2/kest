@@ -110,6 +110,17 @@ permit(principal, action, resource) when {
 
 ---
 
+### B-04: OTel Baggage Propagation Loss in ThreadPoolExecutor
+
+**Component:** `libs/kest-core/python/python/kest/core/decorators.py`  
+**Spec reference:** F-CP-05 (baggage must propagate reliably downstream)  
+**Symptom:** In the GIL-free Rust signing path, OpenTelemetry baggage (`kest.user`, `kest.agent`) was silently omitted from JWS labels. The baggage was completely lost when execution offloaded to a background thread to prevent event loop blocking. This caused `403 Forbidden` errors in downstream hops.  
+**Root cause:** Python `contextvars` (which underpin OTel baggage) are thread-local and coroutine-local. `asyncio.get_running_loop().run_in_executor()` runs the target function in a bare thread without propagating the caller's context variables. Any read or write of OTel baggage inside the background thread operated with a fresh, empty context.  
+**Fix (2026-04-12):** Explicitly capture the context before offloading with `cv = contextvars.copy_context()` and execute the background operation within it via `cv.run()`.  
+**Lesson:** Any offloading to `ThreadPoolExecutor` or `ProcessPoolExecutor` inside a Python async context MUST explicitly pass and run within `contextvars.copy_context()` if it interacts with OpenTelemetry, tracing, or logging frameworks that rely on ContextVars.
+
+---
+
 ## 4. Spec Gaps and Deviations
 
 ### D-01: Baggage Key Naming — RESOLVED (2026-04-11)
@@ -249,7 +260,9 @@ This requires adding a `RustNativeIdentityProvider` pyclass that holds an `ed255
 
 **Tracking:** [eterna2/kest#11](https://github.com/eterna2/kest/issues/11)
 
-**Current guidance:** In production, use the Python backend (`KEST_BACKEND=python`) unless running single-threaded or you have measured Rust is faster in your specific workload.
+**Fixed (2026-04-11):** Implemented `RustEd25519Provider` (A-02-A). Local Ed25519 signing is now performed entirely in Rust using the `ed25519-dalek` crate. The `sign_entry` function in `lib.rs` detects the native provider and executes canonicalization + signing in a single `py.allow_threads` block. This eliminates GIL re-acquisition for local signing, achieving linear scaling under thread contention.
+
+**Current guidance:** For high-throughput multithreaded signing, use `RustEd25519Provider` with the Rust backend. SPIREProvider still requires GIL re-acquisition (due to the SPIFFE socket Python callback) and remains a bottleneck under extreme contention.
 
 ---
 
@@ -521,3 +534,42 @@ await mw(scope, noop_receive, noop_send)
 ```
 
 **Symptom if wrong:** Test passes trivially because `captured` is empty — the lambda was called but returned `None`, which is awaited without error, and no baggage was captured.
+
+---
+
+### T-10: PyO3 `#[pyclass(subclass)]` — Use `__new__` Not `__init__` in Python Subclasses
+
+**File:** `libs/kest-core/python/python/kest/core/identity/providers/local.py` — `RustEd25519Provider`
+
+PyO3's `#[new]` maps to Python `__new__`, **not** `__init__`. When a Python class subclasses a PyO3 `#[pyclass(subclass)]` (e.g., `RustNativeIdentityProvider`), calling `super().__init__(args...)` will **not** reach the Rust constructor — due to MRO, it routes through `IdentityProvider`, `ABC`, and reaches `object.__init__()`, which does not accept arguments.
+
+**Wrong approach (generates `TypeError: object.__init__() takes exactly one argument`):**
+
+```python
+class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
+    def __init__(self, private_key_bytes: bytes, principal: str):
+        super().__init__(private_key_bytes, principal)  # BUG: routes to object.__init__
+```
+
+**Correct approach — override `__new__` to invoke the Rust constructor:**
+
+```python
+class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
+    def __new__(cls, private_key_bytes: bytes, principal: str = "..."):
+        # Explicitly routes to the PyO3 #[new] constructor, bypassing MRO ambiguity.
+        return RustNativeIdentityProvider.__new__(cls, private_key_bytes, principal)
+
+    def __init__(self, private_key_bytes: bytes, principal: str = "..."):
+        pass  # No-op: __new__ handled all Rust initialization.
+```
+
+**Symptom:** `TypeError: object.__init__() takes exactly one argument (the instance to initialize)` when constructing any `RustEd25519Provider` instance.
+
+**Discovered during:** Rebase of PR #35 onto main (2026-04-12). Jules generated the subclass with `pass` in `__init__` (which avoids the TypeError but leaves the Rust struct uninitialized), and the initial fix attempt used `super().__init__()` which routes to `object.__init__()`.
+
+### T-11: JCS Sorting Discrepancy (Rust vs Python)
+- **Problem**: Bit-for-bit JWS equivalence failed for labels containing control characters (e.g., `\x1f`).
+- **Root Cause**: `serde_jcs` (v0.1.0) is **abandoned** and violates RFC 8785 §3.2.3. The RFC requires sorting by raw (unescaped) UTF-16 code unit values. `serde_jcs` incorrectly sorted by the JSON-escaped representation (treating `\u001f` as `\` + `u` + ...), causing `\x1f` (U+001F = 31) to sort *after* `"0"` (U+0030 = 48) instead of before it.
+- **Fix**: Replaced `serde_jcs` with `serde_json_canonicalizer` (v0.2.0+) in both `libs/kest-core/rust/Cargo.toml` and `libs/kest-core/python/Cargo.toml`. The new crate explicitly sort keys as UTF-16 code unit arrays (`sorting_key: Vec<u16>`) as mandated by the RFC. Call sites updated to use `to_vec()` instead of `to_string()`.
+- **Impact**: The Hypothesis property-based test now passes with full Unicode coverage (excluding lone surrogates `Cs`, which are invalid per RFC 8785 / I-JSON).
+- **Files**: `canonical.rs`, `crypto.rs` (Rust core); `lib.rs` (PyO3 extension); both `Cargo.toml` files.

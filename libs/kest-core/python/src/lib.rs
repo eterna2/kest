@@ -4,6 +4,7 @@ use kest_core_rs::models::{
     KestEntry as CoreEntry, KestClassification, KestRuntime, PolicyContext, PolicyDeviation,
 };
 use std::collections::BTreeMap;
+use ed25519_dalek::{SigningKey, Signer};
 
 
 /// Converts a Python dict representing a PolicyContext into the Rust PolicyContext struct.
@@ -54,6 +55,36 @@ pub struct KestEntry {
     pub inner: CoreEntry,
 }
 
+#[pyclass(subclass)]
+pub struct RustNativeIdentityProvider {
+    pub signing_key: SigningKey,
+    #[pyo3(get)]
+    pub principal: String,
+}
+
+#[pymethods]
+impl RustNativeIdentityProvider {
+    #[new]
+    fn new(key_bytes: &[u8], principal: String) -> PyResult<Self> {
+        let key_array: [u8; 32] = key_bytes.try_into()
+            .map_err(|_| PyErr::new::<pyo3::exceptions::PyValueError, _>("Key must be 32 bytes"))?;
+        Ok(Self {
+            signing_key: SigningKey::from_bytes(&key_array),
+            principal,
+        })
+    }
+
+    fn public_key_bytes(&self) -> Vec<u8> {
+        self.signing_key.verifying_key().to_bytes().to_vec()
+    }
+
+    fn sign_payload(&self, payload: &[u8]) -> String {
+        use base64::Engine;
+        let signature = self.signing_key.sign(payload);
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature.to_bytes())
+    }
+}
+
 #[pymethods]
 impl KestEntry {
     #[new]
@@ -70,6 +101,7 @@ impl KestEntry {
         schema_version=None,
         runtime_name=None,
         runtime_version=None,
+        timestamp_ms=None,
         policy_context=None,
     ))]
     fn new(
@@ -86,6 +118,7 @@ impl KestEntry {
         schema_version: Option<String>,
         runtime_name: Option<String>,
         runtime_version: Option<String>,
+        timestamp_ms: Option<u64>,
         policy_context: Option<Bound<'_, PyDict>>,
     ) -> Self {
         let classification_enum = match classification.to_lowercase().as_str() {
@@ -93,6 +126,7 @@ impl KestEntry {
             "data" => KestClassification::Data,
             "critic" => KestClassification::Critic,
             "snapshot" => KestClassification::Snapshot,
+            "sanitizer" => KestClassification::Sanitizer,
             _ => KestClassification::System,
         };
 
@@ -100,6 +134,13 @@ impl KestEntry {
             .as_ref()
             .map(|d| py_dict_to_policy_context(py, d))
             .unwrap_or_default();
+
+        let ts = timestamp_ms.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64
+        });
 
         let inner = CoreEntry {
             schema_version: schema_version.unwrap_or_else(|| "0.3.0".to_string()),
@@ -111,10 +152,7 @@ impl KestEntry {
             parent_ids: parent_ids.unwrap_or_default(),
             classification: classification_enum,
             operation,
-            timestamp_ms: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64,
+            timestamp_ms: ts,
             input_hash: "".to_string(),
             content_hash: "".to_string(),
             environment: BTreeMap::new(),
@@ -170,6 +208,11 @@ impl KestEntry {
     #[getter]
     fn timestamp_ms(&self) -> u64 {
         self.inner.timestamp_ms
+    }
+
+    #[setter]
+    fn set_timestamp_ms(&mut self, val: u64) {
+        self.inner.timestamp_ms = val;
     }
 
     #[getter]
@@ -242,6 +285,24 @@ impl KestEntry {
 
 
 
+fn build_signing_input(inner: &CoreEntry, kid: Option<&str>) -> Result<String, String> {
+    use base64::Engine;
+    let json_val = serde_json::to_value(inner)
+        .map_err(|e| e.to_string())?;
+    let canonical = kest_core_rs::canonical::to_canonical_string(&json_val)
+        .map_err(|e| e)?;
+
+    let header = match kid {
+        Some(k) => serde_json::json!({"alg":"EdDSA","typ":"JWS","kid": k}),
+        None => serde_json::json!({"alg":"EdDSA","typ":"JWS"}),
+    };
+
+    let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json_canonicalizer::to_vec(&header).unwrap());
+    let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(canonical);
+    Ok(format!("{}.{}", header_b64, payload_b64))
+}
+
 #[pyfunction]
 fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult<String> {
     use base64::Engine;
@@ -249,28 +310,44 @@ fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult
     // Clone the inner Rust struct so we can drop the GIL safely.
     let inner = entry.inner.clone();
 
-    // Release the GIL for the heavy canonicalization work (pure Rust, no Python objects).
-    let signing_input = py.allow_threads(|| -> Result<String, String> {
-        let json_val = serde_json::to_value(&inner)
-            .map_err(|e| e.to_string())?;
-        let canonical = kest_core_rs::canonical::to_canonical_string(&json_val)
-            .map_err(|e| e)?;
-        let header = serde_json::json!({"alg":"EdDSA","typ":"JWS"});
-        let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
-            .encode(serde_jcs::to_string(&header).unwrap());
-        let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(canonical);
-        Ok(format!("{}.{}", header_b64, payload_b64))
+    // Check if provider is our native Rust provider (no GIL needed after this)
+    let native_provider: Option<(SigningKey, String)> = provider.bind(py)
+        .downcast::<RustNativeIdentityProvider>()
+        .ok()
+        .map(|p| {
+            let p = p.borrow();
+            (p.signing_key.clone(), p.principal.clone())
+        });
+
+    if let Some((signing_key, principal)) = native_provider {
+        // Entirely GIL-free path: canonicalize + sign in one allow_threads block
+        let jws = py.allow_threads(|| -> Result<String, String> {
+            let signing_input = build_signing_input(&inner, Some(&principal))?;
+            let sig = signing_key.sign(signing_input.as_bytes());
+            let sig_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(sig.to_bytes());
+            Ok(format!("{}.{}", signing_input, sig_b64))
+        }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+        return Ok(jws);
+    }
+
+    // Fallback: Python provider path (GIL re-acquisition, existing behaviour)
+    // Used for SPIREProvider and any custom Python providers.
+    let canonical = py.allow_threads(|| -> Result<Vec<u8>, String> {
+        let json_val = serde_json::to_value(&inner).map_err(|e| e.to_string())?;
+        kest_core_rs::canonical::to_canonical_vec(&json_val).map_err(|e| e.to_string())
     }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
 
-    // Re-acquire GIL to call the Python identity provider's sign_payload.
+    // Re-acquire GIL to call the Python identity provider's sign method.
+    // By contract, IdentityProvider.sign takes the raw canonical bytes 
+    // and returns a complete JWS string (header.payload.signature).
     let signature = Python::with_gil(|py2| {
-        let py_bytes = pyo3::types::PyBytes::new(py2, signing_input.as_bytes());
+        let py_bytes = pyo3::types::PyBytes::new(py2, &canonical);
         provider
-            .call_method1(py2, "sign_payload", (py_bytes,))
+            .call_method1(py2, "sign", (py_bytes,))
             .and_then(|r| r.extract::<String>(py2))
     })?;
 
-    Ok(format!("{}.{}", signing_input, signature))
+    Ok(signature)
 }
 
 
@@ -284,5 +361,6 @@ fn _core(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(version, m)?)?;
     m.add_function(wrap_pyfunction!(sign_entry, m)?)?;
     m.add_class::<KestEntry>()?;
+    m.add_class::<RustNativeIdentityProvider>()?;
     Ok(())
 }
