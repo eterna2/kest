@@ -6,6 +6,11 @@ mod tests {
 
     fn mock_entry(trust_score: i32) -> KestEntry {
         KestEntry {
+            schema_version: "0.3.0".to_string(),
+            runtime: crate::models::KestRuntime {
+                name: "kest-rust".to_string(),
+                version: "0.1.0".to_string(),
+            },
             entry_id: "id".to_string(),
             parent_ids: vec![],
             classification: crate::models::KestClassification::System,
@@ -21,6 +26,7 @@ mod tests {
             taints: vec![],
             trust_score,
             metadata: None,
+            policy_context: crate::models::PolicyContext::default(),
         }
     }
 
