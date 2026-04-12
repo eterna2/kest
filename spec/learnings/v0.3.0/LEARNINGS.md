@@ -253,58 +253,23 @@ This requires adding a `RustNativeIdentityProvider` pyclass that holds an `ed255
 
 ---
 
-### A-03: `Passport.accumulated_taints` and `trust_scores` Are Lazy-Cached Properties
+### A-03: `Passport.accumulated_taints` and `trust_scores` Are Lazy-Cached Properties — RESOLVED (2026-04-12)
 
 **File:** `models.py` — `Passport._get_parsed_entries()`  
 **Decision:** Parsing all JWS payloads in a passport on every `@kest_verified` call is O(n) in chain length. The parsed entries are cached in `_parsed_cache` and invalidated only when `entries` changes (via `add_signature()`).  
 **Why L1 Baggage is still a problem:** Even with caching, a 10-hop chain carries ~10 full JWS entries (~5KB raw, ~1.5KB compressed). Parsing is amortized, but the baggage size itself still triggers claim-check on very deep chains with incompressible (random-signed) data.
 
-**Weaknesses with the current approach:**
+**Resolved (2026-04-12, eterna2/kest#12):**
 
-1. **Snapshot comparison is O(n) on every property read.** `_get_parsed_entries()` compares `_entries_snapshot != self.entries` (a list equality check). For a 10-hop chain, this is a 10-element list comparison on every `trust_scores` or `accumulated_taints` read, even when nothing has changed. A version counter (`int`) would be O(1).
+> **A-03-I (RESOLVED):** Replaced list-snapshot comparison (`_entries_snapshot != self.entries`, O(n)) with integer version counter (`_cache_version != _version`, O(1)). The `_entries_snapshot` field was removed entirely.
 
-2. **`accumulated_taints` and `trust_scores` are recomputed from the full list on every property access.** After `_get_parsed_entries()` returns the cached list, `accumulated_taints` still iterates all entries to build the set union. A incrementally-maintained (`_taints_cache: frozenset`, `_min_trust: int`) would be O(1) per read after the first.
+> **A-03-II (RESOLVED):** `accumulated_taints` now returns `frozenset` in O(1) — maintained incrementally in `add_signature()`. New `min_trust_score` property returns `int` in O(1). `trust_scores` (per-entry list) still requires the parsed cache. The `frozenset` return type is an intentional minor API change — callers that need mutation must use `set(passport.accumulated_taints)`. The one internal caller in `decorators.py` was updated.
 
-3. **Dataclass `__eq__` is broken by the cache fields.** `_parsed_cache` is excluded via `compare=False`, but mutating it means two `Passport` instances with the same entries but different cache states are equal. This is correct but fragile if the pattern is extended.
+> **A-03-III (RESOLVED):** `@dataclass(slots=True)` added. No subclasses of `Passport` exist. Confirmed compatible with Python 3.11+ (pinned in `.prototools`).
 
-**Improvement Options:**
+**`__post_init__` note:** `Passport(entries=[...])` (used by `merge()`, `deserialize()`, and direct construction) triggers `__post_init__()` which rebuilds `_taints_cache`, `_min_trust_cache`, and `_version` from the initial entries. This ensures correct caches regardless of construction path.
 
-> **A-03-I (low effort, immediate):** Replace list-snapshot comparison with a version counter:
-
-```python
-@dataclass
-class Passport:
-    entries: List[str] = field(default_factory=list)
-    _version: int = field(default=0, repr=False, compare=False)
-    _parsed_cache: ... = field(default=None, repr=False, compare=False)
-
-    def _get_parsed_entries(self):
-        if self._parsed_cache is None or self._cache_version != self._version:
-            self._parsed_cache = [self._decode_payload(e) for e in self.entries]
-            self._cache_version = self._version
-        return self._parsed_cache
-
-    def add_signature(self, signature: str):
-        self.entries.append(signature)
-        self._version += 1  # O(1) invalidation
-```
-
-> **A-03-II (medium effort):** Maintain `accumulated_taints` and `min_trust_score` as incrementally-updated fields on `add_signature`:
-
-```python
-def add_signature(self, signature: str):
-    payload = self._decode_payload(signature)  # parse once
-    self.entries.append(signature)
-    self._taints |= set(payload.get("taints", []))  # O(1) incremental union
-    self._min_trust = min(self._min_trust, payload.get("trust_score", 100))
-    self._version += 1
-```
-
-This makes `accumulated_taints` and `min_trust` O(1) property reads and moves the O(1) parse work into `add_signature` — which is already O(n) string work anyway.
-
-> **A-03-III (medium effort):** Add `__slots__ = True` (Python 3.10+ dataclass option) to `Passport`. For a high-throughput service creating thousands of Passport objects per second, `__slots__` reduces per-instance memory by ~40–60 bytes and speeds up attribute access. This requires moving `_parsed_cache`, `_entries_snapshot`, and similar private fields to slotted fields. **Note:** `__slots__` and `dataclass(frozen=True)` are compatible; `__slots__` and mutable cache fields are also compatible (slots don’t imply immutability).
-
-> **A-03-IV (architectural, high effort):** The real long-term fix for L1 baggage explosion is not parsing optimization but **payload slimming** — the Passport wire format sends full JWS entries including headers and large policy context fields. A dedicated "summary" baggage key (`kest.summary`) could carry only `[entry_id, trust_score, taints[], chain_tip]` per hop, with full JWS available via claim-check lookup. This would reduce the per-hop baggage contribution from ~500 bytes to ~80 bytes, pushing the inline threshold from hop 8 to ~52 hops.
+**Test coverage (2026-04-12):** `models_test.py` — `test_passport_version_counter_invalidation`, `test_passport_accumulated_taints_returns_frozenset`, `test_passport_accumulated_taints_incremental`, `test_passport_accumulated_taints_empty`, `test_passport_min_trust_score_property`, `test_passport_min_trust_score_empty`, `test_passport_slots_no_dict`, `test_passport_deserialize_rebuilds_caches`, `test_passport_merge_rebuilds_caches`.
 
 **Tracking:** [eterna2/kest#12](https://github.com/eterna2/kest/issues/12)
 

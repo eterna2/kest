@@ -203,6 +203,116 @@ def test_passport_add_signature():
 
 
 # ===========================================================================
+# Passport Cache Optimization (A-03-I/II/III, Issue #12)
+# ===========================================================================
+
+
+def _make_jws(trust_score: int = 100, taints: list | None = None) -> str:
+    """Build a minimal valid JWS with the given trust_score and taints."""
+    payload: dict = {"trust_score": trust_score}
+    if taints:
+        payload["taints"] = taints
+    payload_b64 = base64.urlsafe_b64encode(json.dumps(payload).encode()).decode()
+    return f"h.{payload_b64}.s"
+
+
+def test_passport_version_counter_invalidation():
+    """A-03-I: Parsed cache uses O(1) integer version comparison, not O(n) list equality."""
+    p = Passport()
+    jws1 = _make_jws(trust_score=90, taints=["t1"])
+    p.add_signature(jws1)
+
+    # First read populates cache
+    _ = p.trust_scores
+    cache_after_first = p._parsed_cache
+
+    # Second read returns same cache object (no re-parse)
+    _ = p.trust_scores
+    assert p._parsed_cache is cache_after_first, (
+        "Cache must not re-parse on repeated read"
+    )
+
+    # add_signature bumps version, next read re-parses
+    jws2 = _make_jws(trust_score=80)
+    p.add_signature(jws2)
+    _ = p.trust_scores
+    assert p._parsed_cache is not cache_after_first, (
+        "Cache must re-parse after add_signature"
+    )
+
+
+def test_passport_accumulated_taints_returns_frozenset():
+    """A-03-II: accumulated_taints returns frozenset (immutable, O(1))."""
+    p = Passport()
+    p.add_signature(_make_jws(taints=["pii", "user_input"]))
+    result = p.accumulated_taints
+    assert isinstance(result, frozenset), (
+        f"accumulated_taints must return frozenset, got {type(result).__name__}"
+    )
+    assert result == {"pii", "user_input"}
+
+
+def test_passport_accumulated_taints_incremental():
+    """A-03-II: Incremental accumulation matches full recomputation."""
+    p = Passport()
+    p.add_signature(_make_jws(taints=["t1", "t2"]))
+    p.add_signature(_make_jws(taints=["t2", "t3"]))
+    p.add_signature(_make_jws(taints=["t4"]))
+    assert p.accumulated_taints == frozenset({"t1", "t2", "t3", "t4"})
+
+
+def test_passport_accumulated_taints_empty():
+    """A-03-II: Empty passport returns empty frozenset."""
+    p = Passport()
+    assert p.accumulated_taints == frozenset()
+    assert isinstance(p.accumulated_taints, frozenset)
+
+
+def test_passport_min_trust_score_property():
+    """A-03-II: min_trust_score returns the minimum across all entries."""
+    p = Passport()
+    p.add_signature(_make_jws(trust_score=90))
+    p.add_signature(_make_jws(trust_score=40))
+    p.add_signature(_make_jws(trust_score=70))
+    assert p.min_trust_score == 40
+
+
+def test_passport_min_trust_score_empty():
+    """A-03-II: Empty passport returns 100 (maximum trust)."""
+    p = Passport()
+    assert p.min_trust_score == 100
+
+
+def test_passport_slots_no_dict():
+    """A-03-III: Passport uses __slots__ — no __dict__ attribute."""
+    p = Passport()
+    assert not hasattr(p, "__dict__"), (
+        "Passport must use __slots__ (no __dict__ attribute)"
+    )
+
+
+def test_passport_deserialize_rebuilds_caches():
+    """Deserialize (via __post_init__) must rebuild incremental taint/trust caches."""
+    jws1 = _make_jws(trust_score=60, taints=["pii"])
+    jws2 = _make_jws(trust_score=80, taints=["external"])
+    original = Passport(entries=[jws1, jws2])
+    serialized = original.serialize()
+
+    restored = Passport.deserialize(serialized)
+    assert restored.accumulated_taints == frozenset({"pii", "external"})
+    assert restored.min_trust_score == 60
+
+
+def test_passport_merge_rebuilds_caches():
+    """Merge (via __post_init__) must rebuild incremental taint/trust caches."""
+    p1 = Passport(entries=[_make_jws(trust_score=50, taints=["t1"])])
+    p2 = Passport(entries=[_make_jws(trust_score=70, taints=["t2"])])
+    merged = Passport.merge(p1, p2)
+    assert merged.accumulated_taints == frozenset({"t1", "t2"})
+    assert merged.min_trust_score == 50
+
+
+# ===========================================================================
 # PassportVerifier (F-PA-04 – F-PA-07)
 # ===========================================================================
 
