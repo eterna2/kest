@@ -1,2 +1,2 @@
 :HL["/kest/stable/_next/static/chunks/06fcy~27nmahe.css","style"]
-0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"concepts","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"RTE9dBg2_mNuQGfmYqM4c"}
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"concepts","param":null,"prefetchHints":0,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}}}},"staleTime":300,"buildId":"iArEE7GI7NDw_b2h5jD2Z"}
