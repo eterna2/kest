@@ -22,9 +22,14 @@ def test_mock_identity_provider():
     assert provider.get_identity() == "spiffe://test"
 
     sig = provider.sign(b"hello")
-    # sign() now returns ONLY the base64url signature portion (no dots),
-    # since the Rust bridge appends it as: header.payload.<return-value>.
-    # Verify it decodes to 32 bytes (SHA-256 HMAC) and contains no dots.
-    assert "." not in sig, "sign() must return only the signature segment (no dots)"
-    decoded = base64.urlsafe_b64decode(sig + "=" * (4 - len(sig) % 4))
-    assert len(decoded) == 32, "Mock signature must be 32 bytes (SHA-256 output)"
+    # sign() now returns a full JWS (header.payload.signature)
+    parts = sig.split(".")
+    assert len(parts) == 3, "sign() must return a full JWS"
+    
+    header = json.loads(
+        base64.urlsafe_b64decode(parts[0] + "=" * (4 - len(parts[0]) % 4)).decode()
+    )
+    assert header["kid"] == "spiffe://test"
+    
+    decoded_sig = base64.urlsafe_b64decode(parts[2] + "=" * (4 - len(parts[2]) % 4))
+    assert len(decoded_sig) == 32, "Mock signature must be 32 bytes (SHA-256 output)"

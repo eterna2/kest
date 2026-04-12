@@ -110,6 +110,17 @@ permit(principal, action, resource) when {
 
 ---
 
+### B-04: OTel Baggage Propagation Loss in ThreadPoolExecutor
+
+**Component:** `libs/kest-core/python/python/kest/core/decorators.py`  
+**Spec reference:** F-CP-05 (baggage must propagate reliably downstream)  
+**Symptom:** In the GIL-free Rust signing path, OpenTelemetry baggage (`kest.user`, `kest.agent`) was silently omitted from JWS labels. The baggage was completely lost when execution offloaded to a background thread to prevent event loop blocking. This caused `403 Forbidden` errors in downstream hops.  
+**Root cause:** Python `contextvars` (which underpin OTel baggage) are thread-local and coroutine-local. `asyncio.get_running_loop().run_in_executor()` runs the target function in a bare thread without propagating the caller's context variables. Any read or write of OTel baggage inside the background thread operated with a fresh, empty context.  
+**Fix (2026-04-12):** Explicitly capture the context before offloading with `cv = contextvars.copy_context()` and execute the background operation within it via `cv.run()`.  
+**Lesson:** Any offloading to `ThreadPoolExecutor` or `ProcessPoolExecutor` inside a Python async context MUST explicitly pass and run within `contextvars.copy_context()` if it interacts with OpenTelemetry, tracing, or logging frameworks that rely on ContextVars.
+
+---
+
 ## 4. Spec Gaps and Deviations
 
 ### D-01: Baggage Key Naming — RESOLVED (2026-04-11)
@@ -556,3 +567,9 @@ class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
 
 **Discovered during:** Rebase of PR #35 onto main (2026-04-12). Jules generated the subclass with `pass` in `__init__` (which avoids the TypeError but leaves the Rust struct uninitialized), and the initial fix attempt used `super().__init__()` which routes to `object.__init__()`.
 
+### T-11: JCS Sorting Discrepancy (Rust vs Python)
+- **Problem**: Bit-for-bit JWS equivalence failed for labels containing control characters (e.g., `\x1f`).
+- **Root Cause**: `serde_jcs` (v0.1.0) is **abandoned** and violates RFC 8785 §3.2.3. The RFC requires sorting by raw (unescaped) UTF-16 code unit values. `serde_jcs` incorrectly sorted by the JSON-escaped representation (treating `\u001f` as `\` + `u` + ...), causing `\x1f` (U+001F = 31) to sort *after* `"0"` (U+0030 = 48) instead of before it.
+- **Fix**: Replaced `serde_jcs` with `serde_json_canonicalizer` (v0.2.0+) in both `libs/kest-core/rust/Cargo.toml` and `libs/kest-core/python/Cargo.toml`. The new crate explicitly sort keys as UTF-16 code unit arrays (`sorting_key: Vec<u16>`) as mandated by the RFC. Call sites updated to use `to_vec()` instead of `to_string()`.
+- **Impact**: The Hypothesis property-based test now passes with full Unicode coverage (excluding lone surrogates `Cs`, which are invalid per RFC 8785 / I-JSON).
+- **Files**: `canonical.rs`, `crypto.rs` (Rust core); `lib.rs` (PyO3 extension); both `Cargo.toml` files.

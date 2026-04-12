@@ -42,7 +42,11 @@ class StaticIdentity(IdentityProvider):
         """
         header = {"alg": "EdDSA", "typ": "JWS", "kid": self.principal}
         header_b64 = (
-            base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
+            base64.urlsafe_b64encode(
+                json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
+            )
+            .decode()
+            .rstrip("=")
         )
         payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
 
@@ -62,7 +66,6 @@ class LocalEd25519Provider(StaticIdentity):
     def __init__(self, principal: str = "spiffe://kest.internal/local-workload"):
         """Initializes with a default SPIFFE-formatted ID."""
         super().__init__(principal)
-
 
 
 class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
@@ -124,9 +127,13 @@ class RustEd25519Provider(RustNativeIdentityProvider, IdentityProvider):
         Returns:
             str: A complete JWS compact serialization (header.payload.sig).
         """
-        header = {"alg": "EdDSA", "typ": "JWS", "kid": self.principal}
+        header = {"alg": "EdDSA", "kid": self.principal, "typ": "JWS"}
         header_b64 = (
-            base64.urlsafe_b64encode(json.dumps(header).encode()).decode().rstrip("=")
+            base64.urlsafe_b64encode(
+                json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
+            )
+            .decode()
+            .rstrip("=")
         )
         payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
         signing_input = f"{header_b64}.{payload_b64}"
@@ -159,21 +166,26 @@ class MockIdentityProvider(IdentityProvider):
 
     def sign(self, payload: bytes) -> str:
         """
-        Returns only the signature portion of a mock JWS.
-
-        The Rust bridge (sign_kest_entry) constructs the full JWS as:
-          header_b64 . payload_b64 . <return-value-of-sign>
-        So this method MUST return only the signature segment — a structurally
-        valid base64url string — NOT a full JWS itself.
+        Returns a mock JWS for testing.
 
         Args:
-            payload: The binary payload to 'sign' (the signing input bytes
-                     passed by the Rust bridge: header_b64.payload_b64).
+            payload: The binary payload to 'sign'
 
         Returns:
-            str: A base64url-encoded mock signature (no dots).
+            str: A structurally valid JWS (header.payload.sig).
         """
+        header = {"alg": "mock", "kid": self.principal, "typ": "JWS"}
+        header_b64 = (
+            base64.urlsafe_b64encode(
+                json.dumps(header, separators=(",", ":"), sort_keys=True).encode()
+            )
+            .decode()
+            .rstrip("=")
+        )
+        payload_b64 = base64.urlsafe_b64encode(payload).decode().rstrip("=")
+        signing_input = f"{header_b64}.{payload_b64}".encode()
+        
         # Produce a deterministic, structurally valid base64url signature part.
-        # Using HMAC-SHA256 of the payload gives a constant-length 44-char output.
-        raw = hashlib.sha256(b"mock-key" + payload).digest()
-        return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+        raw = hashlib.sha256(b"mock-key" + signing_input).digest()
+        sig_b64 = base64.urlsafe_b64encode(raw).decode().rstrip("=")
+        return f"{header_b64}.{payload_b64}.{sig_b64}"

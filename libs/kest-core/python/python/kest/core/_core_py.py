@@ -1,7 +1,5 @@
-import base64
-import json
 import time
-from dataclasses import asdict, dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 import rfc8785
@@ -112,35 +110,7 @@ def sign_entry(entry: KestEntry, provider: Any) -> str:
 
     # Canonicalize and b64 encode payload
     canonical_payload = rfc8785.dumps(payload_dict)
-    payload_b64 = (
-        base64.urlsafe_b64encode(canonical_payload).decode("ascii").rstrip("=")
-    )
-
-    # Header
-    header = {"alg": "EdDSA", "typ": "JWS"}
-    header_b64 = (
-        base64.urlsafe_b64encode(
-            json.dumps(header, separators=(",", ":")).encode("ascii")
-        )
-        .decode("ascii")
-        .rstrip("=")
-    )
-
-    # Sign
-    signing_input = f"{header_b64}.{payload_b64}"
-    signature_bytes = provider.sign_payload(signing_input.encode("utf-8"))
-
-    # Check if signature_bytes is already returning a base64 string or bytes...
-    # In Rust `PyIdentityProvider`, it returns a String which is technically base64url encoded already, wait.
-    # The pure python implementation needs to just concatenate it.
-    if isinstance(signature_bytes, str):
-        sig_str = signature_bytes
-    else:
-        # if it's raw bytes, we must encode it. But `MockProvider` returns str, and `SPIREProvider.sign_payload` returns str?
-        sig_str = (
-            signature_bytes.decode()
-            if isinstance(signature_bytes, bytes)
-            else str(signature_bytes)
-        )
-
-    return f"{signing_input}.{sig_str}"
+    # Use the public `sign` method of the identity provider
+    # By contract, IdentityProvider.sign takes the raw canonical bytes 
+    # and returns a complete JWS string (header.payload.signature)
+    return provider.sign(canonical_payload)

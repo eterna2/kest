@@ -1,6 +1,5 @@
 import base64
 import json
-import json as stdlib_json
 
 import pytest
 
@@ -8,9 +7,11 @@ from kest.core._core_py import KestEntry, sign_entry, version
 
 
 class MockProvider:
-    def sign_payload(self, payload: bytes) -> str:
-        # Mock signature
-        return "mock_signature_b64"
+    def sign(self, payload: bytes) -> str:
+        # Mock full JWS
+        header_b64 = "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXUyJ9"
+        payload_b64 = base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+        return f"{header_b64}.{payload_b64}.mock_signature_b64"
 
     def verify_svid(self, svid: str) -> str:
         return "mock_subject"

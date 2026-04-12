@@ -544,12 +544,15 @@ def kest_verified(
                     )
                     raise PermissionError(f"Kest policies {policies} denied execution")
 
+                import contextvars
+
                 # Fix 6: Offload CPU-bound signing + baggage packing to thread pool
-                # This unblocks the event loop during Ed25519/canonicalization work.
-                # We use a bounded executor to prevent thread exhaustion (SPEC A-01-I).
+                # We use cv.run to ensure OTel ContextVars (baggage) propagate to the thread.
                 loop = asyncio.get_running_loop()
+                cv = contextvars.copy_context()
                 new_ctx = await loop.run_in_executor(
                     _get_sign_executor(),
+                    cv.run,
                     _execute_core_post_auth,
                     state,
                     func.__name__,

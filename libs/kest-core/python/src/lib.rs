@@ -101,6 +101,7 @@ impl KestEntry {
         schema_version=None,
         runtime_name=None,
         runtime_version=None,
+        timestamp_ms=None,
         policy_context=None,
     ))]
     fn new(
@@ -117,6 +118,7 @@ impl KestEntry {
         schema_version: Option<String>,
         runtime_name: Option<String>,
         runtime_version: Option<String>,
+        timestamp_ms: Option<u64>,
         policy_context: Option<Bound<'_, PyDict>>,
     ) -> Self {
         let classification_enum = match classification.to_lowercase().as_str() {
@@ -124,6 +126,7 @@ impl KestEntry {
             "data" => KestClassification::Data,
             "critic" => KestClassification::Critic,
             "snapshot" => KestClassification::Snapshot,
+            "sanitizer" => KestClassification::Sanitizer,
             _ => KestClassification::System,
         };
 
@@ -131,6 +134,13 @@ impl KestEntry {
             .as_ref()
             .map(|d| py_dict_to_policy_context(py, d))
             .unwrap_or_default();
+
+        let ts = timestamp_ms.unwrap_or_else(|| {
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as u64
+        });
 
         let inner = CoreEntry {
             schema_version: schema_version.unwrap_or_else(|| "0.3.0".to_string()),
@@ -142,10 +152,7 @@ impl KestEntry {
             parent_ids: parent_ids.unwrap_or_default(),
             classification: classification_enum,
             operation,
-            timestamp_ms: std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() as u64,
+            timestamp_ms: ts,
             input_hash: "".to_string(),
             content_hash: "".to_string(),
             environment: BTreeMap::new(),
@@ -201,6 +208,11 @@ impl KestEntry {
     #[getter]
     fn timestamp_ms(&self) -> u64 {
         self.inner.timestamp_ms
+    }
+
+    #[setter]
+    fn set_timestamp_ms(&mut self, val: u64) {
+        self.inner.timestamp_ms = val;
     }
 
     #[getter]
@@ -273,21 +285,20 @@ impl KestEntry {
 
 
 
-fn build_signing_input(inner: &CoreEntry, principal: Option<&str>) -> Result<String, String> {
+fn build_signing_input(inner: &CoreEntry, kid: Option<&str>) -> Result<String, String> {
     use base64::Engine;
     let json_val = serde_json::to_value(inner)
         .map_err(|e| e.to_string())?;
     let canonical = kest_core_rs::canonical::to_canonical_string(&json_val)
         .map_err(|e| e)?;
 
-    let header = if let Some(p) = principal {
-        serde_json::json!({"alg":"EdDSA","typ":"JWS", "kid": p})
-    } else {
-        serde_json::json!({"alg":"EdDSA","typ":"JWS"})
+    let header = match kid {
+        Some(k) => serde_json::json!({"alg":"EdDSA","typ":"JWS","kid": k}),
+        None => serde_json::json!({"alg":"EdDSA","typ":"JWS"}),
     };
 
     let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(serde_jcs::to_string(&header).unwrap());
+        .encode(serde_json_canonicalizer::to_vec(&header).unwrap());
     let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(canonical);
     Ok(format!("{}.{}", header_b64, payload_b64))
 }
@@ -321,22 +332,22 @@ fn sign_entry(py: Python<'_>, entry: &KestEntry, provider: PyObject) -> PyResult
 
     // Fallback: Python provider path (GIL re-acquisition, existing behaviour)
     // Used for SPIREProvider and any custom Python providers.
-    let signing_input = py.allow_threads(|| build_signing_input(&inner, None))
-        .map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
+    let canonical = py.allow_threads(|| -> Result<Vec<u8>, String> {
+        let json_val = serde_json::to_value(&inner).map_err(|e| e.to_string())?;
+        kest_core_rs::canonical::to_canonical_vec(&json_val).map_err(|e| e.to_string())
+    }).map_err(|e| PyErr::new::<pyo3::exceptions::PyRuntimeError, _>(e))?;
 
-    // Re-acquire GIL to call the Python identity provider's sign_payload.
+    // Re-acquire GIL to call the Python identity provider's sign method.
+    // By contract, IdentityProvider.sign takes the raw canonical bytes 
+    // and returns a complete JWS string (header.payload.signature).
     let signature = Python::with_gil(|py2| {
-        let py_bytes = pyo3::types::PyBytes::new(py2, signing_input.as_bytes());
+        let py_bytes = pyo3::types::PyBytes::new(py2, &canonical);
         provider
-            .call_method1(py2, "sign_payload", (py_bytes,))
+            .call_method1(py2, "sign", (py_bytes,))
             .and_then(|r| r.extract::<String>(py2))
     })?;
 
-    if signature.contains('.') {
-        Ok(signature)
-    } else {
-        Ok(format!("{}.{}", signing_input, signature))
-    }
+    Ok(signature)
 }
 
 

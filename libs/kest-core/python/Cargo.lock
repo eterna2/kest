@@ -275,8 +275,8 @@ dependencies = [
  "kest-core-rs",
  "pyo3",
  "rand",
- "serde_jcs",
  "serde_json",
+ "serde_json_canonicalizer",
 ]
 
 [[package]]
@@ -286,8 +286,8 @@ dependencies = [
  "base64",
  "ed25519-dalek",
  "serde",
- "serde_jcs",
  "serde_json",
+ "serde_json_canonicalizer",
  "sha2",
  "thiserror",
  "uuid",
@@ -542,17 +542,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_jcs"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cacecf649bc1a7c5f0e299cc813977c6a78116abda2b93b1ee01735b71ead9a8"
-dependencies = [
- "ryu-js",
- "serde",
- "serde_json",
-]
-
-[[package]]
 name = "serde_json"
 version = "1.0.149"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -563,6 +552,17 @@ dependencies = [
  "serde",
  "serde_core",
  "zmij",
+]
+
+[[package]]
+name = "serde_json_canonicalizer"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8a4c2ea923e1d3d2c03bd1299b7061e015f3bd9dab5a47b34283df9d8ab36a1"
+dependencies = [
+ "ryu-js",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

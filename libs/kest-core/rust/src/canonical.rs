@@ -45,6 +45,11 @@ mod tests {
     }
 }
 
+pub fn to_canonical_vec(value: &serde_json::Value) -> Result<Vec<u8>, String> {
+    serde_json_canonicalizer::to_vec(value).map_err(|e| e.to_string())
+}
+
 pub fn to_canonical_string(value: &serde_json::Value) -> Result<String, String> {
-    serde_jcs::to_string(value).map_err(|e| e.to_string())
+    to_canonical_vec(value)
+        .and_then(|b| String::from_utf8(b).map_err(|e| e.to_string()))
 }

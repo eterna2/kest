@@ -57,7 +57,7 @@ pub fn sign_kest_entry(
     // Let's assume a simple EdDSA header: {"alg":"EdDSA","typ":"JWS"}
     let header = serde_json::json!({"alg":"EdDSA","typ":"JWS"});
     let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
-        .encode(serde_jcs::to_string(&header).unwrap());
+        .encode(serde_json_canonicalizer::to_vec(&header).unwrap());
     
     let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
         .encode(canonical_json);
