@@ -12,6 +12,7 @@ dependencies = [
     "opentelemetry-exporter-otlp>=1.41.0",
     "httpx>=0.28.1",
     "uuid-utils>=0.14.1",
+    "rfc8785>=0.1.4",
     "moto>=5.1.22",
     "regopy>=1.4.0",
     "pytest-cov>=7.1.0",
@@ -36,9 +37,6 @@ cedar = [
 ]
 rego = [
     "regopy>=0.3.0",
-]
-python-backend = [
-    "rfc8785>=0.1.4",
 ]
 
 [tool.maturin]

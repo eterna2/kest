@@ -1062,6 +1062,7 @@ dependencies = [
     { name = "opentelemetry-sdk" },
     { name = "pytest-cov" },
     { name = "regopy" },
+    { name = "rfc8785" },
     { name = "uuid-utils" },
 ]
 
@@ -1075,9 +1076,6 @@ cedar = [
 ]
 opa = [
     { name = "opa-python-client" },
-]
-python-backend = [
-    { name = "rfc8785" },
 ]
 rego = [
     { name = "regopy" },
@@ -1119,11 +1117,11 @@ requires-dist = [
     { name = "pytest-cov", specifier = ">=7.1.0" },
     { name = "regopy", specifier = ">=1.4.0" },
     { name = "regopy", marker = "extra == 'rego'", specifier = ">=0.3.0" },
-    { name = "rfc8785", marker = "extra == 'python-backend'", specifier = ">=0.1.4" },
+    { name = "rfc8785", specifier = ">=0.1.4" },
     { name = "spiffe", marker = "extra == 'spiffe'", specifier = ">=0.2.6" },
     { name = "uuid-utils", specifier = ">=0.14.1" },
 ]
-provides-extras = ["spiffe", "aws", "opa", "cedar", "rego", "python-backend"]
+provides-extras = ["spiffe", "aws", "opa", "cedar", "rego"]
 
 [package.metadata.requires-dev]
 dev = [
