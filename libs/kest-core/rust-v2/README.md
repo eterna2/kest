@@ -12,14 +12,64 @@ This README is an authoritative reference designed for both **Human Engineers** 
 
 ## 🏗 Why `kest-runtime-rs` Exists
 
-During load-testing of the standard Python implementation (V1), Kest experienced a "GIL Contention Cliff" when evaluating concurrent requests exceeding ~190 RPS. The fundamental bottleneck was the sequential locking caused by heavy I/O and CPU operations bound to the interpreter:
-- **Trace Context Reads/Writes:** Constantly unpacking strings from OpenTelemetry Baggage over C-FFI.
-- **REST/RPC Operations:** Calling out to Cedar or Open Policy Agent (OPA) validation engines. 
-- **Cryptography:** JWS signing loops and payload canonicalization.
+During load-testing of the standard Python implementation (V1), Kest experienced a "GIL Contention Cliff". Heavy I/O bound to the interpreter—specifically OpenTelemetry Baggage context loading, Cedar/OPA policy evaluations, and JWS cryptographic signing—resulted in bottlenecked sequential locking.
 
-`kest-runtime-rs` moves *all* of these operations strictly into a native Rust orchestration pipeline. High-level runtime environments (like Python or JavaScript) only interact with Kest to initiate a standard `PipelineRequest`, after which the native code drops the interpreter lock, drives concurrency, and handles security resolution autonomously. Throughput successfully scales linearly past 3,000+ RPS.
+`kest-runtime-rs` solves this by moving *all* of these operations strictly into a native Rust orchestration pipeline.
+
+1. High-level runtime environments (like Python or JavaScript) only interact with Kest to initiate a standard `PipelineRequest`.
+2. The PyO3 extension drops the Global Interpreter Lock (GIL).
+3. The native Rust code drives concurrency and handles security resolution autonomously.
+4. Python eventually regains the GIL strictly to ingest the returned boolean decision.
+
+Throughput successfully scales linearly past 3,000+ RPS, avoiding heavy native-to-python serialized switches.
 
 ---
+
+## 🔄 The V2 Execution Lifecycle
+
+The execution path of a `@kest_verified` call traversing the `kest-runtime-rs` boundary involves precise sub-task orchestration.
+
+```mermaid
+sequenceDiagram
+    participant Python as Python Decorator (Host)
+    participant PyO3 as PyO3 FFI Boundary
+    participant Pipeline as Rust KestPipeline
+    participant Engine as Rust PolicyEngine (Cedar/OPA)
+    participant Provider as Rust IdentityProvider
+
+    Python->>PyO3: Execute `@kest_verified(req_dict)`
+    note over Python,PyO3: Extracts payload,<br/>maps user context,<br/>and stringifies values.
+
+    PyO3->>PyO3: Parses `PyDict` into `HashMap<String, String>`
+    PyO3->>Pipeline: Initializes `PipelineRequest`
+
+    activate Pipeline
+    note over Pipeline: Execution runs natively (GIL release)
+    
+    Pipeline->>Pipeline: 1. Decode ambient OTel Baggage (kest.passport_z)
+    Pipeline->>Pipeline: 2. Parse Parent DAG IDs & Trust Scores
+    Pipeline->>Pipeline: 3. Merge `added_taints`, delete `removed_taints`
+    Pipeline->>Pipeline: 4. Merge mapped `context` array into `environment`
+    
+    Pipeline->>Engine: `evaluate(context_map, origin)`
+    activate Engine
+    Engine-->>Pipeline: Return Boolean Decision
+    deactivate Engine
+    
+    Pipeline->>Provider: Request DAG cryptographic signature
+    activate Provider
+    Provider-->>Pipeline: Return signed JWS & Public Key
+    deactivate Provider
+    
+    Pipeline->>Pipeline: Assemble nested `KestEntry`
+    Pipeline->>Pipeline: Compress nested payload for Claim-Check DB if > 4096 bytes
+    
+    Pipeline-->>PyO3: Return native JSON result String
+    deactivate Pipeline
+    
+    PyO3-->>Python: Load JSON into Dict and return control
+    note over Python,PyO3: Proceed to execute wrapped function
+```
 
 ## 🗺 Architecture Overview
 
@@ -27,15 +77,9 @@ The crate is structured strictly across distinct responsibilities:
 
 1. **Pipeline Orchestrator (`src/pipeline.rs`)**: 
    The `KestPipeline` struct handles the data lifecycle. It takes a transient `PipelineRequest` and executes the standardized CARTA validation trace.
-   - Decodes ambient OpenTelemetry baggage `kest.passport_z`.
-   - Merges newly `added_taints` and deletes `removed_taints`.
-   - Bootstraps or computes the weakest-link CARTA `trust_score` dynamic evaluation.
-   - Synthesizes the exact payload requested by the external Verification Engines.
-   - Signs the newly verified entry via the generic `IdentityProvider` trait interface.
-   - Assembles and compresses the next inline baggage representation, reverting to `Claim-Check` persistence if standard HTTP header thresholds (> 4096 bytes) are breached.
-
+   
 2. **Policy Engines (`src/engines/`)**: 
-   These are execution drivers adhering to the `PolicyEngine` Rust trait, capable of mapping the verification attributes against target deployment constraints.
+   Execution drivers adhering to the `PolicyEngine` Rust trait, capable of mapping the verification attributes against target deployment constraints.
    - `opa.rs`: Open Policy Agent driver (makes standard HTTP POSTs formatting the `EvaluatorPayload`).
    - `cedar.rs`: Cedar Local/Remote driver (constructs the AWS Cedar Principal/Action/Resource schema mapping).
    - `mock.rs`: Test engine that defaults to pass/fail primitives.
@@ -54,12 +98,14 @@ Kest specification (`F-AE-13`) dictates that environments are carried globally d
 However, Policy Engines expect constrained, strictly-typed schemas for logical evaluation operations (e.g. `trust_score > 50` natively in Cedar requires an Integer resolution).
 
 ### The Implementation Guardrails
-To prevent constraint errors when interacting with Policy Engines across boundaries, **Spec-Aware Type Coercion** is implemented strictly within the Engine adapters (`opa.rs`, `cedar.rs`, `foreign.rs`). 
+To prevent constraint errors when interacting with Policy Engines across boundaries, **Spec-Aware Type Coercion** is implemented strictly within the Engine adapters. 
 
 When `PolicyEngine::evaluate()` intercepts the execution context, it dynamically iterates the string entries in the payload. If it encounters a key predefined within spec as native-typed (like `trust_score`), it intercepts it (e.g. `v.parse::<i32>()`) and binds it as a direct native primitive inside the final emitted JSON `serde_json::Value` passed out to the engine.
 
-> [!WARNING] 
-> Do not attempt to map native JSON values generically directly onto the `kest-core-rs` structs inside the `KestEntry` declaration. String serialization validation guarantees must be strictly enforced at the Baggage layer. Rely on Engine layers for specialized decoding routines.
+> [!WARNING]
+> **Dynamic Context Mapping Limitations**
+> Variables passed implicitly via `@kest_verified(context_map={"user": "id"})` suffer from the string boundary limitations when compiled inside PyO3's native initialization loop.
+> Do not attempt to run primitive integer constraints (e.g. `context.account_level >= 3`) inside an engine against mapping fields unless the Policy evaluates strictly for Strings (e.g. `context.account_level == "3"`).
 
 ---
 
