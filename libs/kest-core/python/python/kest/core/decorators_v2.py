@@ -175,6 +175,7 @@ def _execute_v2_pipeline(
             "enterprise_policies": get_active_enterprise_policies(),
             "deviations_json": json.dumps(get_active_deviations()),
             "origin_trust_score": self_score,
+            "context": mapped_context,
         }
         
         if trust_override is not None:

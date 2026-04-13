@@ -1,12 +1,12 @@
 """
-bench_decorator_throughput.py — Throughput benchmarks for @kest_verified across backends.
+bench_decorator_throughput.py — Realistic throughput benchmarks for @kest_verified across backends.
 
-Benchmarks the full decorator lifecycle:
-  1. Context mapping
-  2. Baggage unpacking
-  3. Policy evaluation (Mock)
-  4. Audit entry signing
-  5. Baggage packing
+Benchmarks the full decorator lifecycle under realistic conditions: 
+  1. Real Identity Provider (Ed25519)
+  2. Realistic context mapping via kwargs
+  3. Real Policy Engine (CedarLocalEngine)
+  4. Adding taints and setting trust overrides
+  5. Audit entry signing and baggage packing
 
 Usage:
     KEST_BACKEND=rust   uv run python examples/bench/bench_decorator_throughput.py
@@ -27,7 +27,9 @@ from typing import Any
 # Allow running from the bench directory or from the project root.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
-from kest.core import get_backend, configure, PolicyEngine, LocalEd25519Provider
+from kest.core import get_backend, configure
+from kest.core.engine import CedarLocalEngine
+from kest.core.identity.providers.local import LocalEd25519Provider
 
 # Configure the right decorator based on backend
 BACKEND = get_backend()
@@ -40,9 +42,15 @@ PROVIDER = LocalEd25519Provider()
 THREAD_COUNTS = [1, 2, 4, 8]
 WINDOW_SECS = 3
 
-class MockPolicyEngine(PolicyEngine):
-    def evaluate(self, entry_id: str, policy_names: list[str], context: dict) -> bool:
-        return True
+CEDAR_POLICY = """
+permit(
+    principal,
+    action,
+    resource
+) when {
+    context.role == "admin"
+};
+"""
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -72,23 +80,32 @@ def _throughput(fn, n_threads: int, window: float = WINDOW_SECS) -> float:
 # Benchmarks
 # ---------------------------------------------------------------------------
 
-@kest_verified("allow-all")
-def target_function(x: int):
+@kest_verified(
+    "authz-operation",
+    added_taints=["DB_READ"],
+    trust_override=95,
+    context_map={"user_role": "role"}
+)
+def target_function(x: int, user_role: str = "guest"):
     return x + 1
 
 def bench_decorator_throughput():
-    configure(engine=MockPolicyEngine(), identity=PROVIDER)
+    cedar_engine = CedarLocalEngine(
+        policies={'kest::Action::"authz-operation"': CEDAR_POLICY},
+        entities=[]
+    )
+    configure(engine=cedar_engine, identity=PROVIDER)
 
-    print(f"\n## Scalability: @kest_verified ({BACKEND})")
+    print(f"\n## Scalability (Realistic): @kest_verified ({BACKEND})")
     print(f"{'Threads':>8} | {'ops/sec':>10}")
     print("-" * 25)
     
     results = {}
     for n in THREAD_COUNTS:
-        # Warmup
-        target_function(1)
+        # Warmup (cache Cedar JIT and context logic)
+        target_function(1, user_role="admin")
         
-        ops = _throughput(lambda: target_function(1), n)
+        ops = _throughput(lambda: target_function(1, user_role="admin"), n)
         results[n] = ops
         print(f"{n:>8} | {ops:>10.1f}")
     return results
@@ -98,7 +115,7 @@ def bench_decorator_throughput():
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print(f"# Kest Decorator Throughput Benchmark — backend={BACKEND}")
+    print(f"# Kest Realistic Decorator Throughput Benchmark — backend={BACKEND}")
     print(f"  Window: {WINDOW_SECS}s per test | Threads tested: {THREAD_COUNTS}")
 
     results: dict[str, Any] = {"backend": BACKEND}

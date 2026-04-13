@@ -1,0 +1,23 @@
+
+# FastAPI Benchmark — backend=rust
+  Window: 3s per test | Concurrency tested: [1, 2, 4, 8, 16, 32]
+
+## Scalability: Sync Endpoint (FastAPI ThreadPool)
+ Threads |    ops/sec
+-------------------------
+       1 |      552.3
+       2 |      569.0
+       4 |      461.0
+       8 |      341.0
+      16 |      264.0
+      32 |      259.3
+
+## Scalability: Async Endpoint (Single Event Loop)
+  Tasks  |    ops/sec
+-------------------------
+       1 |      528.3
+       2 |      532.0
+       4 |      481.3
+       8 |      347.3
+      16 |      275.3
+      32 |      263.7

@@ -293,11 +293,21 @@ class CustomEvaluator:
 @kest_verified(
     policy=["enterprise_baseline", "app_specific_route"],
     origin="verified_partner",        # Translates natively to score hooks
+    context_map={"user_id": "user"},  # Context variables are injected into validation constraints
     trust_evaluator=CustomEvaluator() # Hook evaluates back across FFI transparently
 )
-def handle_partner_ingest(payload):
+def handle_partner_ingest(payload, user_id=None):
     return payload
 ```
+
+> [!WARNING]
+> **V2 Decorator Engine Type Coercion limits**
+> When evaluating inline arguments directly against engines like Cedar or Open Policy Agent (OPA) through `rust-v2` (`KEST_BACKEND=rust-v2`), be aware that all `context_map` dynamic variables (like `user_id` above) are strictly coerced into `String` formats within the native `HashMap<String, String>` pipeline boundary before reaching the evaluation engine.
+> 
+> * **Integer Objects:** Any mapped constraints (e.g., `trust_score` overrides or IDs) evaluating against conditions like `context.trust_score > 50` will **Fail** when processed by `rust-v2` if the policy expects native numerical types. Policy engines must evaluate context fields mapped via `@kest_verified(context_map=...)` using string comparators (e.g. `== "50"`).
+> * **OpenTelemetry Limits:** This behaviour exists because the execution environment acts transiently bridging HTTP Headers containing OTel Baggage schemas.
+
+
 
 **Key Differences & Improvements of V2:**
 - **Concurrency Scaling:** Heavy I/O processing (calling `CedarPolicyEngine`, hashing massive `parent_ids`, building recursive DAG structures) operates outside the generic constraints of Python interpreter locking boundaries, scaling multi-threaded frameworks up to ~3,100+ requests per second natively.

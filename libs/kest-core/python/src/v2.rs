@@ -175,6 +175,19 @@ fn pipeline_execute(
     let trust_override: Option<i32> = req_dict.get_item("trust_override")?.map(|v| v.extract()).transpose()?;
     let origin_trust_score: i32 = req_dict.get_item("origin_trust_score")?.map(|v| v.extract()).transpose()?.unwrap_or(100);
     
+    let mut environment = BTreeMap::new();
+    if let Some(ctx_dict) = req_dict.get_item("context")? {
+        if let Ok(dict) = ctx_dict.downcast::<PyDict>() {
+            for (k, v) in dict {
+                if let Ok(ks) = k.extract::<String>() {
+                    if let Ok(vs) = v.str().and_then(|s| s.extract::<String>()) {
+                        environment.insert(ks, vs);
+                    }
+                }
+            }
+        }
+    }
+
     let mut needs_gil = false;
     let trust_evaluator_func: Option<Box<dyn Fn(i32, Vec<i32>) -> i32 + Send + Sync + '_>> = if let Some(eval) = trust_evaluator {
         needs_gil = true;
@@ -198,7 +211,7 @@ fn pipeline_execute(
         operation,
         input_hash,
         content_hash,
-        environment: BTreeMap::new(),
+        environment,
         otel_context: BTreeMap::new(),
         labels: BTreeMap::new(),
         added_taints,

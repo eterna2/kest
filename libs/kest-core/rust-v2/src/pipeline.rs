@@ -172,6 +172,9 @@ impl<'a, E: PolicyEngine + ?Sized, I: IdentityProvider + ?Sized> KestPipeline<'a
             policy_names.extend(entry.policy_context.function_policies.clone());
 
             let mut context_map = HashMap::new();
+            for (k, v) in &entry.environment {
+                context_map.insert(k.clone(), v.clone());
+            }
             for (k, v) in &entry.otel_context {
                 context_map.insert(k.clone(), v.clone());
             }

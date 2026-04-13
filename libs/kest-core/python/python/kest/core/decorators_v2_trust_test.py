@@ -21,7 +21,8 @@ class CaptureEngine:
 @pytest.fixture(autouse=True)
 def setup_active_backends(monkeypatch):
     import os
-    from kest.core._core import v2
+    from kest.core._core import v2  # type: ignore
+
     
     capture = CaptureEngine()
     engine = v2.RustPolicyEngine.foreign(capture.evaluate)

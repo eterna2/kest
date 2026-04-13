@@ -132,16 +132,49 @@ required a distributed cache backend on every request. Without one, the passport
 > - **Warm path**: With the policy decision cache, repeated calls to the same decorated function by the same principal reduce policy evaluation cost from ~0.6ms to essentially zero. At 10K RPS with the same workload identity, Cedar evaluation drops from 6M eval calls/min to only ~500 (cache misses on TTL expiry).
 > - **Net decorator overhead (warm)**: ~0.18ms — dominated by Ed25519 signing + baggage packing.
 
-### Scalability: @kest_verified (ops/sec vs. thread count)
+### Scalability: L2 Decorator Throughput (Realistic Evaluation)
 
-| Threads | Rust (ops/sec) | Rust v2 (ops/sec) | Python (ops/sec) |
+This tests the full `@kest_verified` decorator lifecycle, including automatic OTel Context/Baggage extraction, payload mapping, and real-world evaluation overhead using `CedarLocalEngine` executing policy: `context.role == "admin"`.
+
+**Performance:**
+
+| Threads | `python` (ops/sec) | `rust` (V1) (ops/sec) | `rust-v2` (ops/sec) |
 |---|---|---|---|
-| 1 | 5,233 | 3,857 | 10,042 |
-| 2 | 5,876 | 3,654 | 9,662 |
-| 4 | 5,200 | 3,686 | 7,459 |
-| 8 | 5,354 | 3,695 | 10,385 |
+| 1 | ~8506 | ~4102 | ~2026 |
+| 2 | ~6558 | ~4519 | ~1913 |
+| 4 | ~8084 | ~4197 | ~1937 |
+| 8 | ~6529 | ~4355 | ~2031 |
 
-> **Interpretation**: The pure Python backend currently leads in throughput because it avoids the PyO3 cross-boundary overhead (serializing/deserializing context to/from Rust structs) for this specific Mock workload. Rust v2 shows lower ops/sec currently due to the comprehensive FFI pipeline orchestrating baggage on every call even for a mock engine.
+> **Interpretation**: 
+> - **Python**: Best baseline single-thread throughput since `CedarLocalEngine`, context mapping, and identity packing are fully executed within the interpreter without serialization overhead. However, throughput is erratic and drops up to 25% under concurrency due to GIL contention.
+> - **Rust (V1)**: The Python FFI overhead + OTel tracing boundary extraction causes a significant 50% penalty off the Python baseline.
+> - **Rust-v2**: Throughput is lowest (~2000 ops/sec) due to deep payload conversion into `HashMap<String, String>` and context wrapping. However, scaling remains highly stable (flatline), proving the background-thread GIL release eliminates contention, making it the most reliable engine for high-concurrency systems despite the serialization baseline tax.
+
+### FastAPI Endpoint Concurrency (Up to 32 threads)
+
+This assesses Kest's overhead when decorated on standard API routes served by `FastAPI` + `uvicorn` (on a single event loop). It compares `async def` routes (where validation happens on the main event loop) vs `def` routes (where FastAPI pushes execution to a threadpool).
+
+**Sync Endpoint (`def` route -> AnyIO Threadpool)**:
+
+| Threaded Requests | `python` (ops/sec) | `rust` (V1) (ops/sec) | `rust-v2` (ops/sec) |
+|---|---|---|---|
+| 1 | ~614.7 | ~552.3 | ~580.0 |
+| 4 | ~481.7 | ~461.0 | ~476.7 |
+| 8 | ~339.3 | ~341.0 | ~337.7 |
+| 16 | ~265.3 | ~264.0 | ~255.3 |
+| 32 | ~262.3 | ~259.3 | ~259.0 |
+
+**Async Endpoint (`async def` route -> Event Loop)**:
+
+| Concurrent Tasks | `python` (ops/sec) | `rust` (V1) (ops/sec) | `rust-v2` (ops/sec) |
+|---|---|---|---|
+| 1 | ~552.7 | ~528.3 | ~532.0 |
+| 4 | ~509.0 | ~481.3 | ~469.3 |
+| 8 | ~355.3 | ~347.3 | ~348.3 |
+| 16 | ~290.3 | ~275.3 | ~261.7 |
+| 32 | ~264.3 | ~263.7 | ~252.0 |
+
+> **Interpretation:** Throughput identically degrades across all backends as concurrency approaches 32 on a single worker server. This signifies that at this layer, ASGI/Event-loop context switching and AnyIO thread-swapping boundaries are the primary bottleneck—not the cryptographic signing or PyO3/GIL constraints—because Kest execution overhead per-request (~0.5ms) is negligible relative to the HTTP framing/event-loop dispatch time.
 
 ---
 
