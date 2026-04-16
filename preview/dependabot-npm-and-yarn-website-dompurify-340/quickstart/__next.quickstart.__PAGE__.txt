@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+3:I[97367,["/kest/preview/dependabot-npm-and-yarn-website-dompurify-340/_next/static/chunks/00p7kquvh4_8e.js","/kest/preview/dependabot-npm-and-yarn-website-dompurify-340/_next/static/chunks/114vggoq28h-..js"],"OutletBoundary"]
+4:"$Sreact.suspense"
+0:{"rsc":["$","$1","c",{"children":["$L2",null,["$","$L3",null,{"children":["$","$4",null,{"name":"Next.MetadataOutlet","children":"$@5"}]}]]}],"isPartial":false,"staleTime":300,"varyParams":null,"buildId":"jh1HeS8S817VST5UG9ANu"}
+5:null
+2:E{"digest":"NEXT_REDIRECT;replace;/developers/guide/getting_started;307;"}
