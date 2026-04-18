@@ -5,8 +5,23 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kest"
-version = "0.3.0"
+version = "0.3.0.post1"
+description = "A Zero-Trust validation and telemetry toolkit for multi-agent workloads."
+readme = "README.md"
 requires-python = ">=3.11,<3.14"
+authors = [{ name = "eterna2", email = "ceilingcat@kest.sh" }]
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "opentelemetry-api>=1.41.0",
     "opentelemetry-sdk>=1.41.0",
@@ -17,26 +32,20 @@ dependencies = [
     "cryptography>=46.0.7",
 ]
 
+[project.urls]
+Homepage = "https://github.com/eterna2/kest/"
+Documentation = "https://eterna2.github.io/kest/stable"
+Repository = "https://github.com/eterna2/kest/"
+
 [project.scripts]
 kest-viz = "kest.cli.viz:main"
 
 [project.optional-dependencies]
-spiffe = [
-    "spiffe>=0.2.6",
-]
-aws = [
-    "boto3>=1.28.0",
-    "aioboto3>=15.5.0",
-]
-opa = [
-    "opa-python-client>=2.0.4",
-]
-cedar = [
-    "cedarpy>=4.8.0",
-]
-rego = [
-    "regopy>=0.3.0",
-]
+spiffe = ["spiffe>=0.2.6"]
+aws = ["boto3>=1.28.0", "aioboto3>=15.5.0"]
+opa = ["opa-python-client>=2.0.4"]
+cedar = ["cedarpy>=4.8.0"]
+rego = ["regopy>=0.3.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kest"]
