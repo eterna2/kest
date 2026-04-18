@@ -3,7 +3,9 @@ $schema: 'https://moonrepo.dev/schemas/workspace.json'
 projects:
   kest-monorepo: '.'
   kest-core-python: 'libs/kest-core/python'
+  kest-deepagents-python: 'libs/kest-deepagents/python'
   kest-lab: 'showcase/kest-lab'
+  kest-terminal-agent: 'showcase/kest-terminal-agent'
   website: 'website'
   kest-core-rs: 'libs/kest-core/rust'
 

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kest-deepagents"
+version = "0.1.0"
+description = "Kest multi-agent security adapter for DeepAgents"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "deepagents",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kest"]
+
+[tool.uv.sources]
+kest = { path = "../../kest-core/python", editable = true }
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "kest",
+    "ruff>=0.15.11",
+    "mypy>=1.20.1",
+]

@@ -1,0 +1,23 @@
+[project]
+name = "kest-terminal-agent"
+version = "0.1.0"
+description = "Textual app to showcase kest terminal agent integration"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "textual",
+    "keyring",
+    "kest-deepagents",
+]
+
+[dependency-groups]
+dev = [
+    "pytest",
+    "pytest-cov",
+    "pytest-asyncio",
+    "ruff>=0.15.11",
+    "mypy>=1.20.1",
+]
+
+[tool.uv.sources]
+kest-deepagents = { path = "../../libs/kest-deepagents/python", editable = true }
