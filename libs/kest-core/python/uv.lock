@@ -889,6 +889,7 @@ spiffe = [
 [package.dev-dependencies]
 dev = [
     { name = "boto3" },
+    { name = "cedarpy" },
     { name = "cryptography" },
     { name = "httpx" },
     { name = "hypothesis" },
@@ -925,6 +926,7 @@ provides-extras = ["spiffe", "aws", "opa", "cedar", "rego"]
 [package.metadata.requires-dev]
 dev = [
     { name = "boto3", specifier = ">=1.28.0" },
+    { name = "cedarpy", specifier = ">=4.8.0" },
     { name = "cryptography", specifier = ">=46.0.7" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "hypothesis", specifier = ">=6.151.12" },
