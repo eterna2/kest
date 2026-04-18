@@ -122,7 +122,7 @@ configure(engine=my_engine)  # identity auto-detected
 
 # Or inspect what was detected:
 identity = get_default_identity()
-print(type(identity))  # → <class 'kest.core.identity.providers.local.LocalEd25519Provider'>
+print(type(identity))  # → <class 'kest.core.providers.local.LocalEd25519Provider'>
 ```
 
 **Probe order**: `SPIFFE_ENDPOINT_SOCKET` → `AWS_BEDROCK_AGENT_ID` → `AWS_ROLE_ARN` → `KEST_OIDC_TOKEN_PATH` → `LocalEd25519Provider` (fallback with warning)

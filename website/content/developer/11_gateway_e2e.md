@@ -353,7 +353,7 @@ After the full flow, the `kest.passport` baggage header carries all 6 JWS entrie
 To verify this chain programmatically:
 
 ```python
-from kest.core.models import Passport, PassportVerifier
+from kest.core import Passport, PassportVerifier
 
 passport = Passport.deserialize(baggage_passport_json)
 PassportVerifier.verify(passport, providers={

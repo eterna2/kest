@@ -292,7 +292,6 @@ kest/
 ├── libs/
 │   ├── kest-core/
 │   │   ├── python/      # Python library (kest package)
-│   │   └── rust/        # Rust core: canonicalization, signing, trust
 ├── showcase/
 │   └── kest-lab/        # Docker Compose integration lab (SPIRE, OPA, Keycloak, Jaeger)
 └── website/             # Documentation site (Next.js)
@@ -310,7 +309,7 @@ class CustomEvaluator:
     def calculate(self, origin_score: int, parent_scores: list) -> int:
          return min(parent_scores + [origin_score]) - 5
 
-# The V2 pipeline is integrated seamlessly.
+# The Pure Python pipeline is integrated seamlessly.
 @kest_verified(
     policy=["enterprise_baseline", "app_specific_route"],
     origin="verified_partner",        # Translates natively to score hooks

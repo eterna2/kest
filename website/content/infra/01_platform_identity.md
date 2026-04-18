@@ -56,7 +56,7 @@ If your application requires explicit configuration or dependency injection (for
 ```python
 import boto3
 from kest.core import configure
-from kest.core.identity import AWSWorkloadIdentity
+from kest.core import AWSWorkloadIdentity
 
 # Explicitly configure a boto3 session
 session = boto3.Session(region_name="eu-central-1")

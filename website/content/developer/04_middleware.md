@@ -72,7 +72,7 @@ baggage: kest.claim_check=550e8400-e29b-41d4-a716-446655440000,kest.chain_tip=ab
 If your gateway authenticates users via JWT (from Keycloak, Auth0, etc.), `KestIdentityMiddleware` extracts the user identity and sets it as context:
 
 ```python
-from kest.core.ext import KestIdentityMiddleware
+from kest.core import KestIdentityMiddleware
 
 app.add_middleware(
     KestIdentityMiddleware,
@@ -129,7 +129,7 @@ async def call_downstream():
 
 ```python
 import requests
-from kest.core.ext import inject_kest_headers
+from kest.core import inject_kest_headers
 
 headers = inject_kest_headers({})
 response = requests.post(
@@ -187,7 +187,7 @@ sequenceDiagram
 # === Service A (API Gateway) ===
 from fastapi import FastAPI
 from kest.core import configure, OPAPolicyEngine, KestMiddleware, kest_verified
-from kest.core.ext import KestIdentityMiddleware
+from kest.core import KestIdentityMiddleware
 
 app = FastAPI()
 app.add_middleware(KestIdentityMiddleware)
