@@ -59,6 +59,12 @@ These permissions are codified in [.agent_allowlist](file:///home/eterna2/github
 > networkingMode=mirrored
 > ```
 
+## 📝 Documentation & Changelogs
+> [!IMPORTANT]
+> Strict rules for maintaining READMEs and Changelogs are modularized in [documentation.md](file:///home/eterna2/github/kest/.agents/rules/documentation.md).
+- Always update project-specific docs and changelogs whenever code or features are modified. 
+- Root documentation acts only as a high-level router and must point to sub-project READMEs and Changelogs for details. Avoid leaving outdated code/guides in any `.md` file.
+
 ## Project Structure
 The repository is a polyglot toolkit (monorepo). Libraries are split functionally:
 1. **Toolkit Core (`libs/kest-core/python`)**: Pure Python logic. Models, cryptography, hash bindings, and interfaces. Contains no framework-specific or presentation logic.
@@ -107,14 +113,4 @@ This repository integrates the [Superpowers](https://github.com/obra/superpowers
 *   **Required for Software Engineering**: For pure software engineering tasks—specifically those involving new logic, refactoring, or bug fixing—the `@brainstorming` and `@writing-plans` workflows are **MANDATORY**. 
 *   **TDD Enforcement**: High-discipline engineering must follow the `@test-driven-development` skill instructions to ensure reliability and maintainability.
 
-## ♊ Gemini CLI Integration
-The Kest monorepo is optimized for the [Gemini CLI](https://geminicli.com). It uses a project-specific `GEMINI.md` to provide context and integrate with local skills.
 
-### 🚀 Setup
-1. **Provision Skills**: Run `moon run setup-gemini-cli` to install all necessary local skills and Superpowers.
-2. **Standard Workflow**: Use `moon run gemini` to start a session within the project context.
-
-### 🛠 Skills Usage
-- Use `@brainstorming` to refine implementation specs.
-- Use `@writing-plans` for detailed design before code changes.
-- All **Superpowers** and **Awesome Skills** are automatically loaded via the root `GEMINI.md`.
