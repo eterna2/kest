@@ -723,7 +723,7 @@ wheels = [
 
 [[package]]
 name = "kest"
-version = "0.3.0"
+version = "0.3.0.post1"
 source = { editable = "../../kest-core/python" }
 dependencies = [
     { name = "cryptography" },
@@ -778,6 +778,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "deepagents" },
+    { name = "kest" },
 ]
 
 [package.dev-dependencies]
@@ -790,7 +791,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "deepagents" }]
+requires-dist = [
+    { name = "deepagents" },
+    { name = "kest", editable = "../../kest-core/python" },
+]
 
 [package.metadata.requires-dev]
 dev = [
