@@ -12,9 +12,9 @@ sidebarCode: |
       return transfer(tx_data)
 ---
 
-The `kest.core.decorators` module provides the primary interface for developers to secure their application logic using Kest.
+The `kest.core` module provides the primary interface for developers to secure their application logic using Kest.
 
-The `kest.core.decorators` module provides the primary interface for developers to secure their application logic using Kest.
+The `kest.core` module provides the primary interface for developers to secure their application logic using Kest.
 
 ---
 

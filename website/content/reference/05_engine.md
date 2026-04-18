@@ -12,9 +12,9 @@ sidebarCode: |
           pass
 ---
 
-The `kest.core.engine` module provides a unified interface for evaluating security policies across different engines.
+The `kest.core` module provides a unified interface for evaluating security policies across different engines.
 
-The `kest.core.engine` module provides a unified interface for evaluating security policies across different engines.
+The `kest.core` module provides a unified interface for evaluating security policies across different engines.
 
 ---
 

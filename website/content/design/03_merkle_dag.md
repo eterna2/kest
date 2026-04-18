@@ -62,7 +62,7 @@ graph TD
 ```
 
 ```python
-from kest.core.models import Passport
+from kest.core import Passport
 
 # Combine two independent lineages
 merged = Passport.merge(passport_a, passport_b)
@@ -220,7 +220,7 @@ The algorithm:
 When parallel branches need to converge, use `Passport.merge()`:
 
 ```python
-from kest.core.models import Passport
+from kest.core import Passport
 
 # branch_a.entries = [sig_root, sig_branch_a]
 # branch_b.entries = [sig_root, sig_branch_b]

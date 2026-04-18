@@ -14,7 +14,7 @@ sidebarCode: |
   }
 ---
 
-The `kest.core.models` module defines the core data structures used by Kest to represent execution lineage and trust.
+The `kest.core` module defines the core data structures used by Kest to represent execution lineage and trust.
 
 ---
 

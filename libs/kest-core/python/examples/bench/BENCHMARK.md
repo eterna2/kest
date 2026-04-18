@@ -1,9 +1,82 @@
 # Kest Core: Comprehensive Performance Benchmark
 
-Measured on **2026-04-11** — kest v0.3.0, Python 3.11.15, Linux.  
-Post-optimisation run (Fix 1–6 applied: passport cache, policy cache, compressed baggage, SVID cache, async offloading).
+Measured on **2026-04-18** — kest v0.4.0-dev (Pure Python), Python 3.11, Linux.  
 
 ---
+
+## Active Pipeline Performance (Pure Python)
+
+Following the removal of the PyO3/Rust bindings, Kest now operates exclusively via a pure Python pipeline backed by the `rfc8785` C extension.
+
+### L0: Core Primitive Micro-benchmarks (Single Thread)
+
+| Benchmark | Latency (µs) |
+|---|---|
+| `entry_create` | 0.89 µs |
+| `sign_entry` | 23.20 µs |
+| `canonical_json` | 4.23 µs |
+| `chain_10` | 261 µs |
+| `chain_100` | 2,600 µs |
+
+### L0: Scalability (ops/sec vs. thread count)
+
+| Threads | `sign_entry` (ops/sec) | `verify` (5-hop) (ops/sec) |
+|---|---|---|
+| 1 | 15,830 | 31,283 |
+| 2 | 15,925 | 31,713 |
+| 4 | 16,345 | 30,667 |
+| 8 | 18,237 | 34,337 |
+
+### L0: GIL Contention (`sign_entry`)
+
+| Metric | Throughput |
+|---|---|
+| Baseline (4 threads) | 15,848 ops/sec |
+| Contested (+ GIL-holder) | 12,719 ops/sec |
+| **Degradation** | **19.7%** |
+
+### L1: BaggageManager Packaging
+
+| Hops | Pack (ms) | Unpack (ms) | Raw Bytes | Packed Bytes | Tier |
+|---|---|---|---|---|---|
+| 1 | 0.003 | 0.008 | 829 | 829 | inline ✓ |
+| 5 | 0.020 | 0.037 | 4,145 | 820 | compressed ✓ |
+| 10 | 0.029 | 0.076 | 8,290 | 988 | compressed ✓ |
+| 25 | 0.057 | 0.159 | 20,725 | 1,284 | compressed ✓ |
+| 50 | 0.105 | 0.341 | 41,450 | 1,716 | compressed ✓ |
+
+### L2: Decorator Overhead
+
+| Configuration | Cold Start (ms) | Warm Hit (ms) | Overhead vs Raw |
+|---|---|---|---|
+| Raw function | - | 0.0001 | - |
+| `@kest_verified` (Mock) | - | 0.1067 | +0.1066 ms |
+| `@kest_verified` (Cedar) | 1.215 | 0.1064 | +0.1064 ms |
+| `@kest_verified` (Rego) | 1.744 | 0.1094 | +0.1093 ms |
+
+### L3: Policy Engine Scalability (4 threads)
+
+| Engine | ops/sec |
+|---|---|
+| Cedar (in-process) | 20,511 |
+| `sign_entry` | 16,884 |
+
+### L4: Multi-hop End-to-End Latency
+
+| Hops | Total Latency (ms) | Per-hop Latency (ms) |
+|---|---|---|
+| 3 | 0.299 | 0.100 |
+| 5 | 0.505 | 0.101 |
+| 10 | 1.423 | 0.142 |
+
+
+---
+
+## [Historical] Rust vs Python Backend Comparison (Pre-0.4.0)
+
+> [!NOTE]
+> The following results reflect historical tests capturing the performance differential between the pure python implementation and the legacy PyO3/Rust and active Rust multi-threading extensions. They are preserved for architectural context on why the GIL-release in Rust bounds didn't significantly outperform python-level C extensions (`rfc8785`) for typical signing paths.
+
 
 ## Overview: Backend Comparison
 
@@ -227,6 +300,9 @@ Assuming SPIRE + Cedar + 10-hop service mesh at 10K RPS:
 
 ---
 
+
+---
+
 ## Reproducing Results
 
 ### Prerequisites
@@ -239,34 +315,31 @@ uv sync --all-extras
 moon run kest-core-python:bench
 ```
 
-Or manually per backend:
+Or manually run the active (pure Python) backend benchmarks:
 ```bash
 cd libs/kest-core/python
 
 # L0: pyperf micro-benchmarks
-KEST_BACKEND=rust   uv run python examples/bench/bench_kest_core.py -o examples/bench/rust.json
-KEST_BACKEND=python uv run python examples/bench/bench_kest_core.py -o examples/bench/python.json
+uv run python examples/bench/bench_kest_core.py -o examples/bench/python.json
 
 # L0: GIL-aware throughput
-KEST_BACKEND=rust   uv run python examples/bench/bench_throughput.py
-KEST_BACKEND=python uv run python examples/bench/bench_throughput.py
+uv run python examples/bench/bench_throughput.py
 
 # L1–L4: System benchmarks
-KEST_BACKEND=rust   uv run python examples/bench/bench_system.py
+uv run python examples/bench/bench_system.py
 ```
+
+> [!NOTE]
+> Historical benchmark reproducer instructions for the deprecated `rust` and `rust-v2` backends have been removed following their decommissioning.
 
 ## Raw Data
 
+> [!NOTE] 
+> Raw `.json` and `.txt` artifacts are now ignored by git to keep the repository clean. The tables above preserve the full historical comparison between the `python`, `rust`, and `rust-v2` bindings.
+
 | File | Contents |
 |---|---|
-| `rust.json` | pyperf results, Rust backend |
 | `python.json` | pyperf results, Python backend |
-| `rust-v2.json` | pyperf results, Rust v2 backend |
-| `throughput_rust.json` | L0 threading results, Rust backend |
 | `throughput_python.json` | L0 threading results, Python backend |
-| `throughput_rust-v2.json` | L0 threading results, Rust v2 backend |
-| `system_rust.json` | L1–L4 system results, Rust backend |
-| `system_rust-v2.json` | L1–L4 system results, Rust v2 backend |
-| `decorator_throughput_rust.json` | L2 decorator throughput, Rust backend |
+| `system_python.json` | L1–L4 system results, Python backend |
 | `decorator_throughput_python.json` | L2 decorator throughput, Python backend |
-| `decorator_throughput_rust-v2.json` | L2 decorator throughput, Rust v2 backend |

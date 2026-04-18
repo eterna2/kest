@@ -125,7 +125,7 @@ The Passport is automatically maintained in the OTel context. If you make anothe
 Access the current execution context from anywhere:
 
 ```python
-from kest.core.context import get_current_passport
+from kest.core.framework.context import get_current_passport
 
 passport = get_current_passport()
 

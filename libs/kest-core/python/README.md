@@ -30,8 +30,8 @@ Initialize Kest with your identity provider and policy engine (usually done once
 
 ```python
 from kest.core import configure
-from kest.core.identity import SPIREProvider
-from kest.core.engine import OPASidecarEngine
+from kest.core import SPIREProvider
+from kest.core import OPASidecarEngine
 
 # Setup Identity (SPIRE)
 identity = SPIREProvider(socket_path="/var/run/spire/agent/public/api.sock")
@@ -73,7 +73,7 @@ To maintain the Merkle chain across network boundaries, use the provided transpo
 **FastAPI Middleware:**
 ```python
 from fastapi import FastAPI
-from kest.core.ext import KestMiddleware
+from kest.core import KestMiddleware
 
 app = FastAPI()
 app.add_middleware(KestMiddleware)
@@ -82,7 +82,7 @@ app.add_middleware(KestMiddleware)
 **HTTPX Interceptor:**
 ```python
 import httpx
-from kest.core.ext import KestHttpxInterceptor
+from kest.core import KestHttpxInterceptor
 
 async def call_next_service(url: str):
     async with httpx.AsyncClient() as client:
@@ -97,7 +97,7 @@ async def call_next_service(url: str):
 You can programmatically verify an entire collected Merkle lineage chain to ensure non-repudiation.
 
 ```python
-from kest.core.models import Passport
+from kest.core import Passport
 from kest.core.trust import PassportVerifier
 
 # 1. Reconstruct Passport from audit logs (OTel spans)

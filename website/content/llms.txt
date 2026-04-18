@@ -35,8 +35,8 @@ This `llms.txt` provides AI agents and LLMs with a consolidated overview of the 
 ## Quick Python Example
 ```python
 from kest.core import configure, kest_verified
-from kest.core.identity import SPIREProvider
-from kest.core.engine import OPASidecarEngine
+from kest.core import SPIREProvider
+from kest.core import OPASidecarEngine
 
 configure(
     identity=SPIREProvider(socket_path="/var/run/spire/agent/public/api.sock"),

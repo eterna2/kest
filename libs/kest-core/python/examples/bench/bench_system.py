@@ -26,25 +26,22 @@ from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
-from kest.core.identity.providers.local import LocalEd25519Provider
-from kest.core.models import BaggageManager, Passport
-
 from kest.core import (
+    BaggageManager,
     CedarLocalEngine,
     KestEntry,
+    LocalEd25519Provider,
     MockPolicyEngine,
+    Passport,
     RegoLocalEngine,
     configure,
-    get_backend,
     kest_verified,
     sign_entry,
 )
 
 PROVIDER = LocalEd25519Provider()
-BACKEND = get_backend()
+BACKEND = "python"
 
-if BACKEND == "rust-v2":
-    from kest.core.decorators_v2 import kest_verified
 
 REPS = 100
 CHAIN_LENGTHS = [1, 5, 10, 25, 50]
@@ -182,7 +179,7 @@ def bench_l2_decorator():
     print(
         "\n## L2: @kest_verified decorator overhead (cold = first call, warm = cache hit)"
     )
-    from kest.core.decorators import invalidate_policy_cache
+    from kest.core import invalidate_policy_cache
 
     results = {}
 

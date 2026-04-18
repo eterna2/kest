@@ -14,12 +14,12 @@ sidebarCode: |
           pass
 ---
 
-The `kest.core.identity` module provides various implementations for identifying workloads and signing audit entries.
+The `kest.core` module provides various implementations for identifying workloads and signing audit entries.
 
 ## Base Class
 
 ### `IdentityProvider(ABC)`
-*Source: `kest.core.identity.base`*
+*Source: `kest.core.base`*
 
 Abstract base class for all identity providers in Kest. An `IdentityProvider` is responsible for identifying the current workload and signing audit entries (Passport nodes).
 
@@ -34,7 +34,7 @@ Abstract base class for all identity providers in Kest. An `IdentityProvider` is
 
 ### Local & Testing
 ### `StaticIdentity`
-*Source: `kest.core.identity.providers.local`*
+*Source: `kest.core.providers.local`*
 
 Basic fallback provider for local testing or less modern infrastructure. Uses a static workload ID and generates a fresh Ed25519 keypair for in-memory signing.
 
@@ -46,7 +46,7 @@ Dummy provider for unit testing without cryptographic overhead. Generates a dete
 
 ### SPIFFE/SPIRE
 ### `SPIREProvider`
-*Source: `kest.core.identity.providers.spiffe`*
+*Source: `kest.core.providers.spiffe`*
 
 Production-grade provider using SPIRE Workload API for X509-SVID signing. Communicates with the SPIRE agent's Unix Domain Socket to fetch identities and certificates.
 
@@ -54,7 +54,7 @@ Production-grade provider using SPIRE Workload API for X509-SVID signing. Commun
 
 ### AWS IAM & KMS
 ### `AWSWorkloadIdentity`
-*Source: `kest.core.identity.providers.aws`*
+*Source: `kest.core.providers.aws`*
 
 Uses AWS STS to identify the workload's role and AWS KMS for signing. Designed for workloads running on AWS (EKS, Lambda).
 
@@ -62,7 +62,7 @@ Uses AWS STS to identify the workload's role and AWS KMS for signing. Designed f
 
 ### Amazon Bedrock
 ### `BedrockAgentIdentity`
-*Source: `kest.core.identity.providers.bedrock`*
+*Source: `kest.core.providers.bedrock`*
 
 Standard provider for Amazon Bedrock Agent execution environments. Resolves Bedrock Agent ID and Alias ID from environment variables and uses AWS KMS to sign execution traces.
 

@@ -1,8 +1,7 @@
 import pyperf
 import rfc8785
 import uuid_utils
-from kest.core._core import KestEntry, sign_entry
-from kest.core.models import Passport
+from kest.core import KestEntry, sign_entry, Passport
 
 
 class MockProvider:

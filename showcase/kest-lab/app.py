@@ -17,9 +17,10 @@ from kest.core import (
     CedarLocalEngine,
     SPIREProvider,
     MockIdentityProvider,
+    KestMiddleware,
+    KestIdentityMiddleware,
 )
-from kest.core.ext import KestMiddleware, KestIdentityMiddleware
-import kest.core.decorators
+import kest.core.framework.decorators as kest_decorators
 
 _propagator = TraceContextTextMapPropagator()
 
@@ -34,7 +35,7 @@ provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
 
 # Patch the Kest tracer to use our global provider
-kest.core.decorators.tracer = trace.get_tracer("kest.core")
+kest_decorators.tracer = trace.get_tracer("kest.core")
 
 # --- JWKS URI for JWT signature verification ---
 JWKS_URI = os.getenv("KEYCLOAK_JWKS_URI")  # None in dev/mock mode → unverified decode

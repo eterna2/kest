@@ -27,17 +27,9 @@ from typing import Any
 # Allow running from the bench directory or from the project root.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
-from kest.core.engine import CedarLocalEngine
-from kest.core.identity.providers.local import LocalEd25519Provider
+from kest.core import CedarLocalEngine, LocalEd25519Provider, configure, kest_verified
 
-from kest.core import configure, get_backend
-
-# Configure the right decorator based on backend
-BACKEND = get_backend()
-if BACKEND == "rust-v2":
-    from kest.core.decorators_v2 import kest_verified
-else:
-    from kest.core import kest_verified
+BACKEND = "python"
 
 PROVIDER = LocalEd25519Provider()
 THREAD_COUNTS = [1, 2, 4, 8]

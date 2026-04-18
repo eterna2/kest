@@ -15,7 +15,7 @@ This dual-language support ensures your security posture remains identical acros
 To evaluate these policies, initialize a `PolicyEngine` with the desired modules:
 
 ```python
-from kest.core.engine import RegoLocalEngine
+from kest.core import RegoLocalEngine
 from kest.core.policies import get_policy
 
 # 1. Load Bell-LaPadula model

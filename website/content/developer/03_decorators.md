@@ -183,7 +183,7 @@ assert result == 7  # Decorator doesn't alter the return value
 ## Error Handling
 
 ```python
-from kest.core.engine import PolicyDeniedError
+from kest.core import PolicyDeniedError
 
 try:
     result = protected_function()

@@ -12,9 +12,7 @@ app = FastAPI()
 # ---------------------------------------------------------
 # Set up Kest backend
 # ---------------------------------------------------------
-from kest.core.engine import CedarLocalEngine
-
-from kest.core import MockIdentityProvider, configure, kest_verified
+from kest.core import CedarLocalEngine, MockIdentityProvider, configure, kest_verified
 
 configure(
     identity=MockIdentityProvider("abc"),

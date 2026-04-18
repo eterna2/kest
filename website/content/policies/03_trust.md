@@ -21,7 +21,7 @@ A trust score is an **integer between 0 (untrusted) and 100 (fully trusted)**. U
 Trust propagation is handled by a `TrustEvaluator`. The default uses a **weakest-link** model:
 
 ```python
-from kest.core.models import DefaultTrustEvaluator
+from kest.core import DefaultTrustEvaluator
 
 evaluator = DefaultTrustEvaluator()
 # trust = (min(parent_scores) * self_score) // 100
