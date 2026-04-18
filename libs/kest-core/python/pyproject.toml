@@ -9,6 +9,21 @@ version = "0.3.1"
 description = "A Zero-Trust validation and telemetry toolkit for multi-agent workloads."
 readme = "README.md"
 requires-python = ">=3.11,<3.14"
+authors = [
+    { name = "eterna2", email = "eterna2@users.noreply.github.com" }
+]
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules"
+]
 dependencies = [
     "opentelemetry-api>=1.41.0",
     "opentelemetry-sdk>=1.41.0",
@@ -18,6 +33,11 @@ dependencies = [
     "rfc8785>=0.1.4",
     "cryptography>=46.0.7",
 ]
+
+[project.urls]
+Homepage = "https://github.com/eterna2/kest/"
+Documentation = "https://eterna2.github.io/kest/"
+Repository = "https://github.com/eterna2/kest/"
 
 [project.scripts]
 kest-viz = "kest.cli.viz:main"
