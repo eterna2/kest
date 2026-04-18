@@ -205,6 +205,24 @@ engine = CedarLocalEngine(policies=["permit(principal, action, resource);"])
 engine = RegoLocalEngine(policies={"pkg/name": "package pkg.name\ndefault allow = true"})
 ```
 
+### Policy Validation (Pre-loading Check)
+
+If you are generating policies dynamically via LLMs, use validators to structural test policies before loading them into an engine:
+
+```python
+from kest.core.policies.validators import CedarValidator, RegoValidator
+
+# Validate syntax and optionally check against a schema
+# requires: uv add "kest[cedar]"
+cedar_validator = CedarValidator()
+cedar_validator.validate_syntax(policy_str, schema='namespace Demo { entity User; }')
+
+# Validates standard Rego syntactic constraints
+# requires: uv add "kest[rego]"
+rego_validator = RegoValidator()
+rego_validator.validate_syntax(rego_str)
+```
+
 ### AWS Verified Permissions
 
 ```python
@@ -219,12 +237,21 @@ engine = AVPPolicyEngine(policy_store_id="ps-abc123", region="us-east-1")
 
 ```python
 from kest.core import (
-    LocalEd25519Provider,   # ephemeral key (dev/test)
+    LocalEd25519Provider,    # ephemeral key (dev/test)
+    OAuthCliProvider,        # Authorization Code + PKCE (stable cross-session identity via passphrase)
     StaticIdentity,          # explicit workload ID + key
     SPIREProvider,           # SPIRE SVID via Unix socket
     AWSWorkloadIdentity,     # AWS STS GetCallerIdentity
     BedrockAgentIdentity,    # AWS Bedrock Agent context
     OIDCIdentity,            # Generic OIDC JWT
+)
+
+# Set up an interactive OAuth 2.0 CLI login explicitly for human/agent workflows
+# Prompts for a stable passphrase, deriving a deterministic Ed25519 key bound to the user across sessions.
+identity = OAuthCliProvider(
+    client_id="my-agent-client",
+    issuer="https://auth.example.com",
+    auto_open_browser=True,
 )
 
 # Auto-detect: SPIRE → AWS → local ephemeral key
