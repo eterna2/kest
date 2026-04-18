@@ -23,7 +23,11 @@ from kest.core.engines.engine import (  # noqa: E402
     PolicyEngine,
     RegoLocalEngine,
 )
-from kest.core.framework.ext import KestHttpxInterceptor, KestMiddleware  # noqa: E402
+from kest.core.framework.ext import (  # noqa: E402
+    KestHttpxInterceptor,
+    KestIdentityMiddleware,
+    KestMiddleware,
+)
 from kest.core.identity import (  # noqa: E402
     AWSWorkloadIdentity,
     BedrockAgentIdentity,
@@ -41,6 +45,7 @@ from kest.core.models.passport import (  # noqa: E402
     DefaultTrustEvaluator,
     Passport,
     PassportVerifier,
+    PolicyDeviation,
     TrustEvaluator,
     register_origin_trust,
 )
@@ -130,10 +135,12 @@ __all__ = [
     "configure",
     "kest_verified",
     "KestMiddleware",
+    "KestIdentityMiddleware",
     "KestHttpxInterceptor",
     "TrustEvaluator",
     "DefaultTrustEvaluator",
     "PassportVerifier",
+    "PolicyDeviation",
     "BaggageManager",
     "register_origin_trust",
     # Operations

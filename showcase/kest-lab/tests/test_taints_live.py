@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 import json
 import base64
-import kest.core.decorators
+import kest.core.framework.decorators as kest_decorators
 
 
 @pytest.fixture
@@ -22,11 +22,11 @@ def otel_recorder():
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     test_tracer = provider.get_tracer("kest.core.test")
     # Store old tracer
-    old_tracer = kest.core.decorators.tracer
-    kest.core.decorators.tracer = test_tracer
+    old_tracer = kest_decorators.tracer
+    kest_decorators.tracer = test_tracer
     yield exporter
     # Restore
-    kest.core.decorators.tracer = old_tracer
+    kest_decorators.tracer = old_tracer
 
 
 @pytest.mark.live

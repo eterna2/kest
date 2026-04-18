@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run_all.sh — Run the full Kest benchmark suite for both backends.
+# run_all.sh — Run the full Kest benchmark suite for the pure Python backend.
 # Usage: bash examples/bench/run_all.sh
 set -euo pipefail
 
@@ -11,60 +11,23 @@ echo "=============================="
 
 # --- L0: pyperf micro-benchmarks ---
 echo ""
-echo "[L0] pyperf micro-benchmarks (Rust backend)..."
-KEST_BACKEND=rust uv run python examples/bench/bench_kest_core.py \
-  --fast -o examples/bench/rust.json
-
-echo ""
 echo "[L0] pyperf micro-benchmarks (Python backend)..."
-KEST_BACKEND=python uv run python examples/bench/bench_kest_core.py \
+uv run python examples/bench/bench_kest_core.py \
   --fast -o examples/bench/python.json
-
-echo ""
-echo "[L0] pyperf micro-benchmarks (Rust v2 backend)..."
-KEST_BACKEND=rust-v2 uv run python examples/bench/bench_kest_core.py \
-  --fast -o examples/bench/rust-v2.json
-
-echo ""
-echo "[L0] pyperf comparison table:"
-uv run python -m pyperf compare_to \
-  examples/bench/rust.json examples/bench/python.json examples/bench/rust-v2.json --table \
-  | tee examples/bench/summary.txt
 
 # --- L0: GIL-aware throughput ---
 echo ""
-echo "[L0] Threading throughput (Rust backend)..."
-KEST_BACKEND=rust uv run python examples/bench/bench_throughput.py
-
-echo ""
 echo "[L0] Threading throughput (Python backend)..."
-KEST_BACKEND=python uv run python examples/bench/bench_throughput.py
-
-echo ""
-echo "[L0] Threading throughput (Rust v2 backend)..."
-KEST_BACKEND=rust-v2 uv run python examples/bench/bench_throughput.py
-
-
-echo ""
-echo "[L0] Decorator throughput (Rust backend)..."
-KEST_BACKEND=rust uv run python examples/bench/bench_decorator_throughput.py
+uv run python examples/bench/bench_throughput.py
 
 echo ""
 echo "[L0] Decorator throughput (Python backend)..."
-KEST_BACKEND=python uv run python examples/bench/bench_decorator_throughput.py
-
-echo ""
-echo "[L0] Decorator throughput (Rust v2 backend)..."
-KEST_BACKEND=rust-v2 uv run python examples/bench/bench_decorator_throughput.py
+uv run python examples/bench/bench_decorator_throughput.py
 
 # --- L1–L4: System benchmarks ---
 echo ""
-echo "[L1–L4] System benchmarks (Rust backend)..."
-KEST_BACKEND=rust uv run python examples/bench/bench_system.py
-
-echo ""
-echo "[L1–L4] System benchmarks (Rust v2 backend)..."
-KEST_BACKEND=rust-v2 uv run python examples/bench/bench_system.py
+echo "[L1–L4] System benchmarks (Python backend)..."
+uv run python examples/bench/bench_system.py
 
 echo ""
 echo "=============================="

@@ -21,9 +21,10 @@ from kest.core import (
     SPIREProvider,
     MockIdentityProvider,
     CedarLocalEngine,
+    KestMiddleware,
+    KestIdentityMiddleware,
 )
-from kest.core.ext import KestMiddleware, KestIdentityMiddleware
-import kest.core.decorators
+import kest.core.framework.decorators as kest_decorators
 
 # --- OTel ---
 SERVICE_NAME = os.getenv("SERVICE_NAME", "kest-agent")
@@ -33,7 +34,7 @@ otlp_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:
 exporter = OTLPSpanExporter(endpoint=f"{otlp_endpoint}/v1/traces")
 provider.add_span_processor(BatchSpanProcessor(exporter))
 trace.set_tracer_provider(provider)
-kest.core.decorators.tracer = trace.get_tracer("kest.core")
+kest_decorators.tracer = trace.get_tracer("kest.core")
 
 # --- Identity & Engine ---
 SPIRE_SOCKET = "unix:///var/run/spire/agent/public/api.sock"

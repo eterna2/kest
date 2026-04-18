@@ -8,8 +8,8 @@ from kest.core import (
     configure,
     OPAPolicyEngine,
     MockIdentityProvider,
+    PolicyDeviation,
 )
-from kest.core.models import PolicyDeviation
 
 @pytest.mark.live
 @pytest.mark.asyncio
