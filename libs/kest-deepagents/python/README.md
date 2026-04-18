@@ -1,5 +1,9 @@
 # kest-deepagents
 
+[![PyPI version](https://img.shields.io/pypi/v/kest-deepagents.svg)](https://pypi.org/project/kest-deepagents/)
+[![License: PolyForm Shield 1.0.0](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](https://polyformproject.org/licenses/shield/1.0.0/)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/kest-deepagents)
+
 The `kest-deepagents` library provides the specific bridging abstractions required to mount `kest` capabilities securely onto `deepagents`. It allows terminal and browser agents to operate securely with robust, policy-backed guardrails.
 
 ## Overview
