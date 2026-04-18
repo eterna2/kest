@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## [0.3.1] - 2026-04-19
+## [0.3.0.post1] - 2026-04-19
 
 - **Fix**: Added explicit `description` and `readme` parameters to the core `pyproject.toml` to correctly render documentation metadata on PyPI.
 - **CI**: Hardened action triggers by specifying absolute SHAs and binding the proper `pypi` Trusted Publisher OIDC environment payload.
