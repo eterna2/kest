@@ -1,4 +1,0 @@
-User-Agent: *
-Allow: /
-
-Sitemap: https://eterna2.github.io/kest/preview/refactor-benchmark-and-lab-updates/sitemap.xml
