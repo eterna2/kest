@@ -8,6 +8,19 @@ version = "0.1.0"
 description = "Kest multi-agent security adapter for DeepAgents"
 readme = "README.md"
 requires-python = ">=3.11"
+authors = [{ name = "eterna2", email = "ceilingcat@kest.sh" }]
+license = { text = "Apache-2.0" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Security",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
 dependencies = [
     "deepagents",
     "kest>=0.3.0",
@@ -15,6 +28,11 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kest"]
+
+[project.urls]
+Homepage = "https://github.com/eterna2/kest/"
+Documentation = "https://eterna2.github.io/kest/stable"
+Repository = "https://github.com/eterna2/kest/"
 
 [tool.uv.sources]
 kest = { path = "../../kest-core/python", editable = true }
