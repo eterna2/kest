@@ -1,7 +1,7 @@
 """
 bench_decorator_throughput.py — Realistic throughput benchmarks for @kest_verified across backends.
 
-Benchmarks the full decorator lifecycle under realistic conditions: 
+Benchmarks the full decorator lifecycle under realistic conditions:
   1. Real Identity Provider (Ed25519)
   2. Realistic context mapping via kwargs
   3. Real Policy Engine (CedarLocalEngine)
@@ -27,9 +27,10 @@ from typing import Any
 # Allow running from the bench directory or from the project root.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
-from kest.core import get_backend, configure
 from kest.core.engine import CedarLocalEngine
 from kest.core.identity.providers.local import LocalEd25519Provider
+
+from kest.core import configure, get_backend
 
 # Configure the right decorator based on backend
 BACKEND = get_backend()
@@ -56,6 +57,7 @@ permit(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _throughput(fn, n_threads: int, window: float = WINDOW_SECS) -> float:
     """Run fn in n_threads threads for window seconds, return ops/sec."""
     stop = threading.Event()
@@ -76,39 +78,42 @@ def _throughput(fn, n_threads: int, window: float = WINDOW_SECS) -> float:
 
     return counter[0] / window
 
+
 # ---------------------------------------------------------------------------
 # Benchmarks
 # ---------------------------------------------------------------------------
+
 
 @kest_verified(
     "authz-operation",
     added_taints=["DB_READ"],
     trust_override=95,
-    context_map={"user_role": "role"}
+    context_map={"user_role": "role"},
 )
 def target_function(x: int, user_role: str = "guest"):
     return x + 1
 
+
 def bench_decorator_throughput():
     cedar_engine = CedarLocalEngine(
-        policies={'kest::Action::"authz-operation"': CEDAR_POLICY},
-        entities=[]
+        policies={'kest::Action::"authz-operation"': CEDAR_POLICY}, entities=[]
     )
     configure(engine=cedar_engine, identity=PROVIDER)
 
     print(f"\n## Scalability (Realistic): @kest_verified ({BACKEND})")
     print(f"{'Threads':>8} | {'ops/sec':>10}")
     print("-" * 25)
-    
+
     results = {}
     for n in THREAD_COUNTS:
         # Warmup (cache Cedar JIT and context logic)
         target_function(1, user_role="admin")
-        
+
         ops = _throughput(lambda: target_function(1, user_role="admin"), n)
         results[n] = ops
         print(f"{n:>8} | {ops:>10.1f}")
     return results
+
 
 # ---------------------------------------------------------------------------
 # Main

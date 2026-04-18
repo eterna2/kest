@@ -26,6 +26,9 @@ from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
+from kest.core.identity.providers.local import LocalEd25519Provider
+from kest.core.models import BaggageManager, Passport
+
 from kest.core import (
     CedarLocalEngine,
     KestEntry,
@@ -36,8 +39,6 @@ from kest.core import (
     kest_verified,
     sign_entry,
 )
-from kest.core.identity.providers.local import LocalEd25519Provider
-from kest.core.models import BaggageManager, Passport
 
 PROVIDER = LocalEd25519Provider()
 BACKEND = get_backend()

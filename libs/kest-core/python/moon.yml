@@ -8,23 +8,17 @@ tags: ['python', 'kest-core']
 
 tasks:
   check:
-    script: 'uv run maturin develop'
+    script: 'uv sync'
     deps:
       - 'install'
     inputs:
-      - 'src/**/*.rs'
-      - 'Cargo.toml'
       - 'pyproject.toml'
-    outputs:
-      - 'python/kest/core/_core*.so'
-      - 'python/kest/core/_core*.pyd'
   test:
-    script: 'uv run pytest --cov=python/kest/core --cov-report=xml --cov-report=term-missing python/kest/core'
+    script: 'uv run pytest --cov=src/kest/core --cov-report=xml --cov-report=term-missing src/kest/core'
     deps:
       - 'check'
     inputs:
-      - 'python/**/*.py'
-      - 'src/**/*.rs'
+      - 'src/**/*.py'
   up:
     script: "moon run kest-lab:up"
   test-live:
@@ -32,22 +26,20 @@ tasks:
     deps:
       - "check"
     inputs:
-      - 'python/**/*.py'
-      - 'src/**/*.rs'
+      - 'src/**/*.py'
   typecheck:
-    script: 'uv run mypy --ignore-missing-imports python/'
+    script: 'uv run mypy --ignore-missing-imports src/'
     deps:
       - 'install'
     inputs:
-      - 'python/**/*.py'
+      - 'src/**/*.py'
   run-e2e:
     script: 'uv run python examples/e2e/main.py'
     deps:
       - 'check'
     inputs:
       - 'examples/**/*.py'
-      - 'python/**/*.py'
-      - 'src/**/*.rs'
+      - 'src/**/*.py'
   viz:
     script: 'uv run kest-viz $path'
     deps:
@@ -61,5 +53,4 @@ tasks:
     inputs:
       - 'examples/bench/**/*.py'
       - 'examples/bench/**/*.sh'
-      - 'python/**/*.py'
-      - 'src/**/*.rs'
+      - 'src/**/*.py'

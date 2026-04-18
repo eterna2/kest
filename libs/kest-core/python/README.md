@@ -5,7 +5,7 @@
 
 Kest is a high-fidelity Zero Trust framework for enforcing execution lineage across polyglot microservices. It solves the **Secret Zero** problem by combining Workload Identity (SPIFFE), Policy-as-Code (OPA/Cedar), and Cryptographic Merkle DAGs.
 
-This package provides the Python bindings for the `kest-core-rs` Rust engine via PyO3, alongside Python decorators (`@kest_verified`), OpenTelemetry Baggage integration, and Policy/Identity provider abstractions.
+This package provides the pure Python implementation of the core Kest framework, alongside Python decorators (`@kest_verified`), OpenTelemetry Baggage integration, and Policy/Identity provider abstractions.
 
 > **⚠️ Breaking Change Notice (v0.3.0)**: Kest v0.3.0 is a complete architectural rewrite from v0.2.0. The core cryptographic engine has been ported to Rust (`kest-core-rs`), replacing the previous pure Python implementation. Identity is now strictly verified via SPIFFE/SPIRE, and policy evaluations have shifted from local embedded engines to scalable Sidecar patterns (OPA/Cedar). Please see the documentation for migration paths.
 
@@ -148,24 +148,9 @@ The output can be rendered in any Markdown viewer or the [Mermaid Live Editor](h
 
 ## Performance
 
-Kest ships two backends for the core cryptographic engine:
+## Performance
 
-| Backend | How to activate | Use case |
-|---|---|---|
-| **Rust** (default) | `KEST_BACKEND=rust` or `kest.core.set_backend("rust")` | Production; highest throughput |
-| **Python** | `KEST_BACKEND=python` or `kest.core.set_backend("python")` | sdist installs, debugging, environments without a Rust toolchain |
-
-### Benchmark Summary
-
-Representative results on a reference host (see [`examples/bench/BENCHMARK.md`](examples/bench/BENCHMARK.md) for full details):
-
-| Benchmark | Rust backend | Python backend | Speedup |
-|---|---|---|---|
-| `entry_create` | 0.80 µs | 0.81 µs | 1.01x slower |
-| `sign_entry` | 24.70 µs | 24.70 µs | ~1.0x |
-| `canonical_json` | 3.89 µs | 3.98 µs | 1.02x slower |
-| `chain_10` | 276 µs | 281 µs | 1.02x slower |
-| `chain_100` | 2.79 ms | 2.79 ms | ~1.0x |
+Kest Python is designed to be highly efficient in capturing execution lineage. The pure Python inline framework imposes minimal overhead suitable for the vast majority of microservice transactions.
 
 ### Running Benchmarks
 ```bash

@@ -12,7 +12,7 @@
 
 **Kest** is a Zero Trust execution lineage framework for Python agentic workflows and data pipelines. Every function call decorated with `@kest_verified` produces a cryptographically signed audit entry that is chained into a tamper-evident **Merkle DAG Passport**. The Passport propagates automatically across distributed hops via OpenTelemetry baggage, giving you verifiable, non-repudiable lineage across any number of services.
 
-> v0.3.0 is a complete rewrite. The signing and hashing primitives are implemented in Rust (via PyO3) for correctness and performance. A **security hardening patch** (2026-04-11) fixed cross-request identity collision in the policy cache, decoupled baggage reads from global lab state, and added a JWT verification guard to `KestIdentityMiddleware`. See the [Changelog](CHANGELOG.md) for the full list of changes.
+> v0.3.0 is a complete rewrite. The Python package is now a pure Python implementation for maximum portability and ease of installation. A **security hardening patch** (2026-04-11) fixed cross-request identity collision in the policy cache, decoupled baggage reads from global lab state, and added a JWT verification guard to `KestIdentityMiddleware`. See the [Changelog](CHANGELOG.md) for the full list of changes.
 
 ---
 
@@ -27,7 +27,7 @@
 | **Multi-hop OBO** | `KestMiddleware` + `KestHttpxInterceptor` thread the Passport through HTTP service boundaries automatically. |
 | **Three-Tier Baggage** | Inline → Compressed Inline (`kest.passport_z`) → Claim Check. Handles chains from 1 to 50+ hops without header bloat. |
 | **Identity Flexibility** | SPIRE/SPIFFE, AWS STS, Bedrock Agents, OIDC JWTs, or a local Ed25519 ephemeral key. |
-| **Rust Core** | RFC 8785 canonicalization + ED25519 signing via PyO3. Use `KEST_BACKEND=python` for multithreaded production (GIL cliff — see [#11](https://github.com/eterna2/kest/issues/11)). |
+| **Pure Python** | RFC 8785 canonicalization + ED25519 signing in pure Python for maximum portability. |
 
 ---
 
@@ -273,13 +273,7 @@ kest/
 
 ---
 
-## The V2 Pipeline (`kest-runtime-rs`)
-
-The new V2 execution environment (`KEST_BACKEND=rust`, default natively when built via `uv`/`maturin`) completely bypasses the Python Global Interpreter Lock (GIL) Contention Cliff observed in earlier versions. It delegates all policy evaluation, cryptographic signing, CARTA trust evaluations, OTel baggage extraction, and data constraints into highly-concurrent native Rust components. 
-
-By default, your `@kest_verified` functions will seamlessly route traces down this `v2` pipeline layer.
-
-### Extended Guide for the V2 Decorator
+### Extended Guide for the Gateway Server
 
 ```python
 from kest.core import kest_verified
@@ -300,21 +294,7 @@ def handle_partner_ingest(payload, user_id=None):
     return payload
 ```
 
-> [!WARNING]
-> **V2 Decorator Engine Type Coercion limits**
-> When evaluating inline arguments directly against engines like Cedar or Open Policy Agent (OPA) through `rust-v2` (`KEST_BACKEND=rust-v2`), be aware that all `context_map` dynamic variables (like `user_id` above) are strictly coerced into `String` formats within the native `HashMap<String, String>` pipeline boundary before reaching the evaluation engine.
-> 
-> * **Integer Objects:** Any mapped constraints (e.g., `trust_score` overrides or IDs) evaluating against conditions like `context.trust_score > 50` will **Fail** when processed by `rust-v2` if the policy expects native numerical types. Policy engines must evaluate context fields mapped via `@kest_verified(context_map=...)` using string comparators (e.g. `== "50"`).
-> * **OpenTelemetry Limits:** This behaviour exists because the execution environment acts transiently bridging HTTP Headers containing OTel Baggage schemas.
 
-
-
-**Key Differences & Improvements of V2:**
-- **Concurrency Scaling:** Heavy I/O processing (calling `CedarPolicyEngine`, hashing massive `parent_ids`, building recursive DAG structures) operates outside the generic constraints of Python interpreter locking boundaries, scaling multi-threaded frameworks up to ~3,100+ requests per second natively.
-- **Dynamic Spec-Aware Typing:** Even though Kest V2 universally handles OpenTelemetry Baggage metadata as strict String interfaces (`BTreeMap<String, String>`), policy evaluations specifically enforce primitive type conversions behind the scenes. Using `input.trust_score >= 80` inside Rego correctly receives dynamic Integers cleanly due to native adapter evaluation intercepts mapped in the `rust-v2` architecture.
-- **Inversion of Control Hooks:** Foreign class objects (like any standard Python variable passed to evaluate `trust_override` or `trust_evaluator`) are evaluated sequentially without memory leaks. Rust manages execution contexts and only re-acquires the GIL efficiently exactly when dipping into Python evaluation methods.
-
-Set `export KEST_BACKEND=python` locally if operating strictly single-thread or performing deep debugging of the internal validation pipeline steps. `KEST_BACKEND=rust` is the operational standard for live concurrent workflows.
 
 ---
 

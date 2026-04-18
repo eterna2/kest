@@ -1,15 +1,8 @@
-import os
-
-import kest.core._core  # noqa: F401_py
 import pyperf
+import rfc8785
 import uuid_utils
-
-try:
-    import kest.core._core  # noqa: F401
-
-    HAS_RUST = True
-except ImportError:
-    HAS_RUST = False
+from kest.core._core import KestEntry, sign_entry
+from kest.core.models import Passport
 
 
 class MockProvider:
@@ -42,15 +35,7 @@ def build_chain(KestEntryClass, sign_func, n) -> list:
 
 def main():
     runner = pyperf.Runner()
-
     provider = MockProvider()
-
-    backend = os.environ.get("KEST_BACKEND", "python").lower()
-
-    if backend == "rust" and HAS_RUST:
-        from kest.core._core import KestEntry, sign_entry
-    else:
-        from kest.core._core_py import KestEntry, sign_entry
 
     # 1. KestEntry constructor
     runner.bench_func(
@@ -82,14 +67,8 @@ def main():
     )
 
     # 3. Canonical JSON serialization directly
-    if backend == "rust" and HAS_RUST:
-        # We can't directly call Rust canonicalize, so we skip or just benchmark the python one.
-        pass
-    else:
-        import rfc8785
-
-        payload_dict = {"a": 1, "b": "test", "c": {"d": []}}
-        runner.bench_func("canonical_json", lambda: rfc8785.dumps(payload_dict))
+    payload_dict = {"a": 1, "b": "test", "c": {"d": []}}
+    runner.bench_func("canonical_json", lambda: rfc8785.dumps(payload_dict))
 
     # 4. Chain of 10
     runner.bench_func("chain_10", lambda: build_chain(KestEntry, sign_entry, 10))
@@ -98,8 +77,6 @@ def main():
     runner.bench_func("chain_100", lambda: build_chain(KestEntry, sign_entry, 100))
 
     # 6. Passport verify 10
-    from kest.core.models import Passport
-
     _entries = build_chain(KestEntry, sign_entry, 10)
     _passport = Passport(entries=_entries)
     _providers = {"mock_subject": provider}
