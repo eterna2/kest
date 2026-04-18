@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.1] - 2026-04-19
+
+- **Fix**: Added explicit `description` and `readme` parameters to the core `pyproject.toml` to correctly render documentation metadata on PyPI.
+- **CI**: Hardened action triggers by specifying absolute SHAs and binding the proper `pypi` Trusted Publisher OIDC environment payload.
+
 ## [0.3.0] - 2026-04-18
 
 > **v0.3.0 is a complete architectural rewrite.** The package has eliminated the legacy Rust backend and is now rebuilt from the ground up as a pure Python namespace package. Applications upgrading from any pre-release versions must migrate to the new `kest.core` API.

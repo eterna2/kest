@@ -5,7 +5,9 @@ build-backend = "hatchling.build"
 
 [project]
 name = "kest"
-version = "0.3.0"
+version = "0.3.1"
+description = "A Zero-Trust validation and telemetry toolkit for multi-agent workloads."
+readme = "README.md"
 requires-python = ">=3.11,<3.14"
 dependencies = [
     "opentelemetry-api>=1.41.0",
