@@ -12,7 +12,7 @@
 
 **Kest** is a Zero Trust execution lineage framework for Python agentic workflows and data pipelines. Every function call decorated with `@kest_verified` produces a cryptographically signed audit entry that is chained into a tamper-evident **Merkle DAG Passport**. The Passport propagates automatically across distributed hops via OpenTelemetry baggage, giving you verifiable, non-repudiable lineage across any number of services.
 
-> v0.3.0 is a complete rewrite. The signing and hashing primitives are implemented in Rust (via PyO3) for correctness and performance. A **security hardening patch** (2026-04-11) fixed cross-request identity collision in the policy cache, decoupled baggage reads from global lab state, and added a JWT verification guard to `KestIdentityMiddleware`. See the [Changelog](CHANGELOG.md) for the full list of changes.
+> v0.3.0 is a complete rewrite. The Python package is now a pure Python implementation for maximum portability and ease of installation. A **security hardening patch** (2026-04-11) fixed cross-request identity collision in the policy cache, decoupled baggage reads from global lab state, and added a JWT verification guard to `KestIdentityMiddleware`. See the [Changelog](CHANGELOG.md) for the full list of changes.
 
 ---
 
@@ -27,7 +27,7 @@
 | **Multi-hop OBO** | `KestMiddleware` + `KestHttpxInterceptor` thread the Passport through HTTP service boundaries automatically. |
 | **Three-Tier Baggage** | Inline → Compressed Inline (`kest.passport_z`) → Claim Check. Handles chains from 1 to 50+ hops without header bloat. |
 | **Identity Flexibility** | SPIRE/SPIFFE, AWS STS, Bedrock Agents, OIDC JWTs, or a local Ed25519 ephemeral key. |
-| **Rust Core** | RFC 8785 canonicalization + ED25519 signing via PyO3. Use `KEST_BACKEND=python` for multithreaded production (GIL cliff — see [#11](https://github.com/eterna2/kest/issues/11)). |
+| **Pure Python** | RFC 8785 canonicalization + ED25519 signing in pure Python for maximum portability. |
 
 ---
 
@@ -273,18 +273,32 @@ kest/
 
 ---
 
-## Production Notes
+### Extended Guide for the Gateway Server
 
-### Backend Selection
+```python
+from kest.core import kest_verified
 
-The Rust backend (`KEST_BACKEND=rust`, default when compiled) re-acquires the GIL to call `sign_payload` on Python identity providers. Under multithreaded load this causes ~94% throughput degradation (see [#11](https://github.com/eterna2/kest/issues/11)):
+# Implement optional dynamic trust capabilities via objects
+class CustomEvaluator:
+    def calculate(self, origin_score: int, parent_scores: list) -> int:
+         return min(parent_scores + [origin_score]) - 5
 
-```bash
-# Recommended for production until #11 is resolved
-export KEST_BACKEND=python
+# The V2 pipeline is integrated seamlessly.
+@kest_verified(
+    policy=["enterprise_baseline", "app_specific_route"],
+    origin="verified_partner",        # Translates natively to score hooks
+    context_map={"user_id": "user"},  # Context variables are injected into validation constraints
+    trust_evaluator=CustomEvaluator() # Hook evaluates back across FFI transparently
+)
+def handle_partner_ingest(payload, user_id=None):
+    return payload
 ```
 
-### Policy Cache
+
+
+---
+
+## Production Notes
 
 Policy decisions are cached for 5 seconds by default (TTL configurable):
 

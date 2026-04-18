@@ -1,0 +1,23 @@
+
+# FastAPI Benchmark — backend=python
+  Window: 3s per test | Concurrency tested: [1, 2, 4, 8, 16, 32]
+
+## Scalability: Sync Endpoint (FastAPI ThreadPool)
+ Threads |    ops/sec
+-------------------------
+       1 |      614.7
+       2 |      587.0
+       4 |      481.7
+       8 |      339.3
+      16 |      265.3
+      32 |      262.3
+
+## Scalability: Async Endpoint (Single Event Loop)
+  Tasks  |    ops/sec
+-------------------------
+       1 |      552.7
+       2 |      550.3
+       4 |      509.0
+       8 |      355.3
+      16 |      290.3
+      32 |      264.3

@@ -39,13 +39,31 @@ pub trait IdentityProvider {
     fn sign_payload(&self, payload: &[u8]) -> Result<String, CryptoError>;
 }
 
+impl IdentityProvider for Box<dyn IdentityProvider> {
+    fn verify_svid(&self, svid: &str) -> Result<String, CryptoError> {
+        (**self).verify_svid(svid)
+    }
+    fn sign_payload(&self, payload: &[u8]) -> Result<String, CryptoError> {
+        (**self).sign_payload(payload)
+    }
+}
+
+impl<'a> IdentityProvider for &'a (dyn IdentityProvider + 'a) {
+    fn verify_svid(&self, svid: &str) -> Result<String, CryptoError> {
+        (**self).verify_svid(svid)
+    }
+    fn sign_payload(&self, payload: &[u8]) -> Result<String, CryptoError> {
+        (**self).sign_payload(payload)
+    }
+}
+
 pub trait PolicyEngine {
     fn evaluate(&self, entry: &KestEntry) -> Result<PolicyResult, PolicyError>;
 }
 
 pub fn sign_kest_entry(
     entry: &KestEntry,
-    provider: &impl IdentityProvider,
+    provider: &(impl IdentityProvider + ?Sized),
 ) -> Result<String, CryptoError> {
     let json_val = serde_json::to_value(entry).map_err(|e| CryptoError::SigningFailed(e.to_string()))?;
     let canonical_json = crate::canonical::to_canonical_string(&json_val)

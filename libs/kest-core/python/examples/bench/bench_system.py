@@ -26,6 +26,9 @@ from typing import Any
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
+from kest.core.identity.providers.local import LocalEd25519Provider
+from kest.core.models import BaggageManager, Passport
+
 from kest.core import (
     CedarLocalEngine,
     KestEntry,
@@ -36,11 +39,13 @@ from kest.core import (
     kest_verified,
     sign_entry,
 )
-from kest.core.identity.providers.local import LocalEd25519Provider
-from kest.core.models import BaggageManager, Passport, PassportVerifier
 
 PROVIDER = LocalEd25519Provider()
 BACKEND = get_backend()
+
+if BACKEND == "rust-v2":
+    from kest.core.decorators_v2 import kest_verified
+
 REPS = 100
 CHAIN_LENGTHS = [1, 5, 10, 25, 50]
 
@@ -296,9 +301,10 @@ def bench_l3_policy_engines():
         def rego_eval():
             rego_engine.evaluate(entry.entry_id, ["kest/allow"], {})
 
-        rego_ops = _throughput(rego_eval, n)
-        print(f"  Rego  ops/sec (4 threads): {rego_ops:>10.1f}")
-        results["rego_ops_per_sec"] = rego_ops
+        # regopy multi-threading causes segfault due to cgo bounds. Skip threaded tests.
+        # rego_ops = _throughput(rego_eval, n)
+        # print(f"  Rego  ops/sec (4 threads): {rego_ops:>10.1f}")
+        # results["rego_ops_per_sec"] = rego_ops
     except Exception as e:
         print(f"  Rego: skipped ({e})")
 

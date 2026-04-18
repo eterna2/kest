@@ -2,72 +2,71 @@
   "backend": "rust",
   "L1_baggage": {
     "1": {
-      "pack_ms": 0.004672490031225607,
-      "unpack_ms": 0.0025713699869811535,
-      "raw_bytes": 1775,
-      "packed_bytes": 1775,
+      "pack_ms": 0.0028149900026619434,
+      "unpack_ms": 0.008408030116697773,
+      "raw_bytes": 829,
+      "packed_bytes": 829,
       "tier": "inline \u2713"
     },
     "5": {
-      "pack_ms": 0.04207366997434292,
-      "unpack_ms": 0.018373409984633327,
-      "raw_bytes": 8875,
-      "packed_bytes": 1672,
+      "pack_ms": 0.020526899897959083,
+      "unpack_ms": 0.036201449984218925,
+      "raw_bytes": 4145,
+      "packed_bytes": 940,
       "tier": "compressed \u2713"
     },
     "10": {
-      "pack_ms": 0.052453879980021156,
-      "unpack_ms": 0.03506889996060636,
-      "raw_bytes": 17750,
-      "packed_bytes": 1916,
+      "pack_ms": 0.03086782991886139,
+      "unpack_ms": 0.06656559999100864,
+      "raw_bytes": 8290,
+      "packed_bytes": 1108,
       "tier": "compressed \u2713"
     },
     "25": {
-      "pack_ms": 0.18516370000725146,
-      "unpack_ms": 0.08083417997113429,
-      "raw_bytes": 44375,
-      "packed_bytes": 3268,
+      "pack_ms": 0.05375972992624156,
+      "unpack_ms": 0.15440727991517633,
+      "raw_bytes": 20725,
+      "packed_bytes": 1376,
       "tier": "compressed \u2713"
     },
     "50": {
-      "pack_ms": 0.19197991998225916,
-      "unpack_ms": 0.11124235999886878,
-      "raw_bytes": 88750,
-      "packed_bytes": 3840,
+      "pack_ms": 0.09926311002345756,
+      "unpack_ms": 0.30601117003243417,
+      "raw_bytes": 41450,
+      "packed_bytes": 2056,
       "tier": "compressed \u2713"
     },
     "claim_check_at_hop": null
   },
   "L2_decorator": {
-    "baseline_ms": 6.050002411939203e-05,
-    "no_policy_ms": 0.1793126800475875,
-    "cedar_cold_ms": 56.08743800257798,
-    "cedar_warm_ms": 0.20725346999824978,
-    "rego_cold_ms": 6.128913999418728,
-    "rego_warm_ms": 0.17892834002850577
+    "baseline_ms": 5.9250014601275325e-05,
+    "no_policy_ms": 0.18427085000439547,
+    "cedar_cold_ms": 1.3481250061886385,
+    "cedar_warm_ms": 0.32148104000953026,
+    "rego_cold_ms": 1.9835059938486665,
+    "rego_warm_ms": 0.19649894995382056
   },
   "L3_policy": {
-    "cedar_ops_per_sec": 20471.0,
-    "rego_ops_per_sec": 628318.6666666666,
-    "sign_ops_per_sec": 14861.333333333334
+    "cedar_ops_per_sec": 20807.666666666668,
+    "sign_ops_per_sec": 13148.0
   },
   "L4_multihop": {
     "3": {
-      "total_ms": 0.4191536200232804,
-      "per_hop_ms": 0.13971787334109345
+      "total_ms": 0.4293510000570677,
+      "per_hop_ms": 0.14311700001902258
     },
     "5": {
-      "total_ms": 0.798971799958963,
-      "per_hop_ms": 0.1597943599917926
+      "total_ms": 0.8513284398941323,
+      "per_hop_ms": 0.17026568797882646
     },
     "10": {
-      "total_ms": 1.8517694200272672,
-      "per_hop_ms": 0.18517694200272672
+      "total_ms": 2.115416760207154,
+      "per_hop_ms": 0.21154167602071539
     }
   },
   "L4_merge": {
-    "2": 0.0007958900096127763,
-    "5": 0.0015165899822022766,
-    "10": 0.0027694199525285512
+    "2": 0.02558646010584198,
+    "5": 0.0306923700554762,
+    "10": 0.05776667007012293
   }
 }
