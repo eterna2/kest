@@ -1,404 +1,203 @@
-# Kest: Zero Trust Execution Lineage
+# Kest: Zero Trust Execution Lineage & AI Agent Security
 
 [![PyPI version](https://img.shields.io/pypi/v/kest.svg)](https://pypi.org/project/kest/)
 [![Documentation](https://img.shields.io/badge/docs-stable-brightgreen)](https://eterna2.github.io/kest/)
 [![CI](https://github.com/eterna2/kest/actions/workflows/ci.yml/badge.svg)](https://github.com/eterna2/kest/actions/workflows/ci.yml)
 [![Coveralls](https://coveralls.io/repos/github/eterna2/kest/badge.svg?branch=main)](https://coveralls.io/github/eterna2/kest?branch=main)
+![PyPI - Downloads](https://img.shields.io/pypi/dm/kest)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/eterna2/kest/badge)](https://scorecard.dev/viewer/?uri=github.com/eterna2/kest)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12453/badge)](https://www.bestpractices.dev/projects/12453)
+[![License: PolyForm Shield 1.0.0](https://img.shields.io/badge/License-PolyForm%20Shield%201.0.0-blue.svg)](https://polyformproject.org/licenses/shield/1.0.0/)
 
 > 📖 **[Full documentation → eterna2.github.io/kest](https://eterna2.github.io/kest/)**  
-> 📐 **[Kest v0.3.0 Specification → spec/SPEC-v0.3.0.md](./spec/SPEC-v0.3.0.md)** · [Rendered on website →](https://eterna2.github.io/kest/)
+> 📐 **[Kest v0.3.0 Specification → spec/SPEC-v0.3.0.md](./spec/SPEC-v0.3.0.md)**
 
-**Kest** is a Zero Trust execution lineage framework for Python agentic workflows and data pipelines. Every function call decorated with `@kest_verified` produces a cryptographically signed audit entry that is chained into a tamper-evident **Merkle DAG Passport**. The Passport propagates automatically across distributed hops via OpenTelemetry baggage, giving you verifiable, non-repudiable lineage across any number of services.
+**Kest** is a unified Zero Trust execution lineage framework designed for secure Python agentic workflows, multi-agent collaborations, and distributed data pipelines.
 
-> v0.3.0 is a complete rewrite. The Python package is now a pure Python implementation for maximum portability and ease of installation. A **security hardening patch** (2026-04-11) fixed cross-request identity collision in the policy cache, decoupled baggage reads from global lab state, and added a JWT verification guard to `KestIdentityMiddleware`. See the [Changelog](CHANGELOG.md) for the full list of changes.
+Every interaction decorated with `@kest_verified` produces a cryptographically signed audit entry chained into a tamper-evident **Merkle DAG Passport**. Passports propagate automatically across distributed hops, ensuring verifiable, non-repudiable lineage across autonomous AI subagents, cloud infrastructure, and classical microservices.
 
 ---
 
-## Key Features
+## 🚀 Features at a Glance
 
-| Capability | Description |
-|---|---|
-| **Merkle DAG Lineage** | Every execution step is hashed and chained. Tampering with any node invalidates the entire chain. |
-| **CARTA Trust Scores** | Numeric trust (0–100) propagates through the DAG. One untrusted node degrades all downstream scores. |
-| **Taint Propagation** | Risk labels (`added_taints` / `removed_taints`) accumulate across the chain. |
-| **Policy Enforcement** | Pluggable engines: OPA, Cedar, AWS AVP, or in-process Rego / Cedar — all before the function runs. |
-| **Multi-hop OBO** | `KestMiddleware` + `KestHttpxInterceptor` thread the Passport through HTTP service boundaries automatically. |
-| **Three-Tier Baggage** | Inline → Compressed Inline (`kest.passport_z`) → Claim Check. Handles chains from 1 to 50+ hops without header bloat. |
-| **Identity Flexibility** | SPIRE/SPIFFE, AWS STS, Bedrock Agents, OIDC JWTs, or a local Ed25519 ephemeral key. |
-| **Pure Python** | RFC 8785 canonicalization + ED25519 signing in pure Python for maximum portability. |
+### 🛡️ Kest Core (`libs/kest-core/python`)
+> **📘 Deep Dive**: For comprehensive setup options, distributed OpenTelemetry Baggage propagation, and architectural internals, please see the [Kest Core README](libs/kest-core/python/README.md).
+
+- **Merkle DAG Lineage**: Lineage chains with RFC 8785 strict canonicalization and Ed25519 signing mapped into OpenTelemetry baggage.
+- **CARTA Trust Scores**: Weakest-link integer trust propagation (0–100) combining structural and identity-based origin validation.
+- **Taint Boundaries**: Dynamic runtime tracking of accumulating risk profiles and constraints (e.g., `added_taints`, `removed_taints`).
+- **Pluggable Identity**: OIDC, SPIRE/SPIFFE workload identity, AWS STS/Bedrock contexts, localized Ephemeral Ed25519, and human-in-the-loop Device Flow via `OAuthCliProvider` (with secure platform `keyring`).
+- **Multi-Language Policy**: In-process runtime parity via `RegoLocalEngine` & `CedarLocalEngine`, alongside proactive AST syntax validations.
 
 ---
 
 ## Installation
 
+Install via `uv` or `pip`. `kest` acts as the base framework and is explicitly extensible through optional dependencies (extras).
+
 ```bash
-# Core (remote OPA / Cedar servers)
 uv add kest
-pip install kest
+```
 
-# In-process Rego evaluation (regopy)
-uv add "kest[rego]"
+### Available Extras
+- `rego`: Installs `regopy` for validating capabilities utilizing the `RegoLocalEngine`.
+- `cedar`: Installs `cedarpy` to natively compile and evaluate policies via the `CedarLocalEngine`.
+- `aws`: Installs `boto3` to evaluate external constraints via AWS Verified Permissions (`AVPPolicyEngine`).
+- `spiffe`: Installs standard bindings for native Workload Identity via the `SPIREProvider`.
 
-# In-process Cedar evaluation (cedarpy)
-uv add "kest[cedar]"
-
-# AWS Verified Permissions
-uv add "kest[aws]"
-
-# SPIRE/SPIFFE identity
-uv add "kest[spiffe]"
+Example utilizing multiple extras:
+```bash
+uv add "kest[cedar,rego]"
 ```
 
 ---
 
-## Quick Start
+## 🛠️ How Kest Works
+
+### 1. Identify the Workload
+The toolkit provides immediate integration paths to classical and AI-based environments, allowing seamless transitions from local development to cloud-native production.
 
 ```python
 from kest.core import (
-    configure,
-    kest_verified,
-    CedarLocalEngine,
-    LocalEd25519Provider,
+    SPIREProvider,           # SPIRE SVID via Unix socket (Kubernetes/Docker)
+    OAuthCliProvider,        # Authorization Code + PKCE (CLI/human auth)
+    AWSWorkloadIdentity,     # AWS STS GetCallerIdentity extraction
+    BedrockAgentIdentity,    # AWS Bedrock Agent runtime context
+    LocalEd25519Provider,    # Ephemeral keypair for dev/test
 )
 
-# 1. One-time global configuration
-configure(
-    identity=LocalEd25519Provider(),   # auto-generates an ephemeral Ed25519 key
-    engine=CedarLocalEngine(
-        policies=[
-            """
-            permit(
-                principal,
-                action == Action::"invoke",
-                resource
-            );
-            """
-        ]
-    ),
-)
+# Seamless SPIFFE Workload Validation
+identity = SPIREProvider(socket_path="/var/run/spire/agent/public/api.sock")
 
-# 2. Decorate your functions
-@kest_verified(policy="invoke")
-def ingest_data(payload: dict) -> dict:
-    return {"ingested": payload}
-
-@kest_verified(policy="invoke", added_taints=["unverified"])
-def fetch_external(url: str) -> dict:
-    return {"source": url, "data": "..."}
-
-@kest_verified(policy="invoke", removed_taints=["unverified"])
-def validate(data: dict) -> dict:
-    return {**data, "validated": True}
-
-# 3. Call them — lineage is automatic
-raw = ingest_data({"user": "alice", "amount": 100})
-external = fetch_external("https://api.example.com/prices")
-result = validate(external)
-
-# The result carries a full Passport: a list of JWS-signed KestEntry records
-# that form a cryptographically verifiable Merkle DAG.
-```
-
-### Using Rego In-Process
-
-```python
-from kest.core import configure, kest_verified, RegoLocalEngine, LocalEd25519Provider
-
-POLICY = """
-package kest.allow
-
-import future.keywords
-
-default allow := false
-
-allow if {
-    input.trust_score >= 70       # integer, 0-100
-    input.is_root == false
-}
-"""
-
-configure(
-    identity=LocalEd25519Provider(),
-    engine=RegoLocalEngine(policies={"kest/allow": POLICY}),
-)
-
-@kest_verified(policy="kest/allow")
-def process(data: dict) -> dict:
-    return data
-```
-
-### Trust Scores & Taint Propagation
-
-Trust scores are **integers (0–100)**, not floats. The `DefaultTrustEvaluator` uses a weakest-link model: `score = (min(parent_scores) * self_score) // 100`.
-
-```python
-# Quality gate: block any pipeline where trust has degraded below 80
-REGO_POLICY = """
-package kest.quality
-
-import future.keywords
-
-default allow := false
-
-allow if {
-    input.trust_score >= 80     # integer threshold
-}
-"""
-
-# Sanitizer: removes a taint and resets trust to 100
-@kest_verified(
-    policy="sanitizer_policy",
-    trust_override=100,
-    removed_taints=["unverified_input"],
-)
-async def input_scanner(data: dict) -> dict:
-    # After this hop, trust_score=100 and "unverified_input" is gone from taints
-    return {**data, "scanned": True}
-```
-
-### Multi-hop Propagation (FastAPI)
-
-```python
-from fastapi import FastAPI
-from kest.core import KestMiddleware, KestHttpxInterceptor, configure, kest_verified
-
-app = FastAPI()
-app.add_middleware(KestMiddleware)   # extracts incoming Kest baggage
-
-client = httpx.AsyncClient(transport=KestHttpxInterceptor())  # injects outgoing Kest baggage
-
-@app.post("/process")
-@kest_verified(policy="invoke")
-async def process(body: dict):
-    # The Passport from the caller is automatically extended here.
-    result = await client.post("http://next-service/step", json=body)
-    return result.json()
-```
-
----
-
-## Policy Engines
-
-### Remote Servers
-
-```python
-from kest.core import OPAPolicyEngine, CedarPolicyEngine
-
-# OPA (Open Policy Agent)
-engine = OPAPolicyEngine(url="http://opa:8181")
-
-# Remote Cedar service
-engine = CedarPolicyEngine(url="http://cedar:8080")
-```
-
-### In-Process (no network)
-
-```python
-from kest.core import CedarLocalEngine, RegoLocalEngine
-
-# Cedar (cedarpy) — requires: uv add "kest[cedar]"
-engine = CedarLocalEngine(policies=["permit(principal, action, resource);"])
-
-# Rego (regopy) — requires: uv add "kest[rego]"
-engine = RegoLocalEngine(policies={"pkg/name": "package pkg.name\ndefault allow = true"})
-```
-
-### Policy Validation (Pre-loading Check)
-
-If you are generating policies dynamically via LLMs, use validators to structural test policies before loading them into an engine:
-
-```python
-from kest.core.policies.validators import CedarValidator, RegoValidator
-
-# Validate syntax and optionally check against a schema
-# requires: uv add "kest[cedar]"
-cedar_validator = CedarValidator()
-cedar_validator.validate_syntax(policy_str, schema='namespace Demo { entity User; }')
-
-# Validates standard Rego syntactic constraints
-# requires: uv add "kest[rego]"
-rego_validator = RegoValidator()
-rego_validator.validate_syntax(rego_str)
-```
-
-### AWS Verified Permissions
-
-```python
-from kest.core import AVPPolicyEngine
-
-engine = AVPPolicyEngine(policy_store_id="ps-abc123", region="us-east-1")
-```
-
----
-
-## Identity Providers
-
-```python
-from kest.core import (
-    LocalEd25519Provider,    # ephemeral key (dev/test)
-    OAuthCliProvider,        # Authorization Code + PKCE (stable cross-session identity via passphrase)
-    StaticIdentity,          # explicit workload ID + key
-    SPIREProvider,           # SPIRE SVID via Unix socket
-    AWSWorkloadIdentity,     # AWS STS GetCallerIdentity
-    BedrockAgentIdentity,    # AWS Bedrock Agent context
-    OIDCIdentity,            # Generic OIDC JWT
-)
-
-# Set up an interactive OAuth 2.0 CLI login explicitly for human/agent workflows
-# Prompts for a stable passphrase, deriving a deterministic Ed25519 key bound to the user across sessions.
-identity = OAuthCliProvider(
-    client_id="my-agent-client",
-    issuer="https://auth.example.com",
-    auto_open_browser=True,
-)
-
-# Auto-detect: SPIRE → AWS → local ephemeral key
+# Or auto-detect based on environmental factors (SPIRE → AWS STS → Local Generate)
 from kest.core import get_default_identity
-identity = get_default_identity()
+auto_identity = get_default_identity()
 ```
 
----
-
-## Bundled Access-Control Policies
-
-`kest.core.policies` ships ready-to-load Cedar and Rego files for classical formal models:
-
-| Model | Description |
-|---|---|
-| Bell-LaPadula | Mandatory read/write confidentiality (MLS) |
-| Biba | Integrity confinement (no read-down, no write-up) |
-| Brewer-Nash | Chinese Wall / conflict-of-interest separation |
-| Clark-Wilson | Integrity guards with constrained data items |
-| Goguen-Meseguer | Non-interference |
-| Financial | Transaction-limit and approval-tier enforcement |
-| Security | Clearance-level access control |
+### 2. Configure the Policy Engine
+Engines are decoupled to provide ideal deployment architectures depending on your security posture, whether that is high performance in-process validation or centralized remote network validation.
 
 ```python
-from importlib.resources import files
+from kest.core import (
+    RegoLocalEngine,      # High-speed in-process Rust Rego evaluation
+    CedarLocalEngine,     # High-speed in-process Rust Cedar evaluation
+    OPAPolicyEngine,      # Remote Open Policy Agent server
+    AVPPolicyEngine,      # AWS Verified Permissions standard inference
+)
 
-# Load a bundled policy
-policy_text = files("kest.core.policies").joinpath("bell_lapadula.rego").read_text()
-engine = RegoLocalEngine(policies={"kest/blp": policy_text})
+# Initialize local or remote engine
+engine = RegoLocalEngine(policies={"kest/allow": "package kest.allow\ndefault allow = true"})
+
+# Apply global configuration
+from kest.core import configure
+configure(identity=identity, engine=engine)
 ```
 
----
+> **Note**: Catch syntax problems before they are evaluated directly inside LLM multi-agent prompts using bundled AST validators like `CedarValidator` and `RegoValidator`.
 
-## Monorepo Structure
-
-```
-kest/
-├── libs/
-│   ├── kest-core/
-│   │   ├── python/      # Python library (kest package)
-├── showcase/
-│   └── kest-lab/        # Docker Compose integration lab (SPIRE, OPA, Keycloak, Jaeger)
-└── website/             # Documentation site (Next.js)
-```
-
----
-
-### Extended Guide for the Gateway Server
+### 3. Secure the Operation
+Wrap operations with `@kest_verified` to automatically execute policy constraints, track context mutations, and digitally sign the subsequent lineage into the OpenTelemetry baggage.
 
 ```python
 from kest.core import kest_verified
 
-# Implement optional dynamic trust capabilities via objects
-class CustomEvaluator:
-    def calculate(self, origin_score: int, parent_scores: list) -> int:
-         return min(parent_scores + [origin_score]) - 5
-
-# The Pure Python pipeline is integrated seamlessly.
-@kest_verified(
-    policy=["enterprise_baseline", "app_specific_route"],
-    origin="verified_partner",        # Translates natively to score hooks
-    context_map={"user_id": "user"},  # Context variables are injected into validation constraints
-    trust_evaluator=CustomEvaluator() # Hook evaluates back across FFI transparently
-)
-def handle_partner_ingest(payload, user_id=None):
-    return payload
+@kest_verified(policy="financial_read_access", added_taints=["contains_phi"])
+def execute_sensitive_operation(payload: dict) -> dict:
+    """
+    Kest transparently evaluates incoming baggage against the active policy engine, 
+    and digitally signs the successful execution into the Merkle DAG lineage chain.
+    """
+    return {"status": "success", "processed_by": "kest-worker"}
 ```
 
+When evaluating a policy, Kest structures the deterministic execution lineage into a dictionary mapped specifically for your requested execution language (e.g., Rego or Cedar). The passed evaluation context looks like this:
 
+```json
+{
+  "subject": {
+    "workload": "spiffe://example.org/worker-node",
+    "user": "alice",
+    "agent": null,
+    "task": "billing_admin",
+    "trust_score": 80,
+    "taints": ["contains_phi"]
+  },
+  "object": {
+    "id": "resource_123",
+    "attributes": {}
+  },
+  "environment": {
+    "is_root": false,
+    "source_type": "internal",
+    "parent_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "policy_names": ["financial_read_access"],
+    "policy_tier": "function",
+    "active_deviations": []
+  },
+  "identity": "spiffe://example.org/worker-node",
+  "trust_score": 80
+}
+```
+
+### 4. The Cryptographic OTel Passport
+Every interaction decorated with `@kest_verified` injects a non-repudiable audit entry natively into the OpenTelemetry baggage trace. The Passport is tracked as a JSON array of JWS compact strings (`header.payload.signature`). Before being signed with Ed25519, the canonicalized payload of each entry is formatted according to RFC 8785:
+
+```json
+{
+  "schema_version": "0.3.0",
+  "runtime": { "name": "kest-python", "version": "0.3.0" },
+  "entry_id": "018f2d5e-85a2-73b9-a461-8f55b9e0f3b2",
+  "operation": "execute_sensitive_operation",
+  "classification": "system",
+  "trust_score": 80,
+  "parent_ids": ["e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"],
+  "added_taints": ["contains_phi"],
+  "removed_taints": [],
+  "taints": ["contains_phi"],
+  "labels": {
+    "principal": "spiffe://example.org/worker-node",
+    "trace_id": "5b8aa5a2d2c88dced14032d84784be62"
+  },
+  "policy_context": {
+    "enterprise_policies": [],
+    "platform_policies": ["check_trust_score"],
+    "function_policies": ["financial_read_access"],
+    "deviations": []
+  },
+  "timestamp_ms": 1714574972124
+}
+```
 
 ---
 
-## Production Notes
+## Monorepo Layout
 
-Policy decisions are cached for 5 seconds by default (TTL configurable):
+```text
+kest/
+├── libs/                           
+│   ├── kest-core/                  # Core Python Framework (`kest.core`)
 
-```bash
-# Reduce TTL for high-sensitivity services
-export KEST_POLICY_CACHE_TTL=1.0
-
-# Disable caching entirely (e.g., revocation-critical paths)
-export KEST_POLICY_CACHE_TTL=0
+├── showcase/                       
+│   ├── kest-lab/                   # Complete Docker Compose integration stack (OPA, Keycloak, SPIRE)
+├── website/                        # Next.js Official Documentation Site
 ```
-
-For immediate revocation, call `invalidate_policy_cache()` from your application:
-
-```python
-from kest.core import invalidate_policy_cache
-invalidate_policy_cache()   # flushes all cached decisions
-```
-
-### JWT Verification (`KestIdentityMiddleware`)
-
-`KestIdentityMiddleware` requires a `jwks_uri` to verify JWT signatures. Without it, the middleware raises `RuntimeError` at startup (on the first request). To allow unsigned JWTs in development:
-
-```bash
-export KEST_INSECURE_NO_VERIFY=true   # dev/test only — never in production
-```
-
-### Baggage Key Names
-
-As of v0.3.0 security hardening, baggage keys are aligned with the spec:
-
-| Baggage Key | Description |
-|---|---|
-| `kest.passport` | Inline Passport (JWS chain, ≤ 4 KB) |
-| `kest.passport_z` | Compressed inline Passport (zlib+base64url, ≤ 4 KB compressed) |
-| `kest.claim_check` | Claim Check UUID (when Passport exceeds both thresholds) |
-| `kest.chain_tip` | SHA-256 of the last entry (for quick chain validation) |
-| `kest.user` | User subject from JWT `sub` claim |
-| `kest.agent` | Agent/service identity from JWT `client_id` claim |
-| `kest.task` | Task scope from JWT `scope` claim |
-
-> ⚠️ Old containers (pre-hardening) write `kest.principal_user` / `kest.workload_agent`. Rebuild all services together when upgrading.
-
-
-The most complete flow Kest supports is a **human → agent → gateway → task** delegation chain:
-
-```
-Alice → kest-agent (OBO exchange) → kest-gateway /authorise (scope check)
-      → task token (scope: task:process-data only)
-      → kest-gateway /execute-task → hop1 → hop2 → hop3
-```
-
-Every hop produces a signed `KestEntry`. At the end, you have **6 cryptographically linked audit entries** in a Merkle DAG, covering:
-
-| # | Service | Trust Score | Policy |
-|---|---|---|---|
-| 1 | kest-agent (OBO delegation) | 10 (internet) | `delegation_policy` |
-| 2 | kest-gateway /authorise | 100 (internal) | `gateway_policy` |
-| 3 | kest-gateway /execute-task | 100 | `task_policy` |
-| 4–6 | hop1, hop2, hop3 | 100 | `workload_user_policy` |
-
-See the full step-by-step walkthrough — with actual token payloads, policy context dicts, and decoded audit entries at every hop — in the **[Gateway E2E documentation](https://eterna2.github.io/kest/stable/examples/gateway_e2e)**.
 
 ---
 
-## Running the Lab
+## Running the Showcase Integration Lab
+
+For real-world architectural validation—including interactions across SPIFFE domains and independent policy execution engines—we utilize our integrated Docker Lab environment. The `kest-lab` spins up a complete zero-trust testing stack featuring a SPIRE server for workload identity attestation, an Open Policy Agent (OPA) sidecar, Keycloak for OIDC JWT generation, and a Jaeger instance for OpenTelemetry collection. This sandbox natively replicates and validates multi-hop asynchronous trace leakage and production proxy configurations.
+
+For detailed instructions on interacting with the instances and extending the sandbox, please see the [Kest Lab README](showcase/kest-lab/README.md).
 
 ```bash
-# Start the full integration environment
+# Provision the Docker environments (Keycloak, Jaeger, OPA, SPIRE, & hop microservices) 
 moon run kest-lab:up
 
-# Run live integration tests (inside the lab containers)
-moon run kest-lab:test-live
+# Run live integration scripts safely verifying lineage injection flows
+moon run kest-core-python:test-live
 
-# Stop the lab
+# Tear down the lab
 moon run kest-lab:down
 ```
 
@@ -411,7 +210,7 @@ Full reference documentation is available on the project website:
 - [🚀 **Stable Documentation**](https://eterna2.github.io/kest/stable/)
 - [📦 **v0.3.0 Reference**](https://eterna2.github.io/kest/v0.3.0/)
 
-See the [Changelog](CHANGELOG.md) for the complete version history.
+See the [Root Changelog](CHANGELOG.md) to navigate version histories across all monorepo modules.
 
 ---
 

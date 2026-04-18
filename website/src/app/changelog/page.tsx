@@ -9,8 +9,8 @@ import Link from 'next/link';
  * When the site is rebuilt, any changes to the source file are automatically reflected.
  */
 function getChangelog(): string {
-  // Walk up from website/ to the monorepo root
-  const changelogPath = path.join(process.cwd(), '..', 'CHANGELOG.md');
+  // Walk up from website/ to the kest-core python lib where the changelog is located
+  const changelogPath = path.join(process.cwd(), '..', 'libs', 'kest-core', 'python', 'CHANGELOG.md');
   if (!fs.existsSync(changelogPath)) {
     return '# Changelog\n\nNo changelog found.';
   }
