@@ -39,7 +39,7 @@
 | Verification Hook lifecycle | F-PE-01 → F-PE-13 | ✅ Implemented | Steps 8→9→10→11 match spec exactly |
 | Trust score | F-TS-01 → F-TS-06 | ✅ Implemented | All default origin scores correct |
 | Taint tracking | F-TT-01 → F-TT-06 | ✅ Implemented | |
-| Identity context (user/agent/task) | F-IC-01 → F-IC-05 | ✅ Implemented | Baggage keys: `kest.user`, `kest.agent`, `kest.task` |
+| Identity context (user/agent/task/resource) | F-IC-01 → F-IC-05 | ✅ Implemented | `user`, `agent`, `task` via Baggage; `resource_id`/`resource_attr` via decorator params (Issue #77) |
 | Context propagation | F-CP-01 → F-CP-08 | ✅ Implemented | `kest.passport_z` (compressed) is now normative |
 | Telemetry | F-TE-01 → F-TE-04 | ✅ Implemented | |
 | Global configuration | F-GC-01 → F-GC-04 | ✅ Implemented | |
@@ -182,3 +182,21 @@ When subclassing a PyO3 class (e.g., `RustNativeIdentityProvider`), override `__
 
 ### A-06: V2 Context Normalization Resolution
 **Resolution**: While the `rust-v2` backend generically stores tracking context as strings for OTel payload validation (`BTreeMap<String, String>`), Kest explicitly implements Spec-Aware Type Coercion directly inside the Engine Adapters (Cedar, OPA, and Foreign FFI engines). This specifically parses and intercepts standard specification integer fields like `trust_score` before policy evaluation, ensuring strict type compliance across language boundaries.
+### T-07: Assert `context["object"]` Shape in Engine Override
+
+When testing `resource_id` / `resource_attr` forwarding, override `evaluate()` in a `MockPolicyEngine` subclass to capture the `context` dict:
+
+```python
+class _CapturingEngine(MockPolicyEngine):
+    def __init__(self): super().__init__(allow_all=True); self.contexts = []
+    def evaluate(self, entry_id, policy_names, context):
+        self.contexts.append(context); return True
+```
+
+Then assert:
+```python
+assert engine.contexts[0]["object"]["id"] == "expected-id"
+assert engine.contexts[0]["object"]["attributes"] == {"dept": "eng"}
+```
+
+This avoids patching internals and tests the full end-to-end resolver path.

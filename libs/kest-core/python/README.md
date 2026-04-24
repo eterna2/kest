@@ -99,6 +99,10 @@ Engines like Rego or Cedar evaluate the context state precisely. Kest maps its e
     "trust_score": 80,                   // Cumulative CARTA integer (0-100)
     "taints": ["contains_phi"]           // Active cumulated risk profiles
   },
+  "object": {
+    "id": "document:42",                 // Resource identifier (resource_id param)
+    "attributes": { "dept": "finance" }  // Resource attributes (resource_attr param)
+  },
   "environment": {
     "parent_hash": "e3b0c442...",        // Deterministic previous-hop JWS signature
     "policy_names": ["financial_access"] // Active policies triggered for current execution
@@ -137,7 +141,35 @@ has_taint(t) {
 }
 ```
 
-### 3. Policy Validation
+### 3. Resource Context (ABAC)
+
+For Attribute-Based Access Control, pass `resource_id` and `resource_attr` to `@kest_verified`. Both accept a static value or a **resolver** — a callable that receives the decorated function's arguments at call time.
+
+```python
+from kest.core import kest_verified
+
+# Static resource identity
+@kest_verified(
+    policy="document_read",
+    resource_id="documents:42",
+    resource_attr={"dept": "finance", "classification": "confidential"},
+)
+def read_document(doc_id: str) -> dict:
+    ...
+
+# Resolver: derive resource context dynamically from function arguments
+@kest_verified(
+    policy="document_read",
+    resource_id=lambda doc_id, **kw: f"documents:{doc_id}",
+    resource_attr=lambda doc_id, **kw: {"dept": "finance"},
+)
+def read_document_dynamic(doc_id: str) -> dict:
+    ...
+```
+
+Resolved values are forwarded to the policy engine as `object.id` / `object.attributes` per SPEC §9.2 and serialized into `KestEntry.labels["kest.resource_attr"]` for tamper-evident audit.
+
+### 4. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
 
 ```python
