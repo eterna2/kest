@@ -7,7 +7,7 @@ import json
 import os
 import time
 from threading import Lock
-from typing import Any, List, Optional, Union
+from typing import Any, Callable, List, Optional, Union
 
 import opentelemetry.context as otel_context
 import uuid_utils
@@ -67,6 +67,9 @@ class _PolicyDecisionCache:
             context.get("user", ""),
             context.get("agent", ""),
             context.get("task", ""),
+            # ABAC resource axis — MUST be in cache key to prevent cross-resource
+            # collisions where different resource IDs share a cached allow decision.
+            context.get("object", {}).get("id", "") or "",
         )
 
     def get_or_evaluate(
@@ -278,6 +281,32 @@ def get_active_deviations() -> List[Any]:
     return getattr(kest.core, "_active_deviations", [])
 
 
+def _build_resource_context(
+    resource_id: Optional[Union[str, Callable]],
+    resource_attr: Optional[Union[dict, Callable]],
+    args: tuple,
+    kwargs: dict,
+) -> tuple:
+    """
+    Resolve resource_id and resource_attr at call time.
+
+    If the value is callable, it is invoked with (*args, **kwargs) of the
+    decorated function and must return the resolved value.  Static values
+    are returned as-is.  None → None.
+
+    Returns:
+        (resolved_id, resolved_attr) where resolved_id is str|None and
+        resolved_attr is dict|None.
+    """
+    resolved_id: Optional[str] = (
+        resource_id(*args, **kwargs) if callable(resource_id) else resource_id
+    )
+    resolved_attr: Optional[dict] = (
+        resource_attr(*args, **kwargs) if callable(resource_attr) else resource_attr
+    )
+    return resolved_id, resolved_attr
+
+
 def _build_mapped_context(func, context_map, args, kwargs):
     mapped_context = {}
     mapped_labels = {}
@@ -317,6 +346,8 @@ def _execute_core_logic(
     kwargs: dict,
     engine: Optional[PolicyEngine],
     identity: Optional[IdentityProvider],
+    resolved_resource_id: Optional[str] = None,
+    resolved_resource_attr: Optional[dict] = None,
 ):
     """Shared core logic extracted to prevent duplication between sync and async execution paths."""
     active_id = identity or get_active_identity()
@@ -395,6 +426,11 @@ def _execute_core_logic(
         "task": _get_baggage("kest.task") or "",
         # Implementation extension: raw OAuth scope for Cedar ABAC checks
         "scope": _get_baggage("kest.scope") or "",
+        # SPEC-v0.3.0 §9.2 — resource context for ABAC (F-IC-01, F-IC-02)
+        "object": {
+            "id": resolved_resource_id,
+            "attributes": resolved_resource_attr or {},
+        },
     }
 
     # Needs to be provided by caller logic:
@@ -422,6 +458,7 @@ def _execute_core_post_auth(
     added_taints,
     removed_taints,
     mapped_labels,
+    resource_attr: Optional[dict] = None,
 ):
     span = state["span"]
     labels = {"principal": state["principal"]}
@@ -442,6 +479,10 @@ def _execute_core_post_auth(
         labels["kest.identity"] = json.dumps(
             {"user": principal_user or "", "agent": principal_agent or ""}
         )
+
+    # Spec §2.7 F-IC-04: embed resource_attr in labels as kest.resource_attr JSON string
+    if resource_attr:
+        labels["kest.resource_attr"] = json.dumps(resource_attr)
 
     entry = KestEntry(
         entry_id=state["entry_id"],
@@ -496,7 +537,31 @@ def kest_verified(
     removed_taints: Optional[List[str]] = None,
     trust_override: Optional[int] = None,
     context_map: Optional[dict] = None,
+    resource_id: Optional[Union[str, Callable]] = None,
+    resource_attr: Optional[Union[dict, Callable]] = None,
 ):
+    """
+    Decorator that wraps a function with Kest zero-trust policy enforcement.
+
+    Args:
+        policy: Policy name(s) to evaluate (logical AND).
+        engine: Per-invocation PolicyEngine override.
+        identity: Per-invocation IdentityProvider override.
+        trust_evaluator: Per-invocation TrustEvaluator override.
+        origin: Source type for root-node trust bootstrapping.
+        added_taints: Taint labels to introduce at this node.
+        removed_taints: Taint labels to clear at this node.
+        trust_override: Hard-set trust_score bypassing the evaluator (sanitizer).
+        context_map: Map of function argument names to policy context keys.
+        resource_id: Resource identifier for ABAC.  Accepts a static string or a
+            callable (resolver) that receives the function's (*args, **kwargs) and
+            returns a string.  Forwarded as ``object.id`` in the policy context
+            (SPEC-v0.3.0 §9.2, F-IC-01).
+        resource_attr: Resource attributes for ABAC.  Accepts a static dict or a
+            callable (resolver) that receives (*args, **kwargs) and returns a dict.
+            Forwarded as ``object.attributes`` in the policy context and serialized
+            into ``KestEntry.labels["kest.resource_attr"]`` (F-IC-01, F-IC-04).
+    """
     _raw_policies = [policy] if isinstance(policy, str) else policy
     policies = list(dict.fromkeys(_raw_policies))
 
@@ -507,6 +572,9 @@ def kest_verified(
         async def async_wrapper(*args, **kwargs):
             mapped_context, mapped_labels = _build_mapped_context(
                 func, context_map, args, kwargs
+            )
+            resolved_rid, resolved_rattr = _build_resource_context(
+                resource_id, resource_attr, args, kwargs
             )
             state = _execute_core_logic(
                 func.__name__,
@@ -521,6 +589,8 @@ def kest_verified(
                 kwargs,
                 engine,
                 identity,
+                resolved_resource_id=resolved_rid,
+                resolved_resource_attr=resolved_rattr,
             )
 
             span = state["span"]
@@ -559,6 +629,7 @@ def kest_verified(
                     added_taints,
                     removed_taints,
                     mapped_labels,
+                    resolved_rattr,
                 )
                 token = otel_context.attach(new_ctx)
                 try:
@@ -570,6 +641,9 @@ def kest_verified(
         def sync_wrapper(*args, **kwargs):
             mapped_context, mapped_labels = _build_mapped_context(
                 func, context_map, args, kwargs
+            )
+            resolved_rid, resolved_rattr = _build_resource_context(
+                resource_id, resource_attr, args, kwargs
             )
             state = _execute_core_logic(
                 func.__name__,
@@ -584,6 +658,8 @@ def kest_verified(
                 kwargs,
                 engine,
                 identity,
+                resolved_resource_id=resolved_rid,
+                resolved_resource_attr=resolved_rattr,
             )
 
             span = state["span"]
@@ -608,7 +684,12 @@ def kest_verified(
                     raise PermissionError(f"Kest policies {policies} denied execution")
 
                 new_ctx = _execute_core_post_auth(
-                    state, func.__name__, added_taints, removed_taints, mapped_labels
+                    state,
+                    func.__name__,
+                    added_taints,
+                    removed_taints,
+                    mapped_labels,
+                    resolved_rattr,
                 )
                 token = otel_context.attach(new_ctx)
                 try:

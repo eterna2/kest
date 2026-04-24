@@ -6,6 +6,13 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Resource Context** (F-IC-01, F-IC-02, F-IC-04): Added `resource_id` (str | Callable) and
+  `resource_attr` (dict | Callable) parameters to `@kest_verified`. Both accept static values
+  or resolver callables that are invoked with the decorated function's arguments at call time.
+  Resolved values are forwarded to the policy engine as `object.id` / `object.attributes` per
+  SPEC-v0.3.0 §9.2 (F-IC-01, F-IC-02) and serialized into `KestEntry.labels["kest.resource_attr"]`
+  for tamper-evident audit (F-IC-04). The policy decision cache key now includes `resource_id` to
+  prevent cross-resource ABAC cache collisions.
 - **Context Accessor Functions** (F-CP-06): Implemented the five public context accessor functions required by SPEC-v0.3.0 §2.8:
   - `get_current_user()` — reads `kest.user` from OTel Baggage
   - `get_current_agent()` — reads `kest.agent` from OTel Baggage
