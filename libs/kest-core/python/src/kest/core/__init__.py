@@ -40,6 +40,12 @@ from kest.core.framework.ext import (  # noqa: E402
     KestIdentityMiddleware,
     KestMiddleware,
 )
+from kest.core.framework.validators import (  # noqa: E402
+    MaxLengthValidator,
+    OutputValidationError,
+    OutputValidator,
+    RegexDenyListValidator,
+)
 from kest.core.identity import (  # noqa: E402
     AWSWorkloadIdentity,
     BedrockAgentIdentity,
@@ -165,4 +171,9 @@ __all__ = [
     "get_current_task",
     "get_current_jwt",
     "get_current_passport",
+    # Output Validators (Issue #78)
+    "OutputValidator",
+    "OutputValidationError",
+    "MaxLengthValidator",
+    "RegexDenyListValidator",
 ]

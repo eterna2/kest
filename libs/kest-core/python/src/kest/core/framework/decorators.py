@@ -16,6 +16,7 @@ from opentelemetry import baggage, trace
 from kest.core import KestEntry, sign_entry
 from kest.core.engines.engine import PolicyEngine
 from kest.core.framework.context import get_current_jwt
+from kest.core.framework.validators import OutputValidationError, OutputValidator
 from kest.core.identity import IdentityProvider
 from kest.core.models.passport import (
     ORIGIN_TRUST_MAP,
@@ -459,6 +460,7 @@ def _execute_core_post_auth(
     removed_taints,
     mapped_labels,
     resource_attr: Optional[dict] = None,
+    extra_taints: Optional[List[str]] = None,
 ):
     span = state["span"]
     labels = {"principal": state["principal"]}
@@ -493,9 +495,9 @@ def _execute_core_post_auth(
         labels=labels,
         added_taints=added_taints or [],
         removed_taints=removed_taints or [],
-        taints=list(state["current_accumulated"])
+        taints=list(state["current_accumulated"]) + (extra_taints or [])
         if state["current_accumulated"]
-        else [],
+        else (extra_taints or []),
         policy_context={
             "enterprise_policies": get_active_enterprise_policies(),
             "platform_policies": [],
@@ -539,6 +541,7 @@ def kest_verified(
     context_map: Optional[dict] = None,
     resource_id: Optional[Union[str, Callable]] = None,
     resource_attr: Optional[Union[dict, Callable]] = None,
+    output_validators: Optional[List[OutputValidator]] = None,
 ):
     """
     Decorator that wraps a function with Kest zero-trust policy enforcement.
@@ -561,6 +564,12 @@ def kest_verified(
             callable (resolver) that receives (*args, **kwargs) and returns a dict.
             Forwarded as ``object.attributes`` in the policy context and serialized
             into ``KestEntry.labels["kest.resource_attr"]`` (F-IC-01, F-IC-04).
+        output_validators: Optional list of :class:`~kest.core.framework.validators.OutputValidator`
+            instances.  Each validator's :meth:`validate` method is called with the
+            function's return value after execution succeeds.  If any validator raises
+            :class:`~kest.core.framework.validators.OutputValidationError`, the taint
+            ``"output_validation_failed"`` is added to the audit entry and the error
+            is re-raised (the result is NOT returned to the caller).
     """
     _raw_policies = [policy] if isinstance(policy, str) else policy
     policies = list(dict.fromkeys(_raw_policies))
@@ -633,7 +642,28 @@ def kest_verified(
                 )
                 token = otel_context.attach(new_ctx)
                 try:
-                    return await func(*args, **kwargs)
+                    result = await func(*args, **kwargs)
+                    # Run output validators (Issue #78)
+                    if output_validators:
+                        for validator in output_validators:
+                            try:
+                                validator.validate(result)
+                            except OutputValidationError:
+                                # Re-sign entry with the failure taint audited
+                                await loop.run_in_executor(
+                                    _get_sign_executor(),
+                                    cv.run,
+                                    _execute_core_post_auth,
+                                    state,
+                                    func.__name__,
+                                    added_taints,
+                                    removed_taints,
+                                    mapped_labels,
+                                    resolved_rattr,
+                                    ["output_validation_failed"],
+                                )
+                                raise
+                    return result
                 finally:
                     otel_context.detach(token)
 
@@ -693,7 +723,25 @@ def kest_verified(
                 )
                 token = otel_context.attach(new_ctx)
                 try:
-                    return func(*args, **kwargs)
+                    result = func(*args, **kwargs)
+                    # Run output validators (Issue #78)
+                    if output_validators:
+                        for validator in output_validators:
+                            try:
+                                validator.validate(result)
+                            except OutputValidationError:
+                                # Re-sign entry with the failure taint audited
+                                _execute_core_post_auth(
+                                    state,
+                                    func.__name__,
+                                    added_taints,
+                                    removed_taints,
+                                    mapped_labels,
+                                    resolved_rattr,
+                                    ["output_validation_failed"],
+                                )
+                                raise
+                    return result
                 finally:
                     otel_context.detach(token)
 
