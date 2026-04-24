@@ -22,6 +22,8 @@ jobs:
 
       - name: Install proto
         uses: moonrepo/setup-toolchain@261c62cb5b0f580c7be7c8cd0f023a2e96756095  # v0.6.4
+        with:
+          proto-version: 0.56.4
 
       - name: Install dependencies
         run: proto install
