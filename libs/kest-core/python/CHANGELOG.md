@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.4.0] - 2026-04-24
+
+### Added
+
+- **Context Accessor Functions** (F-CP-06): Implemented the five public context accessor functions required by SPEC-v0.3.0 §2.8:
+  - `get_current_user()` — reads `kest.user` from OTel Baggage
+  - `get_current_agent()` — reads `kest.agent` from OTel Baggage
+  - `get_current_task()` — reads `kest.task` from OTel Baggage
+  - `get_current_jwt()` — reads `kest.jwt` from OTel Baggage (previously internal, now public with type hints)
+  - `get_current_passport()` — reads `kest.passport` from OTel Baggage (previously internal, now public with type hints)
+- All five accessors are exported from the `kest.core` public API.
+
+### Changed
+
+- **Toolchain**: Upgraded moon from 2.1.3 → 2.2.3 to fix proto 0.55.4 WASM plugin incompatibility (`missing field 'working_dir'`).
+
 ## [0.3.0.post1] - 2026-04-19
 
 - **Fix**: Added explicit `description` and `readme` parameters to the core `pyproject.toml` to correctly render documentation metadata on PyPI.

@@ -4,7 +4,7 @@ from typing import Dict, Optional, Union
 class RegoValidator:
     """
     Validates Rego policy syntax structurally without executing it.
-    
+
     Requires the optional `rego` extra (regopy).
     """
 
@@ -18,10 +18,10 @@ class RegoValidator:
     def validate_syntax(self, policy_str: str) -> None:
         """
         Validates the syntax of a Rego policy string.
-        
+
         Args:
             policy_str: The Rego policy to validate.
-            
+
         Raises:
             ValueError: If the policy has syntax errors.
         """
@@ -35,7 +35,7 @@ class RegoValidator:
 class CedarValidator:
     """
     Validates Cedar policy syntax and optionally validates against a specific Cedar Schema.
-    
+
     Requires the optional `cedar` extra (cedarpy).
     """
 
@@ -51,11 +51,11 @@ class CedarValidator:
     ) -> None:
         """
         Validates the syntax of a Cedar policy, and optionally checks it against a schema.
-        
+
         Args:
             policy_str: The Cedar policy string to validate.
             schema: Optional schema (Cedar schema syntax or JSON) to validate against.
-            
+
         Raises:
             ValueError: If the policy has syntax errors or fails schema validation.
         """

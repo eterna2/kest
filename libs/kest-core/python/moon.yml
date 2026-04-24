@@ -14,7 +14,7 @@ tasks:
     inputs:
       - 'pyproject.toml'
   test:
-    script: 'uv run pytest --cov=src/kest/core --cov-report=xml --cov-report=term-missing src/kest/core'
+    script: 'uv run pytest --cov=src/kest --cov-report=xml --cov-report=term-missing src/kest'
     deps:
       - 'check'
     inputs:
@@ -53,4 +53,16 @@ tasks:
     inputs:
       - 'examples/bench/**/*.py'
       - 'examples/bench/**/*.sh'
+      - 'src/**/*.py'
+  format:
+    script: 'uv run ruff format src/ && uv run ruff check --fix src/'
+    deps:
+      - 'check'
+    inputs:
+      - 'src/**/*.py'
+  lint:
+    script: 'uv run ruff check src/'
+    deps:
+      - 'check'
+    inputs:
       - 'src/**/*.py'

@@ -11,8 +11,8 @@ This package provides the core Python implementation of Kest, including:
 from typing import Any
 
 from kest.core._core import KestEntry, sign_entry, version
-from kest.core.framework.cache import CacheProvider, SimpleCache  # noqa: E402
-from kest.core.framework.decorators import invalidate_policy_cache, kest_verified  # noqa: E402
+
+__version__ = version()
 from kest.core.engines.engine import (  # noqa: E402
     AVPPolicyEngine,
     CedarLocalEngine,
@@ -22,6 +22,18 @@ from kest.core.engines.engine import (  # noqa: E402
     PolicyCache,
     PolicyEngine,
     RegoLocalEngine,
+)
+from kest.core.framework.cache import CacheProvider, SimpleCache  # noqa: E402
+from kest.core.framework.context import (  # noqa: E402
+    get_current_agent,
+    get_current_jwt,
+    get_current_passport,
+    get_current_task,
+    get_current_user,
+)
+from kest.core.framework.decorators import (  # noqa: E402
+    invalidate_policy_cache,
+    kest_verified,
 )
 from kest.core.framework.ext import (  # noqa: E402
     KestHttpxInterceptor,
@@ -110,6 +122,7 @@ def configure(
 
 
 __all__ = [
+    "__version__",
     "version",
     "KestEntry",
     "Passport",
@@ -146,4 +159,10 @@ __all__ = [
     # Operations
     "sign_entry",
     "invalidate_policy_cache",
+    # Context Accessors (F-CP-06)
+    "get_current_user",
+    "get_current_agent",
+    "get_current_task",
+    "get_current_jwt",
+    "get_current_passport",
 ]
