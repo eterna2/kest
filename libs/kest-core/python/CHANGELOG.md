@@ -13,6 +13,12 @@ All notable changes to this project will be documented in this file.
   SPEC-v0.3.0 §9.2 (F-IC-01, F-IC-02) and serialized into `KestEntry.labels["kest.resource_attr"]`
   for tamper-evident audit (F-IC-04). The policy decision cache key now includes `resource_id` to
   prevent cross-resource ABAC cache collisions.
+- **Output Validators / Guardrail Hooks** (Issue #78): Added `output_validators` parameter to
+  `@kest_verified` accepting a list of `OutputValidator` instances. Validators are run after
+  function execution; any `OutputValidationError` adds the taint `"output_validation_failed"` to
+  the audit entry and re-raises (the result is NOT returned to the caller). Built-in validators:
+  - `MaxLengthValidator(max_chars)` — rejects outputs whose `str()` exceeds `max_chars` characters.
+  - `RegexDenyListValidator(patterns)` — rejects outputs matching any regex in the deny-list.
 - **Context Accessor Functions** (F-CP-06): Implemented the five public context accessor functions required by SPEC-v0.3.0 §2.8:
   - `get_current_user()` — reads `kest.user` from OTel Baggage
   - `get_current_agent()` — reads `kest.agent` from OTel Baggage
