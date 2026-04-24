@@ -422,6 +422,9 @@ def _execute_core_post_auth(
     added_taints,
     removed_taints,
     mapped_labels,
+    content_hash: str = "",
+    input_hash: str = "",
+    classification: str = "system",
 ):
     span = state["span"]
     labels = {"principal": state["principal"]}
@@ -443,10 +446,13 @@ def _execute_core_post_auth(
             {"user": principal_user or "", "agent": principal_agent or ""}
         )
 
+    # Use a new UUID for auditable validation failures to avoid entry_id collisions in Passport
+    entry_id = state["entry_id"] if classification == "system" else str(uuid_utils.uuid7())
+
     entry = KestEntry(
-        entry_id=state["entry_id"],
+        entry_id=entry_id,
         operation=func_name,
-        classification="system",
+        classification=classification,
         trust_score=state["current_node_trust"],
         parent_ids=state["parent_hashes"],
         labels=labels,
@@ -455,6 +461,8 @@ def _execute_core_post_auth(
         taints=list(state["current_accumulated"])
         if state["current_accumulated"]
         else [],
+        content_hash=content_hash,
+        input_hash=input_hash,
         policy_context={
             "enterprise_policies": get_active_enterprise_policies(),
             "platform_policies": [],
@@ -496,6 +504,7 @@ def kest_verified(
     removed_taints: Optional[List[str]] = None,
     trust_override: Optional[int] = None,
     context_map: Optional[dict] = None,
+    output_validators: Optional[List[Any]] = None,
 ):
     _raw_policies = [policy] if isinstance(policy, str) else policy
     policies = list(dict.fromkeys(_raw_policies))
@@ -547,9 +556,17 @@ def kest_verified(
                 import contextvars
 
                 # Fix 6: Offload CPU-bound signing + baggage packing to thread pool
-                # We use cv.run to ensure OTel ContextVars (baggage) propagate to the thread.
                 loop = asyncio.get_running_loop()
                 cv = contextvars.copy_context()
+
+                input_hash = ""
+                try:
+                    input_data = json.dumps({"args": args, "kwargs": kwargs}, sort_keys=True, default=str)
+                    input_hash = hashlib.sha256(input_data.encode()).hexdigest()
+                except Exception:
+                    pass
+
+                # Phase 1: Pre-Execution Sign (Ensures audit even if func fails)
                 new_ctx = await loop.run_in_executor(
                     _get_sign_executor(),
                     cv.run,
@@ -559,10 +576,38 @@ def kest_verified(
                     added_taints,
                     removed_taints,
                     mapped_labels,
+                    "", # content_hash
+                    input_hash,
+                    "system"
                 )
+
                 token = otel_context.attach(new_ctx)
                 try:
-                    return await func(*args, **kwargs)
+                    result = await func(*args, **kwargs)
+
+                    # Post-Execution Validation
+                    if output_validators:
+                        for validator in output_validators:
+                            try:
+                                validator.validate(result)
+                            except Exception as e:
+                                # Sign secondary 'sanitizer' entry to record validation failure
+                                # Use a fresh context for second sign to avoid detach issues
+                                await loop.run_in_executor(
+                                    _get_sign_executor(),
+                                    cv.run,
+                                    _execute_core_post_auth,
+                                    state,
+                                    func.__name__ + ".validation_failed",
+                                    (added_taints or []) + ["output_validation_failed"],
+                                    removed_taints,
+                                    mapped_labels,
+                                    "",
+                                    "",
+                                    "sanitizer"
+                                )
+                                raise e
+                    return result
                 finally:
                     otel_context.detach(token)
 
@@ -607,12 +652,46 @@ def kest_verified(
                     )
                     raise PermissionError(f"Kest policies {policies} denied execution")
 
+                input_hash = ""
+                try:
+                    input_data = json.dumps({"args": args, "kwargs": kwargs}, sort_keys=True, default=str)
+                    input_hash = hashlib.sha256(input_data.encode()).hexdigest()
+                except Exception:
+                    pass
+
+                # Phase 1: Pre-Execution Sign
                 new_ctx = _execute_core_post_auth(
-                    state, func.__name__, added_taints, removed_taints, mapped_labels
+                    state,
+                    func.__name__,
+                    added_taints,
+                    removed_taints,
+                    mapped_labels,
+                    "",
+                    input_hash,
+                    "system"
                 )
+
                 token = otel_context.attach(new_ctx)
                 try:
-                    return func(*args, **kwargs)
+                    result = func(*args, **kwargs)
+
+                    if output_validators:
+                        for validator in output_validators:
+                            try:
+                                validator.validate(result)
+                            except Exception as e:
+                                _execute_core_post_auth(
+                                    state,
+                                    func.__name__ + ".validation_failed",
+                                    (added_taints or []) + ["output_validation_failed"],
+                                    removed_taints,
+                                    mapped_labels,
+                                    "",
+                                    "",
+                                    "sanitizer"
+                                )
+                                raise e
+                    return result
                 finally:
                     otel_context.detach(token)
 

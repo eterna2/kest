@@ -23,6 +23,8 @@ class KestEntry:
     added_taints: Optional[List[str]] = None
     removed_taints: Optional[List[str]] = None
     taints: Optional[List[str]] = None
+    input_hash: Optional[str] = None
+    content_hash: Optional[str] = None
     schema_version: Optional[str] = None
     runtime_name: Optional[str] = None
     runtime_version: Optional[str] = None
@@ -55,8 +57,8 @@ class KestEntry:
 
         # Internal initialized fields (similar to Rust)
         self._timestamp_ms = int(time.time() * 1000)
-        self._input_hash = ""
-        self._content_hash = ""
+        self.input_hash = self.input_hash or ""
+        self.content_hash = self.content_hash or ""
         self._environment = {}
         self._otel_context = {}
         self._metadata = None
@@ -64,14 +66,6 @@ class KestEntry:
     @property
     def timestamp_ms(self) -> int:
         return self._timestamp_ms
-
-    @property
-    def input_hash(self) -> str:
-        return self._input_hash
-
-    @property
-    def content_hash(self) -> str:
-        return self._content_hash
 
     @property
     def environment(self) -> Dict[str, str]:

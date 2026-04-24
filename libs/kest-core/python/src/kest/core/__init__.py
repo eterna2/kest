@@ -13,6 +13,11 @@ from typing import Any
 from kest.core._core import KestEntry, sign_entry, version
 from kest.core.framework.cache import CacheProvider, SimpleCache  # noqa: E402
 from kest.core.framework.decorators import invalidate_policy_cache, kest_verified  # noqa: E402
+from kest.core.framework.validators import (  # noqa: E402
+    MaxLengthValidator,
+    OutputValidator,
+    RegexDenyListValidator,
+)
 from kest.core.engines.engine import (  # noqa: E402
     AVPPolicyEngine,
     CedarLocalEngine,
@@ -134,6 +139,9 @@ __all__ = [
     "SimpleCache",
     "configure",
     "kest_verified",
+    "OutputValidator",
+    "MaxLengthValidator",
+    "RegexDenyListValidator",
     "KestMiddleware",
     "KestIdentityMiddleware",
     "KestHttpxInterceptor",
