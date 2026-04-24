@@ -6,12 +6,12 @@ import opentelemetry.context as otel_context
 import pytest
 from opentelemetry import baggage
 
+from kest.core.engines.engine import PolicyEngine
 from kest.core.framework.decorators import (
     _LAB_AUDIT_FILE,
     invalidate_policy_cache,
     kest_verified,
 )
-from kest.core.engines.engine import PolicyEngine
 from kest.core.identity import StaticIdentity
 
 

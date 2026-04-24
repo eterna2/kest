@@ -8,8 +8,8 @@ Covers:
           disables caching so every call is evaluated fresh.
 """
 
-from kest.core.framework.decorators import _PolicyDecisionCache, invalidate_policy_cache
 from kest.core.engines.engine import MockPolicyEngine
+from kest.core.framework.decorators import _PolicyDecisionCache, invalidate_policy_cache
 
 # ---------------------------------------------------------------------------
 # Helpers

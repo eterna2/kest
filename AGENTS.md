@@ -10,7 +10,7 @@ This document is the primary source of truth for ALL AI-powered assistants (Gemi
 ## 🤖 Workflows & Automation
 > [!IMPORTANT]
 > Rules for workflows are modularized in [workflows.md](file:///home/eterna2/github/kest/.agents/rules/workflows.md).
-- Prioritize established workflows in `.agents/workflows/`, such as `@verify` and `@serve-docs`.
+- Prioritize established workflows in `.agents/workflows/`, such as `@verify`, `@format`, and `@serve-docs`.
 
 ## Architectural Principles
 See `.agents/skills/principles.md` for the immutable core principles regarding transparency, design consistency, and module boundaries. The following are practical implementation guidelines:
@@ -21,6 +21,7 @@ See `.agents/skills/principles.md` for the immutable core principles regarding t
 5. **Decoupling:** Separate domain logic completely from presentation and integration logic.
 6. **Python Coding Principles:**
     - **Absolute Imports:** Use absolute imports (e.g. `from kest.core.context import ...`) instead of relative imports (e.g. `from .context import ...`) to maintain clarity and avoid issues in complex package structures.
+    - **Autoformatting:** After every Python code change, run `@format` (`moon run kest-core-python:format`) to apply `ruff format` and `ruff check --fix`. This is mandatory before committing.
 
 ## 🧪 Testing Workflows
 > [!IMPORTANT]

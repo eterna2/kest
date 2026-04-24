@@ -14,8 +14,8 @@ import uuid_utils
 from opentelemetry import baggage, trace
 
 from kest.core import KestEntry, sign_entry
-from kest.core.framework.context import get_current_jwt
 from kest.core.engines.engine import PolicyEngine
+from kest.core.framework.context import get_current_jwt
 from kest.core.identity import IdentityProvider
 from kest.core.models.passport import (
     ORIGIN_TRUST_MAP,
