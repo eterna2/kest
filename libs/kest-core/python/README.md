@@ -169,7 +169,45 @@ def read_document_dynamic(doc_id: str) -> dict:
 
 Resolved values are forwarded to the policy engine as `object.id` / `object.attributes` per SPEC §9.2 and serialized into `KestEntry.labels["kest.resource_attr"]` for tamper-evident audit.
 
-### 4. Policy Validation
+### 4. Output Validators (Guardrails)
+
+Protect against prompt injection artifacts and data leaks by validating function return values
+before they reach the caller. If validation fails, the result is **not returned** and a
+`"output_validation_failed"` taint is recorded in the audit chain.
+
+```python
+from kest.core import (
+    kest_verified,
+    MaxLengthValidator,
+    RegexDenyListValidator,
+)
+
+@kest_verified(
+    policy="summarize",
+    output_validators=[
+        MaxLengthValidator(max_chars=5000),
+        RegexDenyListValidator(patterns=[
+            r"\b\d{3}-\d{2}-\d{4}\b",  # SSN
+            r"CONFIDENTIAL",
+        ]),
+    ],
+)
+def summarize_document(doc_id: str) -> str:
+    ...
+```
+
+You can implement custom validators by subclassing `OutputValidator`:
+
+```python
+from kest.core import OutputValidator, OutputValidationError
+
+class NoBinaryValidator(OutputValidator):
+    def validate(self, output) -> None:
+        if "\x00" in str(output):
+            raise OutputValidationError("Null byte detected in output")
+```
+
+### 5. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
 
 ```python
