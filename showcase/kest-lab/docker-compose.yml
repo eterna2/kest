@@ -169,9 +169,52 @@ services:
       - keycloak
       - otel-collector
 
+  # --- RustFS: S3-compatible Object Storage (written in Rust) ---
+  # Connect the FsspecAgent TUI demo to this endpoint:
+  #   mount s3  →  endpoint=http://localhost:9000  key=minioadmin  secret=minioadmin
+  rustfs:
+    image: rustfs/rustfs:latest
+    environment:
+      RUSTFS_ROOT_USER: minioadmin
+      RUSTFS_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # Web console  (http://localhost:9001)
+    volumes:
+      - rustfs-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      # RustFS has no unauthenticated health endpoint — it returns 403 on every
+      # request. We treat any response (including 4xx) as "alive"; only a
+      # connection-refused (curl exit 7) or timeout counts as unhealthy.
+      test: ["CMD-SHELL", "curl -s --max-time 3 -o /dev/null http://localhost:9000/ && exit 0 || [ $? -ne 7 ]"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+
+  # --- RustFS bucket initialisation ---
+  # Creates the kest-demo bucket used by the FsspecAgent TUI demo.
+  # Runs once and exits; idempotent (--ignore-existing).
+  rustfs-init:
+    image: minio/mc:latest
+    depends_on:
+      rustfs:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set rustfs http://rustfs:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing rustfs/kest-demo &&
+        mc anonymous set download rustfs/kest-demo &&
+        echo 'Bucket kest-demo ready.'
+      "
+    restart: "no"
+
 volumes:
   spire-server-data:
   spire-agent-data:
   # Isolated venv volume: prevents uv sync (running as root inside container)
   # from chowning the host-side .venv directory to root via bind-mount bleed.
   kest-lab-venv:
+  # RustFS object storage data
+  rustfs-data:

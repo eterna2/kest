@@ -36,3 +36,13 @@ tasks:
     script: "docker compose exec hop1 sh -c 'apt-get update && apt-get install -y curl && curl --unix-socket /var/run/spire/agent/public/api.sock http://localhost/bundle'"
   logs-otel:
     script: "docker compose logs -f otel-collector"
+  # --- RustFS tasks ---
+  rustfs-up:
+    description: "Start the RustFS S3-compatible store and initialise the kest-demo bucket."
+    script: "docker compose up -d rustfs rustfs-init"
+  rustfs-down:
+    description: "Stop and remove the RustFS containers (data volume is preserved)."
+    script: "docker compose stop rustfs rustfs-init && docker compose rm -f rustfs rustfs-init"
+  rustfs-logs:
+    description: "Tail RustFS container logs."
+    script: "docker compose logs -f rustfs"

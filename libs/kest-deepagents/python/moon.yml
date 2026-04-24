@@ -55,3 +55,27 @@ tasks:
       - 'examples/bench/**/*.py'
       - 'examples/bench/**/*.sh'
       - 'src/**/*.py'
+  # --- FsspecAgent terminal demo ---
+  rustfs-up:
+    description: "Start the RustFS S3-compatible store in kest-lab and init the kest-demo bucket."
+    script: "moon run kest-lab:rustfs-up"
+  rustfs-down:
+    description: "Stop the RustFS containers in kest-lab."
+    script: "moon run kest-lab:rustfs-down"
+  run-terminal:
+    description: "Launch the Kest FsspecAgent TUI demo (local FS sandbox by default)."
+    script: 'uv run --extra tui kest-terminal'
+    deps:
+      - 'check'
+    inputs:
+      - 'src/**/*.py'
+      - 'examples/**/*.py'
+  run-terminal-s3:
+    description: "Launch the demo with s3fs installed so you can 'mount s3' to RustFS."
+    script: 'uv run --extra tui --extra s3 kest-terminal'
+    deps:
+      - 'check'
+      - 'rustfs-up'
+    inputs:
+      - 'src/**/*.py'
+      - 'examples/**/*.py'
