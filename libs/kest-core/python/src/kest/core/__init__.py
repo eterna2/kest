@@ -12,13 +12,6 @@ from typing import Any
 
 from kest.core._core import KestEntry, sign_entry, version
 from kest.core.framework.cache import CacheProvider, SimpleCache  # noqa: E402
-from kest.core.framework.context import (  # noqa: E402
-    get_current_agent,
-    get_current_jwt,
-    get_current_passport,
-    get_current_task,
-    get_current_user,
-)
 from kest.core.framework.decorators import invalidate_policy_cache, kest_verified  # noqa: E402
 from kest.core.engines.engine import (  # noqa: E402
     AVPPolicyEngine,
@@ -153,9 +146,4 @@ __all__ = [
     # Operations
     "sign_entry",
     "invalidate_policy_cache",
-    "get_current_user",
-    "get_current_agent",
-    "get_current_task",
-    "get_current_jwt",
-    "get_current_passport",
 ]
