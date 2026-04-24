@@ -5,12 +5,12 @@ import secrets
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Callable, Optional
-from urllib.parse import urlparse, parse_qs, urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 
 import httpx
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives.asymmetric import ed25519
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from kest.core.identity.base import IdentityProvider
 
@@ -20,6 +20,7 @@ class KestOAuthServer(HTTPServer):
         super().__init__(*args, **kwargs)
         self.kest_code: Optional[str] = None
         self.kest_state: Optional[str] = None
+
 
 class OAuthCallbackHandler(BaseHTTPRequestHandler):
     """Handles the local redirect callback for the OAuth Authorization Code flow."""
@@ -50,7 +51,7 @@ class OAuthCallbackHandler(BaseHTTPRequestHandler):
 class OAuthCliProvider(IdentityProvider):
     """
     An Identity Engine that performs an Authorization Code Flow + PKCE local OAuth callback.
-    
+
     Determines the root Ed25519 identity key deterministically by hashing the OAuth identity's
     unique identifier combined with a user-provided passphrase using PBKDF2HMAC.
     """
@@ -70,7 +71,7 @@ class OAuthCliProvider(IdentityProvider):
         self.token_url = token_url
         self.auto_open_browser = auto_open_browser
         self.passphrase_provider = passphrase_provider
-        
+
         self.server_port = port
         self.state = None
         self.code_verifier = None
@@ -85,7 +86,9 @@ class OAuthCliProvider(IdentityProvider):
         verifier = secrets.token_urlsafe(32)
         digest = hashes.Hash(hashes.SHA256())
         digest.update(verifier.encode("ascii"))
-        challenge = base64.urlsafe_b64encode(digest.finalize()).decode("ascii").rstrip("=")
+        challenge = (
+            base64.urlsafe_b64encode(digest.finalize()).decode("ascii").rstrip("=")
+        )
         return verifier, challenge
 
     def _get_user_id_from_token(self, id_token: str) -> str:
@@ -109,10 +112,10 @@ class OAuthCliProvider(IdentityProvider):
     def _initialize_key(self, user_id: str) -> None:
         """Deterministically generates the Ed25519 key using PBKDF2 on user_id + passphrase."""
         passphrase = self.passphrase_provider()
-        
+
         # We use the user_id as a salt (in a real scenario, a static realm/app salt could also be added)
         salt = user_id.encode("utf-8")
-        
+
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=32,
@@ -120,7 +123,7 @@ class OAuthCliProvider(IdentityProvider):
             iterations=100000,
         )
         key_material = kdf.derive(passphrase.encode("utf-8"))
-        
+
         self._identity = user_id
         self._private_key = ed25519.Ed25519PrivateKey.from_private_bytes(key_material)
 
@@ -128,10 +131,12 @@ class OAuthCliProvider(IdentityProvider):
         """Runs the local server to capture the OAuth flow."""
         self.state = secrets.token_urlsafe(16)
         self.code_verifier, code_challenge = self._generate_pkce()
-        
+
         server = KestOAuthServer(("localhost", self.server_port), OAuthCallbackHandler)
-        self.server_port = server.server_address[1]  # Update to actual bound port (useful if port=0)
-        
+        self.server_port = server.server_address[
+            1
+        ]  # Update to actual bound port (useful if port=0)
+
         redirect_uri = f"http://localhost:{self.server_port}/callback"
 
         params = {
@@ -143,9 +148,9 @@ class OAuthCliProvider(IdentityProvider):
             "code_challenge_method": "S256",
             "scope": "openid profile email",
         }
-        
+
         url = f"{self.auth_url}?{urlencode(params)}"
-        
+
         if self.auto_open_browser:
             webbrowser.open(url)
         else:
@@ -154,10 +159,10 @@ class OAuthCliProvider(IdentityProvider):
         # We wait for 1 request
         server.kest_code = None
         server.kest_state = None
-        
+
         while server.kest_code is None:
             server.handle_request()
-            
+
         code = server.kest_code
         state = server.kest_state
         server.server_close()
@@ -173,18 +178,20 @@ class OAuthCliProvider(IdentityProvider):
             "redirect_uri": redirect_uri,
             "code_verifier": self.code_verifier,
         }
-        
+
         resp = httpx.post(self.token_url, data=token_data)
         resp.raise_for_status()
-        
+
         tokens = resp.json()
-        
+
         # Test override hook
         if self._test_user_id:
             user_id = self._test_user_id
         else:
             if "id_token" not in tokens:
-                raise ValueError("Response missing id_token. Cannot extract user identity.")
+                raise ValueError(
+                    "Response missing id_token. Cannot extract user identity."
+                )
             user_id = self._get_user_id_from_token(tokens["id_token"])
 
         self._initialize_key(user_id)
@@ -199,7 +206,7 @@ class OAuthCliProvider(IdentityProvider):
         """Signs the payload using the deterministically derived Ed25519 private key."""
         if not self._private_key or not self._identity:
             self._authenticate()
-            
+
         # Ensure it's not None for type checker
         assert self._private_key is not None
         assert self._identity is not None

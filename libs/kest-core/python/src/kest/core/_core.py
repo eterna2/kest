@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Optional
 import rfc8785
 
 # Ensure version matches Cargo.toml
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 
 
 def version() -> str:

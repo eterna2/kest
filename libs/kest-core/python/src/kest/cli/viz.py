@@ -1,5 +1,6 @@
 import argparse
 import base64
+import hashlib
 import json
 import os
 import sqlite3
@@ -20,93 +21,95 @@ def parse_spans_from_sqlite(path: str):
 
 
 def generate_mermaid(spans) -> str:
-    nodes = {}
-    edges = []
+    """Generate a Mermaid graph from a list of OTel spans or raw JWS signature strings.
+
+    Supports two input formats:
+    - Dict spans with an ``attributes`` key (OTel JSON export / SQLite).
+    - Raw JWS compact strings (lab fallback file exporter).
+    """
+    nodes: dict[str, str] = {}
+    edges: list[tuple[str, str]] = []
 
     for span in spans:
-        if isinstance(span, dict) and "attributes" in span:
-            attrs = span.get("attributes", {})
-        elif isinstance(span, dict):
-            # Try to handle flat JSON list of strings (if fallback file exporter just dumped raw passports)
-            pass
-        else:
-            attrs = getattr(span, "attributes", {})
-
         if isinstance(span, str):
-            # It's just a raw signature string from the basic file exporter fallback
-            passport_raw = None
-            parent_hash = None
-            # The test actually dumps a flat list of strings into lab_audit.json
-            entries = spans
-
-            # Since the fallback lab just dumps raw string signatures directly:
-            latest = span
-            sig = latest.split(".")[-1]
-            # Try to extract parent hash from the payload if possible
-            try:
-                parts = span.split(".")
-                if len(parts) >= 2:
-                    # JWT payload is the 2nd part (index 1)
-                    payload_b64 = parts[1]
-                    padding = "=" * (4 - len(payload_b64) % 4)
-                    payload = json.loads(
-                        base64.urlsafe_b64decode(payload_b64 + padding).decode()
-                    )
-                    parent_hashes = payload.get("parent_entry_ids", ["0"])
-                    parent_hash = parent_hashes[0] if parent_hashes else "0"
-
-                    import hashlib
-
-                    # The parent_hash stored is the sha256 of the parent's full signature string.
-                    # So our node ID should be the sha256 of our OWN signature string so children can link to us.
-                    my_hash = hashlib.sha256(span.encode()).hexdigest()
-
-                    workload = payload.get("labels", {}).get("workload_id", "Unknown")
-                    nodes[my_hash] = workload.split("/")[-1]
-
-                    if parent_hash and parent_hash != "0":
-                        edges.append((parent_hash, my_hash))
-            except Exception as e:
-                nodes[sig] = f"Unknown: {e}"
-            continue
-
-        # Look for kest.passport or kest.lineage_root
-        passport_raw = attrs.get("kest.passport", attrs.get("kest_passport", ""))
-        parent_hash = attrs.get("kest.lineage_root", attrs.get("kest_lineage_root", ""))
-
-        if not passport_raw and not parent_hash:
-            continue
-
-        try:
-            if passport_raw:
-                if isinstance(passport_raw, str):
-                    passport = json.loads(passport_raw)
-                else:
-                    passport = passport_raw
-                entries = passport.get("entries", [])
-
-                # Assume the last entry in the passport is the one for this span
-                if entries:
-                    latest = entries[-1]
-                    sig = latest.split(".")[-1]  # use the signature tail as ID
-                    nodes[sig] = attrs.get("service.name", "Unknown Service")
-
-                    if parent_hash and parent_hash != "0":
-                        # We don't necessarily have the parent's full sig, just the hash
-                        # In the real system, lineage root IS the parent's hash
-                        edges.append((parent_hash, sig))
-        except Exception:
-            pass
+            _process_raw_signature(span, nodes, edges)
+        elif isinstance(span, dict) and "attributes" in span:
+            _process_span_dict(span["attributes"], nodes, edges)
 
     out = ["graph TD;"]
-
-    for k, v in nodes.items():
-        out.append(f"    {k}[{v}];")
-
-    for p, c in edges:
-        out.append(f"    {p} --> {c};")
+    for node_id, label in nodes.items():
+        out.append(f"    {node_id}[{label}];")
+    for parent, child in edges:
+        out.append(f"    {parent} --> {child};")
 
     return "\n".join(out)
+
+
+def _process_raw_signature(
+    sig_str: str,
+    nodes: dict[str, str],
+    edges: list[tuple[str, str]],
+) -> None:
+    """Process a raw JWS compact string (header.payload.signature)."""
+    try:
+        parts = sig_str.split(".")
+        if len(parts) < 2:
+            return
+        payload_b64 = parts[1]
+        padding = "=" * (4 - len(payload_b64) % 4)
+        payload = json.loads(base64.urlsafe_b64decode(payload_b64 + padding).decode())
+
+        # Node ID = SHA-256 of the full signature string (so children can reference us)
+        my_hash = hashlib.sha256(sig_str.encode()).hexdigest()
+
+        # Label: extract from labels.principal (e.g. "service/hop1" → "hop1")
+        principal = payload.get("labels", {}).get("principal", "")
+        label = principal.split("/")[-1] if principal else "Unknown"
+        nodes[my_hash] = label
+
+        # Parent: parent_ids[0] per SPEC §5 (sentinel "0" = root)
+        parent_ids = payload.get("parent_ids", ["0"])
+        parent_hash = parent_ids[0] if parent_ids else "0"
+        if parent_hash and parent_hash != "0":
+            edges.append((parent_hash, my_hash))
+
+    except Exception:
+        pass
+
+
+def _process_span_dict(
+    attrs: dict,
+    nodes: dict[str, str],
+    edges: list[tuple[str, str]],
+) -> None:
+    """Process an OTel span's attributes dict."""
+    passport_raw = attrs.get("kest.passport", attrs.get("kest_passport", ""))
+    # kest.chain_tip holds the SHA-256 of the parent's JWS (spec §8.4)
+    parent_hash = attrs.get("kest.chain_tip", attrs.get("kest_chain_tip", ""))
+    service_name = attrs.get("service.name", "Unknown Service")
+
+    if not passport_raw:
+        return
+
+    try:
+        passport = (
+            json.loads(passport_raw) if isinstance(passport_raw, str) else passport_raw
+        )
+        entries = passport.get("entries", [])
+        if not entries:
+            return
+
+        # Latest entry = the one recorded by this span
+        latest = entries[-1]
+        # Node ID = last segment of the JWS (the signature tail) for brevity
+        sig = latest.split(".")[-1]
+        nodes[sig] = service_name
+
+        if parent_hash and parent_hash != "0":
+            edges.append((parent_hash, sig))
+
+    except Exception:
+        pass
 
 
 def main():
