@@ -1,6 +1,12 @@
 from opentelemetry import baggage
 
-from kest.core.framework.context import get_current_jwt, get_current_passport
+from kest.core.framework.context import (
+    get_current_agent,
+    get_current_jwt,
+    get_current_passport,
+    get_current_task,
+    get_current_user,
+)
 
 
 def test_get_current_passport():
@@ -28,5 +34,38 @@ def test_get_current_jwt():
     token = otel_context.attach(ctx)
     try:
         assert get_current_jwt() == "test-jwt"
+    finally:
+        otel_context.detach(token)
+
+
+def test_get_current_user():
+    ctx = baggage.set_baggage("kest.user", "alice")
+    import opentelemetry.context as otel_context
+
+    token = otel_context.attach(ctx)
+    try:
+        assert get_current_user() == "alice"
+    finally:
+        otel_context.detach(token)
+
+
+def test_get_current_agent():
+    ctx = baggage.set_baggage("kest.agent", "agent-007")
+    import opentelemetry.context as otel_context
+
+    token = otel_context.attach(ctx)
+    try:
+        assert get_current_agent() == "agent-007"
+    finally:
+        otel_context.detach(token)
+
+
+def test_get_current_task():
+    ctx = baggage.set_baggage("kest.task", "process-data")
+    import opentelemetry.context as otel_context
+
+    token = otel_context.attach(ctx)
+    try:
+        assert get_current_task() == "process-data"
     finally:
         otel_context.detach(token)
