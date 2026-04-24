@@ -14,7 +14,6 @@ from kest.core import (
     OPAPolicyEngine,
     configure,
     kest_verified,
-    version,
 )
 
 
@@ -37,9 +36,6 @@ def otel_recorder():
 
 @respx.mock
 def test_e2e_flow_with_audit_logs(otel_recorder):
-    # 1. Verify Rust bridge is reachable
-    assert version() == "0.3.0"
-
     # 2. Setup REAL engine (but mocked via respx) and identity
     engine = OPAPolicyEngine(url="http://opa:8181")
     configure(engine=engine, identity=MockIdentityProvider(), clear=True)

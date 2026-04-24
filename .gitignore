@@ -227,7 +227,9 @@ scratchpad/
 
 # tmp
 tmp/
+drafts/
 
 # Generated website copy of the spec — sourced from root SPEC.md at build time.
 # Edit SPEC.md at the repo root; never edit this file directly.
 website/content/design/07_spec.md
+
