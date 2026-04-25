@@ -9,6 +9,12 @@ Each revision is a self-contained, immutable document.
 |---|---|---|---|
 | **v0.3.0** | [SPEC-v0.3.0.md](./SPEC-v0.3.0.md) | ✅ Current | 2025 |
 
+### Feature Specifications
+
+| Feature | File | Status | Published |
+|---|---|---|---|
+| **Sandbox v0.1.0** | [SPEC-sandbox-v0.1.0.md](./SPEC-sandbox-v0.1.0.md) | 📝 Draft | 2026 |
+
 ## Rendered Documentation
 
 The latest specification is rendered and served at:
@@ -33,6 +39,7 @@ The `learnings/` directory captures **agent-discovered runtime findings** that t
 | Version | Learnings File | Contents |
 |---|---|---|
 | **v0.3.0** | [learnings/v0.3.0/LEARNINGS.md](./learnings/v0.3.0/LEARNINGS.md) | Policy cache collision bug, compressed baggage variant, GIL contention cliff, Cedar policy naming, lab infrastructure gotchas |
+| **sandbox-v0.1.0** | `learnings/sandbox-v0.1.0/LEARNINGS.md` | *(created on first discovery)* |
 
 **When to write a learning:**
 - You fix a non-trivial bug — document it in the relevant `LEARNINGS.md`.

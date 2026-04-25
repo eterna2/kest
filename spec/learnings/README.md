@@ -9,9 +9,11 @@ This directory captures **agent-discovered runtime learnings** for each version 
 ```
 spec/learnings/
 ├── README.md              ← this file
-└── v0.3.0/
-    ├── LEARNINGS.md       ← cumulative findings for the v0.3.0 Python implementation
-    └── BENCHMARK.md       ← performance benchmark notes (cross-referenced from BENCHMARK.md)
+├── v0.3.0/
+│   ├── LEARNINGS.md       ← cumulative findings for the v0.3.0 Python implementation
+│   └── BENCHMARK.md       ← performance benchmark notes (cross-referenced from BENCHMARK.md)
+└── sandbox-v0.1.0/
+    └── LEARNINGS.md       ← runtime findings for the Sandbox subsystem (SPEC-sandbox-v0.1.0.md)
 ```
 
 ## How to Use
