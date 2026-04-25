@@ -282,6 +282,29 @@ def get_active_deviations() -> List[Any]:
     return getattr(kest.core, "_active_deviations", [])
 
 
+# ---------------------------------------------------------------------------
+# Classification-based automatic taint tagging (Issue #80)
+# ---------------------------------------------------------------------------
+
+DEFAULT_CLASSIFICATION_TAINT_MAP: dict[str, List[str]] = {
+    "data": ["contains_data"],
+    "critic": ["requires_review"],
+    "sanitizer": ["sanitized"],
+}
+
+
+def get_active_classification_taint_map() -> dict[str, List[str]]:
+    """Return the currently active classification→taint mapping.
+
+    Falls back to :data:`DEFAULT_CLASSIFICATION_TAINT_MAP` if none has been
+    configured via :func:`kest.core.configure`.
+    """
+    import kest.core
+
+    stored = getattr(kest.core, "_active_classification_taint_map", None)
+    return stored if stored is not None else DEFAULT_CLASSIFICATION_TAINT_MAP
+
+
 def _build_resource_context(
     resource_id: Optional[Union[str, Callable]],
     resource_attr: Optional[Union[dict, Callable]],
@@ -453,6 +476,28 @@ def _execute_core_logic(
     }
 
 
+def _compute_accumulated_taints(
+    current_accumulated: set,
+    auto_taints: List[str],
+    removed_taints: Optional[List[str]],
+    extra_taints: Optional[List[str]],
+) -> List[str]:
+    """Compute the final accumulated taint list for a KestEntry.
+
+    Merges inherited taints (*current_accumulated*), classification
+    auto-taints, and optional extra taints (e.g. ``output_validation_failed``).
+    Auto-taints are NOT applied if they appear in *removed_taints*.
+    """
+    accumulated = set(current_accumulated)
+    if auto_taints:
+        for taint in auto_taints:
+            if not removed_taints or taint not in removed_taints:
+                accumulated.add(taint)
+    if extra_taints:
+        accumulated.update(extra_taints)
+    return list(accumulated)
+
+
 def _execute_core_post_auth(
     state,
     func_name,
@@ -464,6 +509,11 @@ def _execute_core_post_auth(
 ):
     span = state["span"]
     labels = {"principal": state["principal"]}
+
+    # Resolve classification auto-taints and merge with added_taints
+    classification = state.get("classification", "system")
+    auto_taints = get_active_classification_taint_map().get(classification, [])
+    effective_added_taints = list(added_taints or []) + auto_taints
     span_ctx = span.get_span_context()
     if span_ctx and span_ctx.is_valid:
         labels["trace_id"] = f"{span_ctx.trace_id:032x}"
@@ -489,15 +539,15 @@ def _execute_core_post_auth(
     entry = KestEntry(
         entry_id=state["entry_id"],
         operation=func_name,
-        classification="system",
+        classification=classification,
         trust_score=state["current_node_trust"],
         parent_ids=state["parent_hashes"],
         labels=labels,
-        added_taints=added_taints or [],
+        added_taints=effective_added_taints,
         removed_taints=removed_taints or [],
-        taints=list(state["current_accumulated"]) + (extra_taints or [])
-        if state["current_accumulated"]
-        else (extra_taints or []),
+        taints=_compute_accumulated_taints(
+            state["current_accumulated"], auto_taints, removed_taints, extra_taints
+        ),
         policy_context={
             "enterprise_policies": get_active_enterprise_policies(),
             "platform_policies": [],
@@ -542,6 +592,7 @@ def kest_verified(
     resource_id: Optional[Union[str, Callable]] = None,
     resource_attr: Optional[Union[dict, Callable]] = None,
     output_validators: Optional[List[OutputValidator]] = None,
+    classification: str = "system",
 ):
     """
     Decorator that wraps a function with Kest zero-trust policy enforcement.
@@ -570,6 +621,11 @@ def kest_verified(
             :class:`~kest.core.framework.validators.OutputValidationError`, the taint
             ``"output_validation_failed"`` is added to the audit entry and the error
             is re-raised (the result is NOT returned to the caller).
+        classification: Data classification label for this operation.  Used for
+            automatic taint tagging via the active ``CLASSIFICATION_TAINT_MAP``.
+            Defaults to ``"system"`` (no auto-taints).  Common values: ``"data"``
+            (adds ``"contains_data"``), ``"critic"`` (adds ``"requires_review"``),
+            ``"sanitizer"`` (adds ``"sanitized"``).
     """
     _raw_policies = [policy] if isinstance(policy, str) else policy
     policies = list(dict.fromkeys(_raw_policies))
@@ -601,6 +657,7 @@ def kest_verified(
                 resolved_resource_id=resolved_rid,
                 resolved_resource_attr=resolved_rattr,
             )
+            state["classification"] = classification
 
             span = state["span"]
             with trace.use_span(span, end_on_exit=True):
@@ -691,6 +748,7 @@ def kest_verified(
                 resolved_resource_id=resolved_rid,
                 resolved_resource_attr=resolved_rattr,
             )
+            state["classification"] = classification
 
             span = state["span"]
             with trace.use_span(span, end_on_exit=True):

@@ -73,6 +73,9 @@ _active_identity: IdentityProvider | None = None
 _active_cache: CacheProvider | None = None
 _active_enterprise_policies: list[str] = []
 _active_deviations: list[Any] = []
+_active_classification_taint_map: dict[str, list[str]] | None = (
+    None  # None = use DEFAULT
+)
 
 
 def configure(
@@ -81,6 +84,7 @@ def configure(
     cache: CacheProvider | None = None,
     enterprise_policies: list[str] | None = None,
     deviations: list[Any] | None = None,
+    classification_taint_map: dict[str, list[str]] | None = None,
     clear: bool = False,
 ):
     """
@@ -96,6 +100,10 @@ def configure(
         cache: (Optional) Cache for policy results and lineage claim-checks.
         enterprise_policies: (Optional) List of policy names enforced at the enterprise level tier.
         deviations: (Optional) List of PolicyDeviations for bypassing baseline policies.
+        classification_taint_map: (Optional) Mapping from classification label to list of taints
+            auto-applied when a function decorated with @kest_verified uses that classification.
+            Overrides the built-in DEFAULT_CLASSIFICATION_TAINT_MAP.  Pass ``None`` (or call
+            ``configure(clear=True)``) to reset to the default map.
         clear: If True, resets all global configurations to None.
     """
     global \
@@ -103,13 +111,15 @@ def configure(
         _active_identity, \
         _active_cache, \
         _active_enterprise_policies, \
-        _active_deviations
+        _active_deviations, \
+        _active_classification_taint_map
     if clear:
         _active_engine = None
         _active_identity = None
         _active_cache = None
         _active_enterprise_policies = []
         _active_deviations = []
+        _active_classification_taint_map = None  # resets to DEFAULT in accessor
 
     if engine:
         _active_engine = engine
@@ -125,6 +135,8 @@ def configure(
         _active_enterprise_policies = enterprise_policies
     if deviations is not None:
         _active_deviations = deviations
+    if classification_taint_map is not None:
+        _active_classification_taint_map = classification_taint_map
 
 
 __all__ = [

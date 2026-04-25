@@ -13,6 +13,16 @@ All notable changes to this project will be documented in this file.
   SPEC-v0.3.0 §9.2 (F-IC-01, F-IC-02) and serialized into `KestEntry.labels["kest.resource_attr"]`
   for tamper-evident audit (F-IC-04). The policy decision cache key now includes `resource_id` to
   prevent cross-resource ABAC cache collisions.
+- **Classification-based Automatic Taint Tagging** (Issue #80): Added `classification` parameter
+  to `@kest_verified` (default `"system"`, matching the existing behaviour). When a classification
+  is mapped in the active `CLASSIFICATION_TAINT_MAP`, the corresponding taints are automatically
+  merged into the decorated function's `KestEntry` without any manual `added_taints` configuration:
+  - `"data"` → `"contains_data"`
+  - `"critic"` → `"requires_review"`
+  - `"sanitizer"` → `"sanitized"`
+  The map is fully configurable via `configure(classification_taint_map=…)` and resets to
+  defaults on `configure(clear=True)`. Auto-taints respect `removed_taints` (an auto-taint that
+  also appears in `removed_taints` is suppressed).
 - **Output Validators / Guardrail Hooks** (Issue #78): Added `output_validators` parameter to
   `@kest_verified` accepting a list of `OutputValidator` instances. Validators are run after
   function execution; any `OutputValidationError` adds the taint `"output_validation_failed"` to
