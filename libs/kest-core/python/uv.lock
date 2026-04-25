@@ -1,5 +1,5 @@
 version = 1
-revision = 3
+revision = 2
 requires-python = ">=3.11, <3.14"
 resolution-markers = [
     "python_full_version >= '3.13'",
@@ -856,14 +856,18 @@ wheels = [
 
 [[package]]
 name = "kest"
-version = "0.3.0"
+version = "0.3.0.post1"
 source = { editable = "." }
 dependencies = [
+    { name = "aiohttp" },
     { name = "cryptography" },
     { name = "httpx" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp" },
     { name = "opentelemetry-sdk" },
+    { name = "pygments" },
+    { name = "pyjwt" },
+    { name = "requests" },
     { name = "rfc8785" },
     { name = "uuid-utils" },
 ]
@@ -908,15 +912,19 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "aioboto3", marker = "extra == 'aws'", specifier = ">=15.5.0" },
+    { name = "aiohttp", specifier = ">=3.13.4" },
     { name = "boto3", marker = "extra == 'aws'", specifier = ">=1.28.0" },
     { name = "cedarpy", marker = "extra == 'cedar'", specifier = ">=4.8.0" },
-    { name = "cryptography", specifier = ">=46.0.7" },
+    { name = "cryptography", specifier = ">=46.0.6" },
     { name = "httpx", specifier = ">=0.28.1" },
     { name = "opa-python-client", marker = "extra == 'opa'", specifier = ">=2.0.4" },
     { name = "opentelemetry-api", specifier = ">=1.41.0" },
     { name = "opentelemetry-exporter-otlp", specifier = ">=1.41.0" },
     { name = "opentelemetry-sdk", specifier = ">=1.41.0" },
+    { name = "pygments", specifier = ">=2.20.0" },
+    { name = "pyjwt", specifier = ">=2.12.0" },
     { name = "regopy", marker = "extra == 'rego'", specifier = ">=0.3.0" },
+    { name = "requests", specifier = ">=2.33.0" },
     { name = "rfc8785", specifier = ">=0.1.4" },
     { name = "spiffe", marker = "extra == 'spiffe'", specifier = ">=0.2.6" },
     { name = "uuid-utils", specifier = ">=0.14.1" },
@@ -1536,20 +1544,20 @@ wheels = [
 
 [[package]]
 name = "pygments"
-version = "2.19.2"
+version = "2.20.0"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/b0/77/a5b8c569bf593b0140bde72ea885a803b82086995367bf2037de0159d924/pygments-2.19.2.tar.gz", hash = "sha256:636cb2477cec7f8952536970bc533bc43743542f70392ae026374600add5b887", size = 4968631, upload-time = "2025-06-21T13:39:12.283Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c3/b2/bc9c9196916376152d655522fdcebac55e66de6603a76a02bca1b6414f6c/pygments-2.20.0.tar.gz", hash = "sha256:6757cd03768053ff99f3039c1a36d6c0aa0b263438fcab17520b30a303a82b5f", size = 4955991, upload-time = "2026-03-29T13:29:33.898Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c7/21/705964c7812476f378728bdf590ca4b771ec72385c533964653c68e86bdc/pygments-2.19.2-py3-none-any.whl", hash = "sha256:86540386c03d588bb81d44bc3928634ff26449851e99741617ecb9037ee5ec0b", size = 1225217, upload-time = "2025-06-21T13:39:07.939Z" },
+    { url = "https://files.pythonhosted.org/packages/f4/7e/a72dd26f3b0f4f2bf1dd8923c85f7ceb43172af56d63c7383eb62b332364/pygments-2.20.0-py3-none-any.whl", hash = "sha256:81a9e26dd42fd28a23a2d169d86d7ac03b46e2f8b59ed4698fb4785f946d0176", size = 1231151, upload-time = "2026-03-29T13:29:30.038Z" },
 ]
 
 [[package]]
 name = "pyjwt"
-version = "2.11.0"
+version = "2.12.1"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/5c/5a/b46fa56bf322901eee5b0454a34343cdbdae202cd421775a8ee4e42fd519/pyjwt-2.11.0.tar.gz", hash = "sha256:35f95c1f0fbe5d5ba6e43f00271c275f7a1a4db1dab27bf708073b75318ea623", size = 98019, upload-time = "2026-01-30T19:59:55.694Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/c2/27/a3b6e5bf6ff856d2509292e95c8f57f0df7017cf5394921fc4e4ef40308a/pyjwt-2.12.1.tar.gz", hash = "sha256:c74a7a2adf861c04d002db713dd85f84beb242228e671280bf709d765b03672b", size = 102564, upload-time = "2026-03-13T19:27:37.25Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/01/c26ce75ba460d5cd503da9e13b21a33804d38c2165dec7b716d06b13010c/pyjwt-2.11.0-py3-none-any.whl", hash = "sha256:94a6bde30eb5c8e04fee991062b534071fd1439ef58d2adc9ccb823e7bcd0469", size = 28224, upload-time = "2026-01-30T19:59:54.539Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/7a/8dd906bd22e79e47397a61742927f6747fe93242ef86645ee9092e610244/pyjwt-2.12.1-py3-none-any.whl", hash = "sha256:28ca37c070cad8ba8cd9790cd940535d40274d22f80ab87f3ac6a713e6e8454c", size = 29726, upload-time = "2026-03-13T19:27:35.677Z" },
 ]
 
 [package.optional-dependencies]
@@ -1794,7 +1802,7 @@ wheels = [
 
 [[package]]
 name = "spiffe"
-version = "0.2.6"
+version = "0.2.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cryptography" },
@@ -1805,9 +1813,9 @@ dependencies = [
     { name = "pyasn1-modules" },
     { name = "pyjwt", extra = ["crypto"] },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/50/ea/1d95bbca2e75e76133e37c6e4fd3b5d57301f10665f546e0bfdabd55815d/spiffe-0.2.6.tar.gz", hash = "sha256:7dcd48f9a60cdb3866cf286bcf51a6c61698a0000a66cbacc705620f3667399a", size = 39365, upload-time = "2026-03-15T22:21:43.333Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/b0/ec/935924ff9db275cd467acc5097034cf83c473a62854a9dd483515cf733b1/spiffe-0.2.7.tar.gz", hash = "sha256:840511865158a8910d76b1388c4275e020baca3961a654aeffa29082ed9b9080", size = 39680, upload-time = "2026-04-18T19:25:36.998Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/df/c21d087817be03d521f0686cc5b6280d09f622f173e45876ab18f2927abf/spiffe-0.2.6-py3-none-any.whl", hash = "sha256:fae794652f960662de43ad0b93286d52262615e1facfbbcce38c2637596e2c09", size = 57780, upload-time = "2026-03-15T22:21:42.042Z" },
+    { url = "https://files.pythonhosted.org/packages/bf/3a/9bc2dc46f9efabcf2d173a656185ac5e85cf93068ed1c28c919baa8fb082/spiffe-0.2.7-py3-none-any.whl", hash = "sha256:2af79d2051b77b0dee46b630cae18e60860ce99c2daf6b32d55f067cddd6e139", size = 58045, upload-time = "2026-04-18T19:25:36.004Z" },
 ]
 
 [[package]]

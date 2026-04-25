@@ -29,7 +29,11 @@ dependencies = [
     "httpx>=0.28.1",
     "uuid-utils>=0.14.1",
     "rfc8785>=0.1.4",
-    "cryptography>=46.0.7",
+    "cryptography>=46.0.6",
+    "aiohttp>=3.13.4",
+    "requests>=2.33.0",
+    "pygments>=2.20.0",
+    "pyjwt>=2.12.0",
 ]
 
 [project.urls]
