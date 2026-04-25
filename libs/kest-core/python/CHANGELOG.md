@@ -53,6 +53,29 @@ All notable changes to this project will be documented in this file.
   > **CI note**: `sandbox_live` tests (E2B, AgentCore) are intentionally excluded from CI to
   > avoid cloud billing. Run locally with credentials — see `SANDBOX.md §8` for instructions.
 
+- **SummarizationProvider — Auto-generated Safe Views** (Issue #82): New
+  `kest.core.vault.summarization` module providing an ABC and three concrete
+  implementations for auto-generating non-sensitive `safe_view` strings from raw
+  data payloads at `HandleVault.seal()` time, eliminating the need for callers
+  to write safe-view strings by hand:
+  - `SafeView(summary, data_type, row_count, schema)` — immutable frozen dataclass;
+    `str(safe_view)` returns the summary text for direct prompt embedding.
+  - `SummarizationProvider` — abstract base class; concrete subclasses implement
+    `summarize(data: Any, context: dict) → SafeView`.
+  - `SchemaBasedSummarizer` — structural / schema introspection: recognises dicts
+    (`"Object with N field(s): …"`), list-of-dicts (`"Tabular data: N row(s); columns: …"`),
+    text strings (`"Text value; N characters."`), and pandas DataFrames via duck-typing
+    (no mandatory `pandas` import — `kest-core` remains lightweight).
+  - `TruncatingSummarizer(max_chars=200)` — first-N-characters safe summary with
+    a `[TRUNCATED]` suffix; safe for any payload type.
+  - `AggregationSummarizer` — computes count, sum, min, max for numeric lists and
+    numeric-valued dicts (`"Numeric sequence: N value(s); sum=…; min=…; max=…."`).
+  - `HandleVault.seal()` gains an optional `summarizer: SummarizationProvider | None`
+    keyword argument. When provided, the generated `SafeView.summary` overwrites any
+    manually passed `safe_view`; the `context` dict is forwarded to the provider for
+    future extensibility.
+  - All symbols exported from `kest.core.vault` and hoisted into `kest.core`.
+
 - **Template & Hydrate engine** (Issue #83): New `TemplateParser`, `TemplateEngine`,
   and `HydrationError` in `kest.core.vault` for data-safe LLM report composition
   using **XML handle tags**:

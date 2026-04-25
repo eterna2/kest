@@ -31,6 +31,7 @@ from kest.core.vault.errors import (
     HandleNotFoundError,
 )
 from kest.core.vault.handle import OpaqueHandle
+from kest.core.vault.summarization import SummarizationProvider
 
 # Internal sentinel: value stored in cache keyed by handle.id.
 # When a codec is active the *data* portion is bytes (encoded payload);
@@ -73,9 +74,10 @@ class HandleVault:
         self,
         data: Any,
         owner_principal: str,
-        safe_view: str,
+        safe_view: str = "",
         ttl_seconds: int = 300,
         granted_principals: Iterable[str] = (),
+        summarizer: Optional[SummarizationProvider] = None,
     ) -> OpaqueHandle:
         """
         Store *data* in the vault and return an opaque handle.
@@ -86,13 +88,21 @@ class HandleVault:
             owner_principal: The principal that owns this handle (may always unseal).
             safe_view: A non-sensitive human-readable description of *data*.
                 Safe to include in LLM prompts, audit logs, and API responses.
+                Ignored (overridden) when *summarizer* is provided.
             ttl_seconds: Lifetime of the handle in seconds (default 300 = 5 min).
                 Pass ``0`` to create an already-expired handle (useful in tests).
             granted_principals: Additional principals permitted to unseal.
+            summarizer: Optional :class:`~kest.core.vault.summarization.SummarizationProvider`.
+                When supplied, it is called with *data* and an empty context dict to
+                auto-generate the ``safe_view``.  The generated summary overrides any
+                value passed as *safe_view*.
 
         Returns:
             A frozen :class:`OpaqueHandle` referencing the sealed data.
         """
+        if summarizer is not None:
+            sv = summarizer.summarize(data, {})
+            safe_view = str(sv)
         now = datetime.now(tz=timezone.utc)
         handle = OpaqueHandle(
             id=f"hdl_{uuid.uuid4().hex}",
