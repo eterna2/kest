@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **FastAPI Integration Plugin** (`kest[fastapi]`): New `kest.core.integrations.fastapi` module
+  providing a zero-boilerplate FastAPI integration for the HandleVault:
+  - `VaultRouter(vault, extractor, gateway_principals)` — a drop-in `APIRouter` exposing
+    `GET /safe-view/{handle_id}` (public) and `GET /resolve/{handle_id}` (privileged) routes.
+  - `VaultDependency(vault, extractor)` — a `Depends`-compatible callable for use in custom
+    routes; unseals handles and enforces vault ACLs automatically.
+  - `JWTPrincipalExtractor(secret, algorithm, claim)` — extracts the caller's SPIFFE principal
+    from an HS256 (or RS/ES) JWT Bearer token.
+  - `HeaderPrincipalExtractor(header_name)` — extracts principal from a plain HTTP header;
+    useful for trusted-proxy and sidecar setups.
+  - `PrincipalExtractor` — base class / protocol; implement `async extract(request) -> str`
+    to integrate any custom authentication mechanism (mTLS, OIDC, API-key, …).
+  - `vault_seal_response(vault, data, safe_view, owner, granted, ttl)` — convenience helper
+    that seals data and returns a `HandleResponse` TypedDict for use in route handlers.
+  - Install with: `pip install kest[fastapi]`
+  - All symbols are also hoisted into `kest.core` under a graceful `try/except ImportError`
+    guard so `kest.core` remains importable without the optional extras.
+
+---
+
 ## [0.4.0] - 2026-04-24
 
 ### Added

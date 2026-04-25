@@ -556,6 +556,82 @@ record = vault.unseal(handle_id, requesting_principal="spiffe://example.com/gate
 ```
 
 
+#### 5e. FastAPI Integration (`kest[fastapi]`)
+
+The `kest.core.integrations.fastapi` plugin wires `HandleVault` directly into a FastAPI
+application with zero boilerplate.  Install the extras first:
+
+```bash
+pip install "kest[fastapi]"
+```
+
+**Drop-in router**
+
+```python
+from fastapi import FastAPI
+from kest.core import HandleVault, VaultCodec, ZlibCompressor
+from kest.core.integrations.fastapi import VaultRouter, JWTPrincipalExtractor
+
+app = FastAPI()
+vault = HandleVault(codec=VaultCodec(compressor=ZlibCompressor()))
+
+router = VaultRouter(
+    vault=vault,
+    extractor=JWTPrincipalExtractor(secret="your-secret", algorithm="HS256"),
+    gateway_principals=["spiffe://example.com/services/gateway"],
+)
+app.include_router(router, prefix="/vault")
+# Routes added:
+#   GET /vault/safe-view/{handle_id}  → public; returns safe_view text
+#   GET /vault/resolve/{handle_id}    → gateway only; returns raw data
+```
+
+**Sealing data in a route handler**
+
+```python
+from kest.core.integrations.fastapi import vault_seal_response, HandleResponse
+from fastapi import APIRouter
+
+router2 = APIRouter()
+
+@router2.post("/patients", response_model=HandleResponse)
+async def create_patient(record: dict) -> HandleResponse:
+    return vault_seal_response(
+        vault=vault,
+        data=record,
+        safe_view=f"Patient record: {record['name']}",
+        owner_principal="spiffe://example.com/data-service",
+        granted_principals=["spiffe://example.com/services/gateway"],
+    )
+```
+
+**Custom route with `VaultDependency`**
+
+```python
+from fastapi import Depends
+from kest.core.integrations.fastapi import VaultDependency
+
+get_unsealed = VaultDependency(vault=vault, extractor=jwt_extractor)
+
+@app.get("/records/{handle_id}")
+async def get_record(data=Depends(get_unsealed)):
+    # `data` is the raw unsealed dict; access denied → 403, expired → 410, missing → 404
+    return {"record": data}
+```
+
+**Custom extractor (mTLS SPIFFE SAN, sidecar header, …)**
+
+```python
+from kest.core.integrations.fastapi import PrincipalExtractor
+from fastapi import HTTPException, Request
+
+class SpiffeSanExtractor(PrincipalExtractor):
+    async def extract(self, request: Request) -> str:
+        san = request.headers.get("X-SPIFFE-ID")
+        if not san:
+            raise HTTPException(status_code=401, detail="Missing SPIFFE identity header")
+        return san
+```
 
 ### 6. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
