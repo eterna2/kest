@@ -20,6 +20,17 @@ Public API::
     )
 """
 
+from kest.core.vault.codec import (
+    AES256GCMEncryptor,
+    Compressor,
+    Encryptor,
+    FernetEncryptor,
+    GzipCompressor,
+    LZ4Compressor,
+    VaultCodec,
+    ZlibCompressor,
+    ZstdCompressor,
+)
 from kest.core.vault.errors import (
     HandleAccessDeniedError,
     HandleExpiredError,
@@ -29,9 +40,21 @@ from kest.core.vault.handle import OpaqueHandle
 from kest.core.vault.vault import HandleVault
 
 __all__ = [
+    # Core vault
     "HandleVault",
     "OpaqueHandle",
+    # Errors
     "HandleNotFoundError",
     "HandleExpiredError",
     "HandleAccessDeniedError",
+    # Codec
+    "VaultCodec",
+    "Compressor",
+    "Encryptor",
+    "ZlibCompressor",
+    "GzipCompressor",
+    "LZ4Compressor",
+    "ZstdCompressor",
+    "AES256GCMEncryptor",
+    "FernetEncryptor",
 ]

@@ -47,6 +47,17 @@ opa = ["opa-python-client>=2.0.4"]
 cedar = ["cedarpy>=4.8.0"]
 rego = ["regopy>=0.3.0"]
 schema = ["jsonschema>=4.0.0"]
+# Vault cache backends (all optional)
+lmdb = ["lmdb>=1.4.0"]
+cachetools = ["cachetools>=5.0.0"]
+redis = ["redis>=5.0.0"]
+valkey = ["valkey>=6.0.0"]
+# Vault codec compression (all optional)
+lz4 = ["lz4>=4.0.0"]
+zstd = ["zstandard>=0.22.0"]
+# FastAPI integration plugin (all optional)
+fastapi = ["fastapi>=0.115.0", "python-jose[cryptography]>=3.3.0"]
+
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kest"]
@@ -69,6 +80,13 @@ dev = [
     "cedarpy>=4.8.0",
     "pyperf>=2.10.0",
     "jsonschema>=4.0.0",
+    # Vault backend testing
+    "cachetools>=5.0.0",
+    "fakeredis>=2.0.0",
+    # FastAPI integration testing
+    "fastapi>=0.115.0",
+    "python-jose[cryptography]>=3.3.0",
+    "anyio>=4.0.0",
 ]
 
 [tool.pytest.ini_options]
