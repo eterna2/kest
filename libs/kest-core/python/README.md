@@ -797,5 +797,101 @@ moon run kest-lab:up
 moon run kest-core-python:test-live
 ```
 
+## Sandboxing
+
+Kest provides a `SandboxProvider` API for executing LLM-generated code in secure, isolated environments. All tool calls from sandboxed code are automatically routed through a `@kest_verified` `ToolProxy`, ensuring every operation is audited and woven into the Kest lineage chain.
+
+### Install a backend
+
+```bash
+uv add kest-core                   # SubprocessSandbox — no extra deps
+uv add 'kest-core[monty]'          # MontySandbox — in-process Rust interpreter (fast, experimental)
+uv add 'kest-core[agentcore]'      # AgentCoreSandbox — AWS Bedrock, VPC mode, CloudTrail
+uv add 'kest-core[e2b]'            # E2BSandbox — Firecracker microVM, cloud-isolated
+uv add 'kest-core[docker]'         # DockerSandbox — OCI container, self-hosted
+```
+
+### Quick example
+
+```python
+from kest.core.sandbox import SubprocessSandbox, SandboxConfig, ToolProxy
+from kest.core import kest_verified
+
+class MyProxy(ToolProxy):
+    def __init__(self):
+        self._taints: set[str] = set()
+
+    @kest_verified
+    async def call_tool(self, tool_name: str, args: dict):
+        if tool_name == "add":
+            return args["a"] + args["b"]
+        raise ValueError(f"Unknown tool: {tool_name}")
+
+    @property
+    def accumulated_taints(self) -> frozenset[str]:
+        return frozenset(self._taints)
+
+    def reset(self):
+        self._taints.clear()
+
+sandbox = SubprocessSandbox()
+result = await sandbox.execute(
+    script='result = call_tool("add", {"a": 10, "b": 32})\nprint(result)',
+    tool_proxy=MyProxy(),
+    config=SandboxConfig(),   # deny-by-default: blocks socket, subprocess, eval, etc.
+)
+print(result.stdout)       # 42
+print(result.taints_added) # frozenset of taints from tool calls
+```
+
+### Backend selection
+
+| Backend | Install extra | Best for |
+|---|---|---|
+| `SubprocessSandbox` | *(none)* | Baseline, CI, no cloud deps |
+| `MontySandbox` | `[monty]` | Fast in-process LLM tool orchestration |
+| `AgentCoreSandbox` | `[agentcore]` | AWS-native, IAM + CloudTrail audit |
+| `E2BSandbox` | `[e2b]` | Full CPython + packages, non-AWS |
+| `DockerSandbox` | `[docker]` | High-privilege, self-hosted |
+
+> **Full documentation:** [`SANDBOX.md`](./SANDBOX.md)  
+> **Normative specification:** [`spec/SPEC-sandbox-v0.1.0.md`](../../../spec/SPEC-sandbox-v0.1.0.md)
+
+#### AgentCore local setup
+
+`AgentCoreSandbox` requires **IAM credentials** (not `AWS_BEARER_TOKEN` — ABSK tokens are intra-AgentCore runtime credentials). The **Code Interpreter resource** is provisioned via IaC or the AWS CLI (not created by the SDK at runtime).
+
+```bash
+# 1. Install the extra
+uv add 'kest-core[agentcore]'
+
+# 2. Ensure IAM credentials are in the boto3 credential chain:
+#    a) Standard profile (automatically picked up)
+#    b) SSO / credential-process profiles:
+eval "$(aws configure export-credentials --format env)"
+
+# 3. (Optional) Create a custom interpreter with specific network settings:
+aws bedrock-agentcore create-code-interpreter \
+    --name kest-interpreter \
+    --network-configuration '{"networkMode": "vpc"}' \
+    --region us-east-1
+# → note the returned codeInterpreterIdentifier
+
+# 4. For cost-efficient testing: reuse an existing session
+#    (avoids repeated StartCodeInterpreterSession calls and quotas):
+export AGENTCORE_CODE_INTERPRETER_ID="aws.codeinterpreter.v1"  # or custom ARN
+export AGENTCORE_SESSION_ID=$(aws bedrock-agentcore start-code-interpreter-session \
+    --code-interpreter-identifier "$AGENTCORE_CODE_INTERPRETER_ID" \
+    --name kest-test-session --session-timeout-seconds 3600 \
+    --query sessionId --output text)
+export AGENTCORE_REGION="us-east-1"
+
+uv run pytest -m sandbox_live -v src/kest/core/sandbox/agentcore_sandbox_test.py
+```
+
+The live integration tests skip automatically with a clear message if IAM credentials are absent or the interpreter is not reachable.
+
+---
+
 ## Documentation
 For full documentation, architecture deep dives, and compliance frameworks mapping, please visit the [Official Kest Documentation Site](https://eterna2.github.io/kest/).
