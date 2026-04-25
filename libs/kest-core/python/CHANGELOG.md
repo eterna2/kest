@@ -6,6 +6,22 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Template & Hydrate engine** (Issue #83): New `TemplateParser` and `TemplateEngine`
+  classes in `kest.core.vault` for data-safe LLM report composition:
+  - `TemplateParser.parse(template)` — regex-based extraction of `{{hdl_...}}` placeholders
+    from LLM-generated skeleton strings.
+  - `TemplateParser.render(template, substitutions)` — substitutes each placeholder
+    with its resolved string value; unknown placeholders are left untouched.
+  - `TemplateEngine(vault, serializer=str)` — orchestrates the full pipeline:
+    parse → ACL-checked unseal (all handles attempted, no short-circuit) →
+    serialise with a configurable `Callable[[Any], str]` → post-hydration
+    `OutputValidator` guardrails → return hydrated string.
+  - `HydrationError(errors: dict[str, Exception])` — raised when one or more
+    handles fail ACL / not-found / expiry checks; `errors` maps each failing
+    handle ID to its original exception so the caller gets a complete picture
+    in a single pass.
+  - Exported from `kest.core.vault` and hoisted into `kest.core`.
+
 - **FastAPI Integration Plugin** (`kest[fastapi]`): New `kest.core.integrations.fastapi` module
   providing a zero-boilerplate FastAPI integration for the HandleVault:
   - `VaultRouter(vault, extractor, gateway_principals)` — a drop-in `APIRouter` exposing

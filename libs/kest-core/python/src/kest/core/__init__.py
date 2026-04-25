@@ -105,6 +105,11 @@ from kest.core.vault.server import (  # noqa: E402, F401
     VaultRPCServer,
     VaultSocketServer,
 )
+from kest.core.vault.template import (  # noqa: E402, F401
+    HydrationError,
+    TemplateEngine,
+    TemplateParser,
+)
 
 # FastAPI integration (kest[fastapi]) — import is lazy so kest.core remains
 # importable without fastapi/python-jose installed.  Consumers that install
@@ -279,6 +284,10 @@ __all__ = [
     "RedisCache",
     "SQLiteCache",
     "ValkeyCache",
+    # Template & Hydrate engine (Issue #83)
+    "TemplateParser",
+    "TemplateEngine",
+    "HydrationError",
     # FastAPI integration (kest[fastapi]) — available only if extras installed
     "VaultRouter",
     "VaultDependency",

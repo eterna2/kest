@@ -633,6 +633,71 @@ class SpiffeSanExtractor(PrincipalExtractor):
         return san
 ```
 
+#### 5f. Template & Hydrate Engine (Issue #83)
+
+LLMs compose report *structure* using opaque handle placeholders — they never see raw sensitive data. A trusted gateway later resolves every placeholder with ACL enforcement and optional output validators.
+
+**Pattern**:
+
+```
+LLM output:  "Q3 expenditure was {{hdl_a1b2c3…}}. Top risk: {{hdl_d4e5f6…}}."
+                                       ↓
+                             TemplateEngine.hydrate()
+                    ┌─────────────────────────────────────┐
+                    │ 1. Parse → [hdl_a1b2…, hdl_d4e5…]  │
+                    │ 2. ACL-checked vault.unseal() for   │
+                    │    all handles (collect all errors) │
+                    │ 3. serializer(data) → str           │
+                    │ 4. OutputValidator guardrails       │
+                    └─────────────────────────────────────┘
+                                       ↓
+                  "Q3 expenditure was $1.2M. Top risk: TX-8812."
+```
+
+**Basic usage**:
+
+```python
+import json
+from kest.core.vault import HandleVault, TemplateEngine
+from kest.core.framework.validators import RegexDenyListValidator
+
+vault = HandleVault()
+engine = TemplateEngine(vault=vault, serializer=json.dumps)
+
+# Upstream service seals the sensitive data
+handle = vault.seal(
+    data={"total": "$1,234,567"},
+    owner_principal="spiffe://example.com/data-service",
+    safe_view="Q3 total expenditure figure",
+    granted_principals=["spiffe://example.com/report-service"],
+)
+
+# LLM produces a skeleton (safe_view only, never raw data)
+skeleton = f"Quarterly expenditure: {{{{{handle.id}}}}}."
+
+# Trusted gateway hydrates with ACL + DLP guardrail
+report = engine.hydrate(
+    template=skeleton,
+    requesting_principal="spiffe://example.com/report-service",
+    output_validators=[RegexDenyListValidator([r"\bSSN\b", r"\bpassword\b"])],
+)
+# → 'Quarterly expenditure: {"total": "$1,234,567"}.'
+```
+
+**Collect-all error handling** — every failing handle is collected before raising:
+
+```python
+from kest.core.vault import HydrationError
+
+try:
+    report = engine.hydrate(template, requesting_principal="untrusted")
+except HydrationError as exc:
+    for handle_id, error in exc.errors.items():
+        print(f"{handle_id}: {type(error).__name__} — {error}")
+    # hdl_a1b2…: HandleAccessDeniedError — Principal 'untrusted' is not authorised…
+    # hdl_d4e5…: HandleAccessDeniedError — Principal 'untrusted' is not authorised…
+```
+
 ### 6. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
 
