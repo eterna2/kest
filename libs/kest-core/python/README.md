@@ -218,6 +218,8 @@ Protect against prompt injection artifacts and data leaks by validating function
 before they reach the caller. If validation fails, the result is **not returned** and a
 `"output_validation_failed"` taint is recorded in the audit chain.
 
+#### Basic Validators
+
 ```python
 from kest.core import (
     kest_verified,
@@ -239,7 +241,66 @@ def summarize_document(doc_id: str) -> str:
     ...
 ```
 
-You can implement custom validators by subclassing `OutputValidator`:
+#### Structured Validation Pipeline
+
+For comprehensive validation with severity levels and aggregated results, use `ValidationPipeline`.
+Unlike individual validators, the pipeline **does not short-circuit** — it runs all validators and
+collects every violation before deciding to block:
+
+```python
+from kest.core import (
+    kest_verified,
+    ValidationPipeline,
+    LengthBoundsValidator,
+    JsonSchemaValidator,
+    ContentClassificationValidator,
+    ValidationSeverity,
+)
+
+pipeline = ValidationPipeline(
+    validators=[
+        LengthBoundsValidator(min_chars=10, max_chars=5000),
+        JsonSchemaValidator(schema={
+            "type": "object",
+            "required": ["summary", "confidence"],
+        }),
+        ContentClassificationValidator(expected=["safe", "neutral"]),
+    ],
+)
+
+# Direct usage — inspect all violations without raising:
+result = pipeline.run(output)
+if not result.passed:
+    for v in result.violations:
+        print(f"[{v.severity.name}] {v.validator_name}: {v.message}")
+
+# Or as an OutputValidator in @kest_verified — raises on first BLOCK violation:
+@kest_verified(policy="summarize", output_validators=[pipeline])
+def summarize(doc: str) -> dict:
+    ...
+```
+
+> **Note:** `JsonSchemaValidator` requires `pip install kest[schema]` (installs `jsonschema>=4.0.0`).
+
+#### Semantic Drift Detection
+
+For custom similarity-based guardrails, subclass `SemanticDriftDetector`:
+
+```python
+from kest.core import SemanticDriftDetector
+
+class EmbeddingDriftDetector(SemanticDriftDetector):
+    def detect(self, reference, output) -> float:
+        # Return 0.0 = no drift, 1.0 = maximum drift
+        return 1 - cosine_similarity(embed(reference), embed(output))
+
+detector = EmbeddingDriftDetector(
+    reference="Expected response topic: product refund policy",
+    threshold=0.3,
+)
+```
+
+#### Custom Validators
 
 ```python
 from kest.core import OutputValidator, OutputValidationError
@@ -249,6 +310,8 @@ class NoBinaryValidator(OutputValidator):
         if "\x00" in str(output):
             raise OutputValidationError("Null byte detected in output")
 ```
+
+
 
 ### 5. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
