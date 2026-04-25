@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kest-vault-showcase"
+version = "0.1.0"
+description = "Realistic MCP-based showcase for Kest HandleVault + OpaqueHandle."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "kest>=0.4.0",
+    "mcp>=1.6.0",
+    "httpx>=0.28.1",
+    "rich>=13.0.0",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = []  # no installable packages — scripts only
+
+[dependency-groups]
+dev = [
+    "kest>=0.4.0",
+    "mcp>=1.6.0",
+    "httpx>=0.28.1",
+    "rich>=13.0.0",
+]
+
+[tool.uv.sources]
+kest = { path = "../../libs/kest-core/python", editable = true }
+
