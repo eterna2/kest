@@ -633,6 +633,96 @@ class SpiffeSanExtractor(PrincipalExtractor):
         return san
 ```
 
+#### 5f. Template & Hydrate Engine (Issue #83)
+
+LLMs compose report *structure* using opaque XML handle tags — they see the
+`safe_view` description but never the underlying sensitive data. A trusted
+gateway later resolves every tag with ACL enforcement and optional output validators.
+
+**Placeholder format**:
+
+```xml
+<kest-handle id="hdl_a1b2c3..." safe_view="Q3 total expenditure figure"/>
+```
+
+The `id` attribute is the opaque pointer used for ACL-checked resolution.
+The `safe_view` attribute travels alongside it so the LLM can reason about
+the handle's content (e.g. "*the total expenditure figure*") without ever
+touching the raw data.
+
+**Data flow**:
+
+```
+Upstream service seals data
+         → OpaqueHandle(id="hdl_…", safe_view="Q3 total expenditure figure")
+         → handle.to_tag() embedded in LLM prompt
+
+LLM receives:
+  "Summarise the Q3 audit. Expenditure: <kest-handle id="hdl_…" safe_view="Q3 total expenditure figure"/>."
+
+LLM output (skeleton):
+  "Total expenditure was <kest-handle id="hdl_…" safe_view="Q3 total expenditure figure"/>."
+                                        ↓
+                            TemplateEngine.hydrate()
+                   ┌──────────────────────────────────────────┐
+                   │ 1. Parse XML tags → [hdl_…]              │
+                   │ 2. ACL-checked vault.unseal() for ALL    │
+                   │    handles (collect all errors, no       │
+                   │    short-circuit)                        │
+                   │ 3. serializer(data) → str                │
+                   │ 4. OutputValidator guardrails (DLP/regex)│
+                   └──────────────────────────────────────────┘
+                                        ↓
+                   "Total expenditure was $1,234,567."
+```
+
+**Usage**:
+
+```python
+import json
+from kest.core.vault import HandleVault, TemplateEngine
+from kest.core.framework.validators import RegexDenyListValidator
+
+vault = HandleVault()
+engine = TemplateEngine(vault=vault, serializer=json.dumps)
+
+# Step 1 — Seal sensitive data upstream
+handle = vault.seal(
+    data={"total": "$1,234,567"},
+    owner_principal="spiffe://example.com/data-service",
+    safe_view="Q3 total expenditure figure",
+    granted_principals=["spiffe://example.com/report-service"],
+)
+
+# Step 2 — Embed handle.to_tag() in the LLM prompt (safe; no raw data)
+llm_prompt = f"Summarise the Q3 audit. The total is: {handle.to_tag()}."
+# → "…The total is: <kest-handle id="hdl_…" safe_view="Q3 total expenditure figure"/>."
+
+# LLM produces a skeleton that preserves (or re-uses) the tag
+skeleton = f"Total expenditure was {handle.to_tag()}."
+
+# Step 3 — Trusted gateway hydrates with ACL + DLP guardrail
+report = engine.hydrate(
+    template=skeleton,
+    requesting_principal="spiffe://example.com/report-service",
+    output_validators=[RegexDenyListValidator([r"\bSSN\b", r"\bpassword\b"])],
+)
+# → 'Total expenditure was {"total": "$1,234,567"}.'
+```
+
+**Collect-all error handling** — every failing handle is reported at once:
+
+```python
+from kest.core.vault import HydrationError
+
+try:
+    report = engine.hydrate(skeleton, requesting_principal="spiffe://untrusted")
+except HydrationError as exc:
+    for handle_id, error in exc.errors.items():
+        print(f"{handle_id}: {type(error).__name__} — {error}")
+    # hdl_a1b2…: HandleAccessDeniedError — Principal 'spiffe://untrusted' is not authorised…
+```
+
 ### 6. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
 

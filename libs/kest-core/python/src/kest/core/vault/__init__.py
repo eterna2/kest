@@ -37,6 +37,7 @@ from kest.core.vault.errors import (
     HandleNotFoundError,
 )
 from kest.core.vault.handle import OpaqueHandle
+from kest.core.vault.template import HydrationError, TemplateEngine, TemplateParser
 from kest.core.vault.vault import HandleVault
 
 __all__ = [
@@ -57,4 +58,8 @@ __all__ = [
     "ZstdCompressor",
     "AES256GCMEncryptor",
     "FernetEncryptor",
+    # Template & Hydrate engine
+    "TemplateParser",
+    "TemplateEngine",
+    "HydrationError",
 ]
