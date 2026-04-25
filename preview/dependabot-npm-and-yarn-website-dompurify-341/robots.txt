@@ -1,4 +1,0 @@
-User-Agent: *
-Allow: /
-
-Sitemap: https://eterna2.github.io/kest/preview/dependabot-npm-and-yarn-website-dompurify-341/sitemap.xml
