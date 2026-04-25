@@ -169,7 +169,50 @@ def read_document_dynamic(doc_id: str) -> dict:
 
 Resolved values are forwarded to the policy engine as `object.id` / `object.attributes` per SPEC §9.2 and serialized into `KestEntry.labels["kest.resource_attr"]` for tamper-evident audit.
 
-### 4. Output Validators (Guardrails)
+
+### 4. Classification-Based Automatic Taint Tagging
+
+Assign a **data classification** label to each `@kest_verified` function and let Kest automatically
+apply the relevant taints — no more manual `added_taints` boilerplate.
+
+```python
+from kest.core import kest_verified
+
+@kest_verified(policy="fetch_records", classification="data")
+def fetch_user_records(user_id: str) -> list:
+    ...
+# KestEntry.taints automatically includes "contains_data"
+
+@kest_verified(policy="review_output", classification="critic")
+def review_agent_output(output: str) -> str:
+    ...
+# KestEntry.taints automatically includes "requires_review"
+```
+
+**Default classification → taint map:**
+| Classification | Auto-taint |
+|---|---|
+| `"data"` | `"contains_data"` |
+| `"critic"` | `"requires_review"` |
+| `"sanitizer"` | `"sanitized"` |
+| `"system"` *(default)* | *(none)* |
+
+The map is fully configurable at startup and resets to defaults after `configure(clear=True)`:
+
+```python
+from kest.core import configure
+
+configure(
+    classification_taint_map={
+        "data": ["pii_detected", "needs_encryption"],
+        "agent": ["agent_output"],
+    }
+)
+```
+
+Auto-taints are **suppressed** if the same taint also appears in `removed_taints`.
+
+### 5. Output Validators (Guardrails)
 
 Protect against prompt injection artifacts and data leaks by validating function return values
 before they reach the caller. If validation fails, the result is **not returned** and a
