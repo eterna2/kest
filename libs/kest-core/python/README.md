@@ -365,7 +365,6 @@ gateway later resolves (unseals) the handle with ACL enforcement.
 
 ```python
 from kest.core import HandleVault, OpaqueHandle
-from kest.core.vault.errors import HandleAccessDeniedError, HandleExpiredError
 
 vault = HandleVault()
 
@@ -417,16 +416,146 @@ except HandleNotFoundError:
 vault.invalidate(handle.id)
 ```
 
-**Custom CacheProvider** (e.g., for Redis-backed vaults in production):
+#### 5a. VaultCodec — Encryption & Compression at Rest
+
+Attach a `VaultCodec` to apply **optional** encryption and/or compression before data is written to
+the cache. Both stages are independently optional.
+
+```python
+import os
+from kest.core import HandleVault, VaultCodec, AES256GCMEncryptor, ZlibCompressor
+
+# Compress then encrypt (recommended for large payloads)
+key = os.urandom(32)  # store securely — e.g. in KMS
+vault = HandleVault(
+    codec=VaultCodec(
+        compressor=ZlibCompressor(),      # optional: reduce cache size
+        encryptor=AES256GCMEncryptor(key), # optional: encrypt at rest
+    )
+)
+
+handle = vault.seal(data={"ssn": "123-45-6789"}, owner_principal="svc", safe_view="PII")
+data = vault.unseal(handle.id, requesting_principal="svc")
+# data -> {"ssn": "123-45-6789"}
+```
+
+**Available compressors** (pipeline order: pickle → compress → encrypt):
+
+| Class | Extra | Notes |
+|---|---|---|
+| `ZlibCompressor` | stdlib | Configurable level (0–9) |
+| `GzipCompressor` | stdlib | Configurable level |
+| `LZ4Compressor` | `kest[lz4]` | Fastest compression |
+| `ZstdCompressor` | `kest[zstd]` | Best ratio |
+
+**Available encryptors:**
+
+| Class | Notes |
+|---|---|
+| `AES256GCMEncryptor(key)` | AES-256-GCM; authenticated; random nonce per call; `key = os.urandom(32)` |
+| `FernetEncryptor(key)` | AES-128-CBC + HMAC; `key = FernetEncryptor.generate_key()` |
+
+#### 5b. Pluggable Cache Backends
+
+`HandleVault` accepts any `CacheProvider`. Five built-in backends are available:
+
 ```python
 from kest.core import HandleVault
-from kest.core.framework.cache import CacheProvider
+from kest.core import SQLiteCache, CachetoolsCache, RedisCache, ValkeyCache
 
-class RedisCache(CacheProvider):
-    ...
+# Persistent SQLite (stdlib — no extra dep)
+vault = HandleVault(cache=SQLiteCache(db_path="/var/kest/vault.db"))
 
-vault = HandleVault(cache=RedisCache())
+# LRU in-memory (pure Python)
+vault = HandleVault(cache=CachetoolsCache(maxsize=1024))
+
+# Redis-backed (also compatible with KeyDB)
+vault = HandleVault(cache=RedisCache(host="localhost", port=6379))
+
+# Valkey-backed
+vault = HandleVault(cache=ValkeyCache(host="localhost", port=6379))
 ```
+
+Install optional extras:
+
+```bash
+pip install kest[lmdb]       # LMDBCache — fastest embedded reads
+pip install kest[cachetools]  # CachetoolsCache — pure-Python LRU/TTL
+pip install kest[redis]       # RedisCache
+pip install kest[valkey]      # ValkeyCache
+pip install kest[lz4]         # LZ4Compressor
+pip install kest[zstd]        # ZstdCompressor
+```
+
+#### 5c. Vault Service Transports
+
+Run a vault as an embeddable micro-service and access it via the unified `VaultClient`:
+
+**HTTP (REST/JSON)**:
+```python
+from kest.core.vault.server import VaultHTTPServer, VaultClient
+
+srv = VaultHTTPServer(port=8421)
+srv.start()
+
+client = VaultClient.http("http://localhost:8421")
+handle = client.seal(data={"ssn": "123"}, owner_principal="svc", safe_view="PII")
+data   = client.unseal(handle["id"], requesting_principal="svc")
+client.invalidate(handle["id"])
+srv.stop()
+```
+
+**XML-RPC**:
+```python
+from kest.core.vault.server import VaultRPCServer, VaultClient
+
+srv = VaultRPCServer(port=8422)
+srv.start()
+client = VaultClient.rpc("localhost", 8422)
+```
+
+**TCP Socket (JSON-RPC 2.0)**:
+```python
+from kest.core.vault.server import VaultSocketServer, VaultClient
+
+srv = VaultSocketServer(address=("localhost", 8423))
+srv.start()
+client = VaultClient.socket(("localhost", 8423))
+
+# Unix domain socket also supported (Linux/macOS)
+srv = VaultSocketServer(address="/tmp/kest-vault.sock")
+client = VaultClient.socket("/tmp/kest-vault.sock")
+```
+
+All three clients raise the same typed errors as the local vault:
+`HandleNotFoundError`, `HandleExpiredError`, `HandleAccessDeniedError`.
+
+#### 5d. Using `HandleVault` with `@kest_verified`
+
+```python
+from kest.core import kest_verified, HandleVault, VaultCodec, AES256GCMEncryptor
+import os
+
+key = os.urandom(32)
+vault = HandleVault(codec=VaultCodec(encryptor=AES256GCMEncryptor(key)))
+
+@kest_verified(action="read_pii", owner="data-service")
+def fetch_user_record(user_id: str) -> str:
+    record = {"name": "Alice", "ssn": "123-45-6789"}
+    handle = vault.seal(
+        data=record,
+        owner_principal="spiffe://example.com/data-service",
+        safe_view=f"User record for {user_id}",
+    )
+    # Return only the opaque pointer to the LLM
+    return handle.id
+
+# Later, a trusted gateway resolves the handle with ACL enforcement:
+handle_id = fetch_user_record("u-42")
+record = vault.unseal(handle_id, requesting_principal="spiffe://example.com/gateway")
+```
+
+
 
 ### 6. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:

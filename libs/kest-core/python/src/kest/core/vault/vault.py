@@ -24,6 +24,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Iterable, Optional
 
 from kest.core.framework.cache import CacheProvider, SimpleCache
+from kest.core.vault.codec import VaultCodec
 from kest.core.vault.errors import (
     HandleAccessDeniedError,
     HandleExpiredError,
@@ -31,7 +32,9 @@ from kest.core.vault.errors import (
 )
 from kest.core.vault.handle import OpaqueHandle
 
-# Internal sentinel: value stored in cache keyed by handle.id
+# Internal sentinel: value stored in cache keyed by handle.id.
+# When a codec is active the *data* portion is bytes (encoded payload);
+# the OpaqueHandle is always stored as a plain Python object.
 _Entry = tuple[OpaqueHandle, Any]
 
 
@@ -54,8 +57,13 @@ class HandleVault:
         raw = vault.unseal(handle.id, requesting_principal="spiffe://example.com/service-a")
     """
 
-    def __init__(self, cache: Optional[CacheProvider] = None) -> None:
+    def __init__(
+        self,
+        cache: Optional[CacheProvider] = None,
+        codec: Optional[VaultCodec] = None,
+    ) -> None:
         self._cache: CacheProvider = cache if cache is not None else SimpleCache()
+        self._codec: Optional[VaultCodec] = codec
 
     # ------------------------------------------------------------------
     # Public API
@@ -94,7 +102,8 @@ class HandleVault:
             expires_at=now + timedelta(seconds=ttl_seconds),
             granted_principals=frozenset(granted_principals),
         )
-        entry: _Entry = (handle, data)
+        payload = self._codec.encode(data) if self._codec is not None else data
+        entry: _Entry = (handle, payload)
         self._cache.set(handle.id, entry)
         return handle
 
@@ -119,10 +128,10 @@ class HandleVault:
             HandleExpiredError: Handle's TTL has elapsed.
             HandleAccessDeniedError: Principal is not authorised.
         """
-        handle, data = self._get_entry(handle_id)
+        handle, payload = self._get_entry(handle_id)
         self._check_expiry(handle)
         self._check_acl(handle, requesting_principal)
-        return data
+        return self._codec.decode(payload) if self._codec is not None else payload
 
     def invalidate(self, handle_id: str) -> None:
         """
