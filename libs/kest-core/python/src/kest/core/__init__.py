@@ -24,6 +24,12 @@ from kest.core.engines.engine import (  # noqa: E402
     RegoLocalEngine,
 )
 from kest.core.framework.cache import CacheProvider, SimpleCache  # noqa: E402
+from kest.core.framework.cache_providers import (  # noqa: E402, F401
+    CachetoolsCache,
+    RedisCache,
+    SQLiteCache,
+    ValkeyCache,
+)
 from kest.core.framework.context import (  # noqa: E402
     get_current_agent,
     get_current_jwt,
@@ -76,14 +82,48 @@ from kest.core.models.passport import (  # noqa: E402
     register_origin_trust,
 )
 from kest.core.vault import (  # noqa: E402, F401
+    AES256GCMEncryptor,
+    Compressor,
+    Encryptor,
+    FernetEncryptor,
+    GzipCompressor,
     HandleVault,
+    LZ4Compressor,
     OpaqueHandle,
+    VaultCodec,
+    ZlibCompressor,
+    ZstdCompressor,
 )
 from kest.core.vault.errors import (  # noqa: E402, F401
     HandleAccessDeniedError,
     HandleExpiredError,
     HandleNotFoundError,
 )
+from kest.core.vault.server import (  # noqa: E402, F401
+    VaultClient,
+    VaultHTTPServer,
+    VaultRPCServer,
+    VaultSocketServer,
+)
+
+# FastAPI integration (kest[fastapi]) — import is lazy so kest.core remains
+# importable without fastapi/python-jose installed.  Consumers that install
+# `kest[fastapi]` can import directly from `kest.core.integrations.fastapi`;
+# the symbols are also hoisted here for convenience.
+try:
+    from kest.core.integrations.fastapi import (  # noqa: F401
+        HandleResponse,
+        HeaderPrincipalExtractor,
+        JWTPrincipalExtractor,
+        PrincipalExtractor,
+        VaultDependency,
+        VaultRouter,
+        vault_seal_response,
+    )
+
+    _FASTAPI_INTEGRATION_AVAILABLE = True
+except ImportError:  # fastapi / python-jose not installed
+    _FASTAPI_INTEGRATION_AVAILABLE = False
 
 _active_engine: PolicyEngine | None = None
 _active_identity: IdentityProvider | None = None
@@ -214,4 +254,37 @@ __all__ = [
     "JsonSchemaValidator",
     "ContentClassificationValidator",
     "SemanticDriftDetector",
+    # Vault — HandleVault & opaque handles
+    "HandleVault",
+    "OpaqueHandle",
+    "VaultCodec",
+    "Compressor",
+    "Encryptor",
+    "GzipCompressor",
+    "ZlibCompressor",
+    "LZ4Compressor",
+    "ZstdCompressor",
+    "AES256GCMEncryptor",
+    "FernetEncryptor",
+    "HandleAccessDeniedError",
+    "HandleExpiredError",
+    "HandleNotFoundError",
+    # Vault servers & clients
+    "VaultHTTPServer",
+    "VaultRPCServer",
+    "VaultSocketServer",
+    "VaultClient",
+    # Cache backends
+    "CachetoolsCache",
+    "RedisCache",
+    "SQLiteCache",
+    "ValkeyCache",
+    # FastAPI integration (kest[fastapi]) — available only if extras installed
+    "VaultRouter",
+    "VaultDependency",
+    "JWTPrincipalExtractor",
+    "HeaderPrincipalExtractor",
+    "PrincipalExtractor",
+    "HandleResponse",
+    "vault_seal_response",
 ]
