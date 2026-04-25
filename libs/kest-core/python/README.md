@@ -354,7 +354,81 @@ class NoBinaryValidator(OutputValidator):
 
 
 
-### 5. Policy Validation
+
+
+### 5. Data Vault / Opaque Handle
+
+In a zero-trust AI architecture, raw sensitive data should **never** reach the LLM context window.
+The `HandleVault` pattern solves this by storing sensitive payloads in a secure in-memory vault and
+giving the LLM only a non-sensitive `safe_view` string alongside an opaque handle ID. A trusted
+gateway later resolves (unseals) the handle with ACL enforcement.
+
+```python
+from kest.core import HandleVault, OpaqueHandle
+from kest.core.vault.errors import HandleAccessDeniedError, HandleExpiredError
+
+vault = HandleVault()
+
+# 1. Seal: sensitive data never leaves the vault
+handle = vault.seal(
+    data="John Doe, SSN: 123-45-6789",
+    owner_principal="spiffe://example.com/service-a",
+    safe_view="A person record with name and SSN",  # <-- safe for LLM
+    ttl_seconds=300,
+)
+
+# handle.id        -> "hdl_a1b2c3..."     (opaque pointer — safe to pass around)
+# handle.safe_view -> "A person record..."  (non-sensitive — safe for LLM prompts)
+
+# 2. LLM operates on safe_view, returns handle.id in its output
+
+# 3. Gateway unseals with ACL check
+raw = vault.unseal(handle.id, requesting_principal="spiffe://example.com/service-a")
+# raw -> "John Doe, SSN: 123-45-6789"
+```
+
+**Grant additional principals:**
+```python
+handle = vault.seal(
+    data={"secret": "value"},
+    owner_principal="spiffe://example.com/service-a",
+    safe_view="Classified payload",
+    granted_principals=["spiffe://example.com/gateway"],
+)
+vault.unseal(handle.id, requesting_principal="spiffe://example.com/gateway")  # OK
+```
+
+**Error handling:**
+```python
+from kest.core import HandleNotFoundError, HandleExpiredError, HandleAccessDeniedError
+
+try:
+    raw = vault.unseal(handle_id, requesting_principal=caller)
+except HandleExpiredError:
+    ...  # TTL elapsed — data no longer accessible
+except HandleAccessDeniedError:
+    ...  # principal not in ACL
+except HandleNotFoundError:
+    ...  # handle was invalidated or never existed
+```
+
+**Early invalidation** (e.g., after a one-shot use):
+```python
+vault.invalidate(handle.id)
+```
+
+**Custom CacheProvider** (e.g., for Redis-backed vaults in production):
+```python
+from kest.core import HandleVault
+from kest.core.framework.cache import CacheProvider
+
+class RedisCache(CacheProvider):
+    ...
+
+vault = HandleVault(cache=RedisCache())
+```
+
+### 6. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
 
 ```python

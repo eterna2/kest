@@ -75,6 +75,15 @@ from kest.core.models.passport import (  # noqa: E402
     TrustEvaluator,
     register_origin_trust,
 )
+from kest.core.vault import (  # noqa: E402, F401
+    HandleVault,
+    OpaqueHandle,
+)
+from kest.core.vault.errors import (  # noqa: E402, F401
+    HandleAccessDeniedError,
+    HandleExpiredError,
+    HandleNotFoundError,
+)
 
 _active_engine: PolicyEngine | None = None
 _active_identity: IdentityProvider | None = None
