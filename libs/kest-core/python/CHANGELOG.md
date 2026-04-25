@@ -6,6 +6,53 @@ All notable changes to this project will be documented in this file.
 
 ### Added
 
+- **Sandbox multi-backend execution** (Issue #84): New `kest.core.sandbox` subsystem providing
+  secure, isolated execution of LLM-generated code with taint propagation and ToolProxy mediation.
+  - `SandboxProvider` — abstract base class defining the uniform `execute(script, tool_proxy,
+    timeout_seconds, config) → SandboxResult` contract across all backends.
+  - `ToolProxy` — abstract mediator for all tool calls from sandboxed code; accumulates taints
+    across the lifetime of one `execute()` call; reset at the start of every call to prevent
+    cross-execution leakage.
+  - `SandboxConfig` — deny-by-default configuration dataclass: `blocked_builtins` (eval, exec,
+    open, …), `blocked_modules` (socket, subprocess, http, …), `allowed_modules` allowlist,
+    `allowed_packages` (pre-installed in execution env), `package_index_url`, `network_mode`.
+  - `SandboxResult` — immutable result: `stdout`, `stderr`, `return_value`, `exit_code`,
+    `taints_added` (frozenset from ToolProxy).
+  - **`SubprocessSandbox`** (no extra) — OS-process isolation with ephemeral venv, preamble
+    injection (builtin stubs + `sys.meta_path` import blocker), JSON-line IPC tool-call bridge,
+    host env stripping, and hard timeout via `asyncio.CancelledError` → process kill.
+  - **`E2BSandbox`** (`kest[e2b]`) — Firecracker microVM backend via `e2b-code-interpreter≥1.0`.
+    Preamble injection, package pre-installation, per-sandbox network isolation. Skips gracefully
+    when `E2B_API_KEY` is absent.
+  - **`AgentCoreSandbox`** (`kest[agentcore]`) — AWS Bedrock AgentCore Code Interpreter backend
+    via `boto3`. IaC-first architecture: the Code Interpreter *resource* is provisioned via IaC
+    or the AWS CLI (`CreateCodeInterpreter`) and identified by `code_interpreter_id`; the SDK only
+    manages *sessions*. Key features:
+    - `session()` async context manager — pins one `StartCodeInterpreterSession` call for N
+      `execute()` calls, avoiding per-call session quota exhaustion.
+    - Injected `session_id` — bypass `Start`/`Stop` entirely when a pre-existing session is
+      supplied; zero additional API calls (cost/quota optimisation for local testing).
+    - Network mode policy warnings: `vpc` (no warning — recommended), `public` (WARNING logged —
+      unrestricted internet by design), `sandbox` (WARNING logged — unpatched DNS-tunnel
+      vulnerability, BeyondTrust Sep 2025, AWS closed as "by design").
+    - All warnings contain `"DNS egress risk"` for CI greppability (per `F-EG-03`).
+    - Skips gracefully when IAM credentials are absent from the boto3 credential chain.
+  - **`MontySandbox`** (`kest[monty]`) — Rust-in-process backend via `pydantic-monty≥0.0.17`.
+    Sub-microsecond cold-start, no subprocess/network/filesystem. Bridge: a sync shim posts
+    async `ToolProxy.call_tool` coroutines to the event loop; Monty's Rust worker thread blocks
+    until the future resolves. Timeout via `asyncio.wait_for`. `SandboxConfig` fields that Monty
+    cannot enforce (`blocked_modules`, `allowed_modules`, `blocked_builtins`, `allowed_packages`,
+    `package_index_url`) emit `WARNING` instead of failing. `MontySyntaxError` and
+    `MontyRuntimeError` are caught at both parse-time and run-time and returned as non-zero
+    `SandboxResult` rather than raised.
+  - `SandboxTimeoutError`, `SandboxNotAvailableError`, `SandboxConfigurationError`,
+    `SandboxExecutionError` — typed exception hierarchy.
+  - `MockSandboxProvider`, `MockToolProxy` — test doubles; no subprocess/network activity.
+  - Install extras: `pip install kest[e2b]` · `pip install kest[agentcore]`
+
+  > **CI note**: `sandbox_live` tests (E2B, AgentCore) are intentionally excluded from CI to
+  > avoid cloud billing. Run locally with credentials — see `SANDBOX.md §8` for instructions.
+
 - **Template & Hydrate engine** (Issue #83): New `TemplateParser`, `TemplateEngine`,
   and `HydrationError` in `kest.core.vault` for data-safe LLM report composition
   using **XML handle tags**:
