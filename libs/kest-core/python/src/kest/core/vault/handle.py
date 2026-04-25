@@ -34,3 +34,23 @@ class OpaqueHandle:
     created_at: datetime
     expires_at: datetime
     granted_principals: frozenset = field(default_factory=frozenset)
+
+    def to_tag(self) -> str:
+        """Return a self-closing XML tag embedding this handle for LLM prompts.
+
+        The tag includes both the opaque ``id`` (for resolution by a trusted
+        gateway) and the ``safe_view`` (a human-readable description that is
+        safe to expose to the LLM).
+
+        Example output::
+
+            <kest-handle id="hdl_a1b2c3..." safe_view="Q3 total expenditure"/>
+
+        Double-quote characters in ``safe_view`` are escaped as ``&quot;`` to
+        keep the XML well-formed.
+
+        Returns:
+            A self-closing ``<kest-handle .../>`` XML tag string.
+        """
+        escaped_view = self.safe_view.replace('"', "&quot;")
+        return f'<kest-handle id="{self.id}" safe_view="{escaped_view}"/>'
