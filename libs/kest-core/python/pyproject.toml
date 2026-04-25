@@ -55,6 +55,9 @@ valkey = ["valkey>=6.0.0"]
 # Vault codec compression (all optional)
 lz4 = ["lz4>=4.0.0"]
 zstd = ["zstandard>=0.22.0"]
+# FastAPI integration plugin (all optional)
+fastapi = ["fastapi>=0.115.0", "python-jose[cryptography]>=3.3.0"]
+
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kest"]
@@ -80,6 +83,10 @@ dev = [
     # Vault backend testing
     "cachetools>=5.0.0",
     "fakeredis>=2.0.0",
+    # FastAPI integration testing
+    "fastapi>=0.115.0",
+    "python-jose[cryptography]>=3.3.0",
+    "anyio>=4.0.0",
 ]
 
 [tool.pytest.ini_options]
