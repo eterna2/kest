@@ -29,6 +29,23 @@ All notable changes to this project will be documented in this file.
   the audit entry and re-raises (the result is NOT returned to the caller). Built-in validators:
   - `MaxLengthValidator(max_chars)` — rejects outputs whose `str()` exceeds `max_chars` characters.
   - `RegexDenyListValidator(patterns)` — rejects outputs matching any regex in the deny-list.
+- **Structured Output Validation Framework** (Issue #81): Expanded the `OutputValidator` ABC into a
+  full composable validation pipeline with severity-aware violation tracking:
+  - `ValidationSeverity` — ordered enum: `INFO`, `WARNING`, `BLOCK`.
+  - `ValidationViolation` — single-validator finding with `message`, `severity`, and `validator_name`.
+  - `ValidationResult` — aggregated pipeline outcome: `passed`, `violations`, and max `severity`.
+  - `ValidationPipeline` — runs all validators, collects every violation before deciding to block.
+    Implements `OutputValidator` itself so it can be passed directly to `output_validators`.
+  - `LengthBoundsValidator(min_chars, max_chars)` — enforces minimum and/or maximum length bounds.
+  - `JsonSchemaValidator(schema)` — validates outputs against a JSON Schema dict; accepts `dict`,
+    `list`, or JSON-encoded `str`. Requires the optional `kest[schema]` extra (`jsonschema>=4.0.0`).
+  - `ContentClassificationValidator(expected)` — verifies the output matches a label list or a
+    callable predicate; supports case-insensitive matching via `case_sensitive=False`.
+  - `SemanticDriftDetector` — abstract base for similarity-based drift detection; subclasses
+    implement `detect(reference, output) -> float` and raise `OutputValidationError` when the
+    drift score meets or exceeds `threshold`.
+  All new symbols are exported from the `kest.core` public API.
+
 - **Context Accessor Functions** (F-CP-06): Implemented the five public context accessor functions required by SPEC-v0.3.0 §2.8:
   - `get_current_user()` — reads `kest.user` from OTel Baggage
   - `get_current_agent()` — reads `kest.agent` from OTel Baggage

@@ -218,6 +218,8 @@ Protect against prompt injection artifacts and data leaks by validating function
 before they reach the caller. If validation fails, the result is **not returned** and a
 `"output_validation_failed"` taint is recorded in the audit chain.
 
+#### Basic Validators
+
 ```python
 from kest.core import (
     kest_verified,
@@ -239,7 +241,107 @@ def summarize_document(doc_id: str) -> str:
     ...
 ```
 
-You can implement custom validators by subclassing `OutputValidator`:
+#### Structured Validation Pipeline
+
+For comprehensive validation with severity levels and aggregated results, use `ValidationPipeline`.
+Unlike individual validators, the pipeline **does not short-circuit** — it runs all validators and
+collects every violation before deciding to block.
+
+Pass the pipeline directly in `output_validators` on `@kest_verified`:
+
+```python
+from kest.core import (
+    kest_verified,
+    ValidationPipeline,
+    LengthBoundsValidator,
+    JsonSchemaValidator,
+    ContentClassificationValidator,
+)
+
+# Build the pipeline once — reuse it across multiple decorated functions.
+pipeline = ValidationPipeline(
+    validators=[
+        LengthBoundsValidator(min_chars=10, max_chars=5000),
+        JsonSchemaValidator(schema={
+            "type": "object",
+            "required": ["summary", "confidence"],
+        }),
+        ContentClassificationValidator(expected=["safe", "neutral"]),
+    ],
+)
+
+@kest_verified(
+    policy="summarize",
+    output_validators=[pipeline],   # <-- pipeline IS an OutputValidator
+)
+def summarize(doc: str) -> dict:
+    return {"summary": "...", "confidence": 0.9, "label": "safe"}
+```
+
+If any validator raises, `@kest_verified` adds an `output_validation_failed` taint to the audit
+entry and re-raises `OutputValidationError` — the result is **never returned** to the caller.
+
+You can also run the pipeline manually to inspect all violations before deciding what to do:
+
+```python
+result = pipeline.run(output)
+if not result.passed:
+    for v in result.violations:
+        print(f"[{v.severity.name}] {v.validator_name}: {v.message}")
+```
+
+> **Note:** `JsonSchemaValidator` requires `pip install kest[schema]` (installs `jsonschema>=4.0.0`).
+
+#### Semantic Drift Detection
+
+For similarity-based guardrails, subclass `SemanticDriftDetector` and implement `detect()`. It
+returns a drift score in `[0.0, 1.0]` (0 = identical, 1 = completely different). If the score
+meets or exceeds `threshold`, `@kest_verified` blocks the output.
+
+```python
+from kest.core import kest_verified, SemanticDriftDetector
+
+class EmbeddingDriftDetector(SemanticDriftDetector):
+    def detect(self, reference, output) -> float:
+        # Return 0.0 = no drift, 1.0 = maximum drift
+        return 1 - cosine_similarity(embed(reference), embed(output))
+
+# The detector itself is an OutputValidator — pass it directly.
+@kest_verified(
+    policy="refund-policy-qa",
+    output_validators=[
+        EmbeddingDriftDetector(
+            reference="Expected response topic: product refund policy",
+            threshold=0.3,
+        ),
+    ],
+)
+def answer_refund_question(question: str) -> str:
+    ...
+```
+
+You can also combine a drift detector with a `ValidationPipeline` for defence-in-depth:
+
+```python
+from kest.core import ValidationPipeline, LengthBoundsValidator
+
+@kest_verified(
+    policy="refund-policy-qa",
+    output_validators=[
+        ValidationPipeline([
+            LengthBoundsValidator(min_chars=20, max_chars=2000),
+            EmbeddingDriftDetector(
+                reference="Expected response topic: product refund policy",
+                threshold=0.3,
+            ),
+        ])
+    ],
+)
+def answer_refund_question(question: str) -> str:
+    ...
+```
+
+#### Custom Validators
 
 ```python
 from kest.core import OutputValidator, OutputValidationError
@@ -249,6 +351,8 @@ class NoBinaryValidator(OutputValidator):
         if "\x00" in str(output):
             raise OutputValidationError("Null byte detected in output")
 ```
+
+
 
 ### 5. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:

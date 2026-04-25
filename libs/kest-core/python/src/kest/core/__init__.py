@@ -41,10 +41,18 @@ from kest.core.framework.ext import (  # noqa: E402
     KestMiddleware,
 )
 from kest.core.framework.validators import (  # noqa: E402
+    ContentClassificationValidator,
+    JsonSchemaValidator,
+    LengthBoundsValidator,
     MaxLengthValidator,
     OutputValidationError,
     OutputValidator,
     RegexDenyListValidator,
+    SemanticDriftDetector,
+    ValidationPipeline,
+    ValidationResult,
+    ValidationSeverity,
+    ValidationViolation,
 )
 from kest.core.identity import (  # noqa: E402
     AWSWorkloadIdentity,
@@ -188,4 +196,13 @@ __all__ = [
     "OutputValidationError",
     "MaxLengthValidator",
     "RegexDenyListValidator",
+    # Structured Validation Framework (Issue #81)
+    "ValidationSeverity",
+    "ValidationViolation",
+    "ValidationResult",
+    "ValidationPipeline",
+    "LengthBoundsValidator",
+    "JsonSchemaValidator",
+    "ContentClassificationValidator",
+    "SemanticDriftDetector",
 ]
