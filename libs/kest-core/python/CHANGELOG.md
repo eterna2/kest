@@ -45,6 +45,20 @@ All notable changes to this project will be documented in this file.
     implement `detect(reference, output) -> float` and raise `OutputValidationError` when the
     drift score meets or exceeds `threshold`.
   All new symbols are exported from the `kest.core` public API.
+- **Data Vault / Opaque Handle Primitives** (Issue #79): Implemented the `kest.core.vault` package
+  providing foundational building blocks for the zero-trust Template & Hydrate composition flow.
+  Raw sensitive data is sealed into a `HandleVault` and referenced by an `OpaqueHandle` — an opaque
+  pointer that carries only a non-sensitive `safe_view` string safe for LLM context windows:
+  - `OpaqueHandle(id, safe_view, owner_principal, created_at, expires_at, granted_principals)` —
+    frozen dataclass; `id` is prefixed `hdl_<uuid4_hex>`; timestamps are UTC-aware.
+  - `HandleVault(cache=None)` — in-memory vault backed by `CacheProvider` (defaults to `SimpleCache`):
+    - `seal(data, owner_principal, safe_view, ttl_seconds=300, granted_principals=())` → `OpaqueHandle`
+    - `unseal(handle_id, requesting_principal)` → raw data; enforces ACL and TTL (lazy expiry check).
+    - `invalidate(handle_id)` — immediate eviction; idempotent for unknown handles.
+    - `get_safe_view(handle_id)` — ACL-free access to the non-sensitive summary.
+  - `HandleNotFoundError`, `HandleExpiredError`, `HandleAccessDeniedError` — typed error hierarchy.
+  - No external dependencies; pluggable `CacheProvider` backend for future Redis / DynamoDB support.
+  All symbols are exported from the `kest.core` public API.
 
 - **Context Accessor Functions** (F-CP-06): Implemented the five public context accessor functions required by SPEC-v0.3.0 §2.8:
   - `get_current_user()` — reads `kest.user` from OTel Baggage
