@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- **FastAPI Integration Plugin** (`kest[fastapi]`): New `kest.core.integrations.fastapi` module
+  providing a zero-boilerplate FastAPI integration for the HandleVault:
+  - `VaultRouter(vault, extractor, gateway_principals)` — a drop-in `APIRouter` exposing
+    `GET /safe-view/{handle_id}` (public) and `GET /resolve/{handle_id}` (privileged) routes.
+  - `VaultDependency(vault, extractor)` — a `Depends`-compatible callable for use in custom
+    routes; unseals handles and enforces vault ACLs automatically.
+  - `JWTPrincipalExtractor(secret, algorithm, claim)` — extracts the caller's SPIFFE principal
+    from an HS256 (or RS/ES) JWT Bearer token.
+  - `HeaderPrincipalExtractor(header_name)` — extracts principal from a plain HTTP header;
+    useful for trusted-proxy and sidecar setups.
+  - `PrincipalExtractor` — base class / protocol; implement `async extract(request) -> str`
+    to integrate any custom authentication mechanism (mTLS, OIDC, API-key, …).
+  - `vault_seal_response(vault, data, safe_view, owner, granted, ttl)` — convenience helper
+    that seals data and returns a `HandleResponse` TypedDict for use in route handlers.
+  - Install with: `pip install kest[fastapi]`
+  - All symbols are also hoisted into `kest.core` under a graceful `try/except ImportError`
+    guard so `kest.core` remains importable without the optional extras.
+
+---
+
 ## [0.4.0] - 2026-04-24
 
 ### Added
@@ -51,14 +75,45 @@ All notable changes to this project will be documented in this file.
   pointer that carries only a non-sensitive `safe_view` string safe for LLM context windows:
   - `OpaqueHandle(id, safe_view, owner_principal, created_at, expires_at, granted_principals)` —
     frozen dataclass; `id` is prefixed `hdl_<uuid4_hex>`; timestamps are UTC-aware.
-  - `HandleVault(cache=None)` — in-memory vault backed by `CacheProvider` (defaults to `SimpleCache`):
+  - `HandleVault(cache=None, codec=None)` — in-memory vault backed by `CacheProvider` (defaults to `SimpleCache`):
     - `seal(data, owner_principal, safe_view, ttl_seconds=300, granted_principals=())` → `OpaqueHandle`
     - `unseal(handle_id, requesting_principal)` → raw data; enforces ACL and TTL (lazy expiry check).
     - `invalidate(handle_id)` — immediate eviction; idempotent for unknown handles.
     - `get_safe_view(handle_id)` — ACL-free access to the non-sensitive summary.
   - `HandleNotFoundError`, `HandleExpiredError`, `HandleAccessDeniedError` — typed error hierarchy.
-  - No external dependencies; pluggable `CacheProvider` backend for future Redis / DynamoDB support.
-  All symbols are exported from the `kest.core` public API.
+- **VaultCodec — Encryption & Compression Pipeline** (Issue #79): Added an optional, composable
+  payload pipeline applied before data enters the cache. Both stages are independently optional:
+  - **Compressors** (stdlib, no extra deps): `ZlibCompressor`, `GzipCompressor`; optional extras:
+    `LZ4Compressor` (`kest[lz4]`), `ZstdCompressor` (`kest[zstd]`)
+  - **Encryptors** (uses core `cryptography` dep): `AES256GCMEncryptor` (AES-256-GCM, authenticated,
+    fresh random nonce per call), `FernetEncryptor` (AES-128-CBC+HMAC-SHA256, simple key management)
+  - `VaultCodec(compressor=None, encryptor=None)` — pipeline order: pickle → compress → encrypt (seal);
+    decrypt → decompress → unpickle (unseal). Both are fully optional; no codec = identity passthrough.
+  All codec symbols exported from `kest.core` public API.
+- **Pluggable Cache Backends** (Issue #79): Five `CacheProvider` implementations beyond the default
+  `SimpleCache`, each available as an optional install extra:
+  - `SQLiteCache` (stdlib, no extra dep) — ACID-compliant SQLite KV store; supports in-memory
+    (`:memory:`) and persistent file modes; thread-safe with a single shared connection + lock.
+  - `LMDBCache` — Lightning Memory-Mapped DB via `kest[lmdb]`; fastest reads via zero-copy B+tree;
+    auto-creates a temporary directory when no path is specified.
+  - `CachetoolsCache` — pure-Python TTLCache/LRUCache via `kest[cachetools]`; configurable maxsize
+    and default_ttl.
+  - `RedisCache` — Redis-backed store via `kest[redis]`; also compatible with KeyDB (RESP protocol).
+  - `ValkeyCache` — Valkey-backed store via `kest[valkey]`; Linux Foundation open-source Redis fork.
+  All backends are exported from `kest.core` public API. LMDB tests are skipped if `lmdb` not
+  installed; Redis/Valkey tests use `fakeredis` in the dev dependency group.
+- **Vault Service Transports** (Issue #79): Three embeddable server transports expose a `HandleVault`
+  over the network; a unified `VaultClient` provides a single API for all three:
+  - `VaultHTTPServer` — REST/JSON over HTTP (stdlib `http.server`); endpoints: `POST /handles`,
+    `POST /handles/{id}/unseal`, `DELETE /handles/{id}`, `GET /handles/{id}/safe_view`.
+  - `VaultRPCServer` — XML-RPC (stdlib `xmlrpc.server`); methods: `seal`, `unseal`, `invalidate`,
+    `get_safe_view`; faults mapped to typed vault errors on the client side.
+  - `VaultSocketServer` — JSON-RPC 2.0 over TCP or Unix domain socket; 4-byte length-prefixed
+    framing; supports both `(host, port)` and socket file path addresses.
+  - `VaultClient.http(url)`, `.rpc(host, port)`, `.socket(address)` — factory classmethods;
+    all raise `HandleNotFoundError`, `HandleExpiredError`, or `HandleAccessDeniedError` natively.
+  All server/client symbols exported from `kest.core` public API.
+
 
 - **Context Accessor Functions** (F-CP-06): Implemented the five public context accessor functions required by SPEC-v0.3.0 §2.8:
   - `get_current_user()` — reads `kest.user` from OTel Baggage
