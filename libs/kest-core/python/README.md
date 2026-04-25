@@ -245,7 +245,9 @@ def summarize_document(doc_id: str) -> str:
 
 For comprehensive validation with severity levels and aggregated results, use `ValidationPipeline`.
 Unlike individual validators, the pipeline **does not short-circuit** — it runs all validators and
-collects every violation before deciding to block:
+collects every violation before deciding to block.
+
+Pass the pipeline directly in `output_validators` on `@kest_verified`:
 
 ```python
 from kest.core import (
@@ -254,9 +256,9 @@ from kest.core import (
     LengthBoundsValidator,
     JsonSchemaValidator,
     ContentClassificationValidator,
-    ValidationSeverity,
 )
 
+# Build the pipeline once — reuse it across multiple decorated functions.
 pipeline = ValidationPipeline(
     validators=[
         LengthBoundsValidator(min_chars=10, max_chars=5000),
@@ -268,36 +270,75 @@ pipeline = ValidationPipeline(
     ],
 )
 
-# Direct usage — inspect all violations without raising:
+@kest_verified(
+    policy="summarize",
+    output_validators=[pipeline],   # <-- pipeline IS an OutputValidator
+)
+def summarize(doc: str) -> dict:
+    return {"summary": "...", "confidence": 0.9, "label": "safe"}
+```
+
+If any validator raises, `@kest_verified` adds an `output_validation_failed` taint to the audit
+entry and re-raises `OutputValidationError` — the result is **never returned** to the caller.
+
+You can also run the pipeline manually to inspect all violations before deciding what to do:
+
+```python
 result = pipeline.run(output)
 if not result.passed:
     for v in result.violations:
         print(f"[{v.severity.name}] {v.validator_name}: {v.message}")
-
-# Or as an OutputValidator in @kest_verified — raises on first BLOCK violation:
-@kest_verified(policy="summarize", output_validators=[pipeline])
-def summarize(doc: str) -> dict:
-    ...
 ```
 
 > **Note:** `JsonSchemaValidator` requires `pip install kest[schema]` (installs `jsonschema>=4.0.0`).
 
 #### Semantic Drift Detection
 
-For custom similarity-based guardrails, subclass `SemanticDriftDetector`:
+For similarity-based guardrails, subclass `SemanticDriftDetector` and implement `detect()`. It
+returns a drift score in `[0.0, 1.0]` (0 = identical, 1 = completely different). If the score
+meets or exceeds `threshold`, `@kest_verified` blocks the output.
 
 ```python
-from kest.core import SemanticDriftDetector
+from kest.core import kest_verified, SemanticDriftDetector
 
 class EmbeddingDriftDetector(SemanticDriftDetector):
     def detect(self, reference, output) -> float:
         # Return 0.0 = no drift, 1.0 = maximum drift
         return 1 - cosine_similarity(embed(reference), embed(output))
 
-detector = EmbeddingDriftDetector(
-    reference="Expected response topic: product refund policy",
-    threshold=0.3,
+# The detector itself is an OutputValidator — pass it directly.
+@kest_verified(
+    policy="refund-policy-qa",
+    output_validators=[
+        EmbeddingDriftDetector(
+            reference="Expected response topic: product refund policy",
+            threshold=0.3,
+        ),
+    ],
 )
+def answer_refund_question(question: str) -> str:
+    ...
+```
+
+You can also combine a drift detector with a `ValidationPipeline` for defence-in-depth:
+
+```python
+from kest.core import ValidationPipeline, LengthBoundsValidator
+
+@kest_verified(
+    policy="refund-policy-qa",
+    output_validators=[
+        ValidationPipeline([
+            LengthBoundsValidator(min_chars=20, max_chars=2000),
+            EmbeddingDriftDetector(
+                reference="Expected response topic: product refund policy",
+                threshold=0.3,
+            ),
+        ])
+    ],
+)
+def answer_refund_question(question: str) -> str:
+    ...
 ```
 
 #### Custom Validators
