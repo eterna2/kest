@@ -46,6 +46,7 @@ aws = ["boto3>=1.28.0", "aioboto3>=15.5.0"]
 opa = ["opa-python-client>=2.0.4"]
 cedar = ["cedarpy>=4.8.0"]
 rego = ["regopy>=0.3.0"]
+schema = ["jsonschema>=4.0.0"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kest"]
@@ -67,6 +68,7 @@ dev = [
     "regopy>=0.3.0",
     "cedarpy>=4.8.0",
     "pyperf>=2.10.0",
+    "jsonschema>=4.0.0",
 ]
 
 [tool.pytest.ini_options]
