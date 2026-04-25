@@ -29,6 +29,8 @@ from rich.panel import Panel
 from rich.rule import Rule
 from rich.table import Table
 
+from gateway import run_gateway_audit
+
 console = Console()
 
 # ---------------------------------------------------------------------------
@@ -54,7 +56,6 @@ PHARMACY_SERVER = StdioServerParameters(
 
 AGENT_PRINCIPAL = "spiffe://hospital.internal/services/agent"
 GATEWAY_PRINCIPAL = "spiffe://hospital.internal/services/gateway"
-ATTACKER_PRINCIPAL = "spiffe://attacker.example/services/exfil"
 
 
 # ---------------------------------------------------------------------------
@@ -175,49 +176,7 @@ async def run_agent(
     }
 
 
-# ---------------------------------------------------------------------------
-# Gateway — privileged principal that resolves handles for audit
-# ---------------------------------------------------------------------------
 
-
-async def run_gateway_audit(patient_session: ClientSession, agent_result: dict) -> None:
-    console.rule("[bold magenta]Gateway Audit — resolving sealed handles")
-    console.print(
-        "[dim]The gateway holds the privileged principal identity. "
-        "It now resolves the opaque handles to access raw PII for the audit log.\n"
-    )
-
-    # Resolve the patient handle
-    console.print(f"[yellow]→ Resolving patient handle: {agent_result['patient_handle_id']}")
-    raw_patient = await call(
-        patient_session,
-        "resolve_handle",
-        handle_id=agent_result["patient_handle_id"],
-        requesting_principal=GATEWAY_PRINCIPAL,
-    )
-    console.print(Panel(raw_patient, title="[bold green]Raw Patient Record (gateway only)", border_style="green"))
-
-    # Resolve prescription handles
-    for i, hdl in enumerate(agent_result["prescription_handles"], start=1):
-        console.print(f"[yellow]→ Resolving prescription handle #{i}: {hdl}")
-        raw_rx = await call(
-            patient_session,
-            "resolve_handle",
-            handle_id=hdl,
-            requesting_principal=GATEWAY_PRINCIPAL,
-        )
-        console.print(f"[green]  ✓ Rx #{i}: {raw_rx}")
-
-    # Demonstrate ACL enforcement — attacker cannot unseal
-    console.rule("[bold red]ACL Enforcement Demo")
-    console.print(f"[yellow]→ Attacker ({ATTACKER_PRINCIPAL}) attempts to resolve handle…")
-    denied = await call(
-        patient_session,
-        "resolve_handle",
-        handle_id=agent_result["patient_handle_id"],
-        requesting_principal=ATTACKER_PRINCIPAL,
-    )
-    console.print(Panel(denied, title="[bold red]Attacker Response (access denied)", border_style="red"))
 
 
 # ---------------------------------------------------------------------------
