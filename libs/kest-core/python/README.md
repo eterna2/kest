@@ -723,6 +723,137 @@ except HydrationError as exc:
     # hdl_a1b2…: HandleAccessDeniedError — Principal 'spiffe://untrusted' is not authorised…
 ```
 
+#### 5g. SummarizationProvider — Auto-generated Safe Views (Issue #82)
+
+Instead of writing `safe_view` strings by hand, attach a `SummarizationProvider` to
+`vault.seal()` and let Kest generate a non-sensitive description automatically. The
+generated summary is stored on the `OpaqueHandle` and is safe for LLM prompts without
+ever exposing raw records or PII.
+
+**Basic usage — auto-generate `safe_view` on seal:**
+
+```python
+from kest.core import HandleVault
+from kest.core.vault.summarization import SchemaBasedSummarizer
+
+vault = HandleVault()
+summarizer = SchemaBasedSummarizer()
+
+data = [
+    {"id": 1, "amount": 100.0, "date": "2025-01-01"},
+    {"id": 2, "amount": 250.0, "date": "2025-01-02"},
+]
+
+handle = vault.seal(
+    data=data,
+    owner_principal="spiffe://example.com/data-service",
+    summarizer=summarizer,
+    # safe_view is auto-generated; no need to write it manually
+)
+print(handle.safe_view)
+# → "Tabular data: 2 row(s); columns: id, amount, date."
+```
+
+The `summarizer` always wins — any manually provided `safe_view` is overridden.
+To use both, omit `summarizer` and set `safe_view` explicitly.
+
+**Bundled implementations:**
+
+| Class | Best for | Output example |
+|---|---|---|
+| `SchemaBasedSummarizer` | Dicts, list-of-dicts, DataFrames | `"Tabular data: 5 row(s); columns: id, amount, date."` |
+| `TruncatingSummarizer` | Raw strings, unknown payloads | `"John Doe, SSN: 123-[TRUNCATED]"` |
+| `AggregationSummarizer` | Numeric lists or dicts | `"Numeric sequence: 5 value(s); sum=150; min=10; max=50."` |
+
+**`SchemaBasedSummarizer`** — structural / schema introspection:
+
+```python
+from kest.core.vault.summarization import SchemaBasedSummarizer, SafeView
+
+s = SchemaBasedSummarizer()
+
+s.summarize({"name": "Alice", "age": 30}, {})
+# SafeView(summary="Object with 2 field(s): name, age.", data_type="object", ...)
+
+s.summarize("some raw text", {})
+# SafeView(summary="Text value; 13 characters.", data_type="text")
+
+# pandas DataFrames work via duck-typing — no pandas import required by kest-core
+import pandas as pd
+df = pd.DataFrame({"id": [1, 2], "amount": [100.0, 200.0]})
+s.summarize(df, {})
+# SafeView(summary="DataFrame: 2 row(s) × 2 column(s); columns: id, amount.", ...)
+```
+
+**`TruncatingSummarizer`** — first N characters with `[TRUNCATED]` marker:
+
+```python
+from kest.core.vault.summarization import TruncatingSummarizer
+
+s = TruncatingSummarizer(max_chars=50)
+s.summarize("A very long sensitive text that goes on and on...", {})
+# SafeView(summary="A very long sensitive text that goes on and on [TRUNCATED]", ...)
+```
+
+**`AggregationSummarizer`** — count, sum, min, max:
+
+```python
+from kest.core.vault.summarization import AggregationSummarizer
+
+s = AggregationSummarizer()
+
+s.summarize([10, 20, 30, 40, 50], {})
+# SafeView(summary="Numeric sequence: 5 value(s); sum=150; min=10; max=50.", ...)
+
+s.summarize({"revenue": 1000, "cost": 400, "profit": 600}, {})
+# SafeView(summary="Key-value map: 3 numeric field(s); sum=2000; min=400; max=1000. ...", ...)
+```
+
+**Custom summarizer:**
+
+Implement `SummarizationProvider` to build domain-specific summaries:
+
+```python
+from kest.core.vault.summarization import SummarizationProvider, SafeView
+from typing import Any
+
+class ClinicalDataSummarizer(SummarizationProvider):
+    def summarize(self, data: Any, context: dict) -> SafeView:
+        records = data if isinstance(data, list) else [data]
+        return SafeView(
+            summary=f"Clinical dataset: {len(records)} patient record(s). "
+                    "Contains PHI — access restricted.",
+            data_type="tabular",
+            row_count=len(records),
+        )
+
+vault = HandleVault()
+handle = vault.seal(
+    data=patient_records,
+    owner_principal="spiffe://example.com/ehr-service",
+    summarizer=ClinicalDataSummarizer(),
+)
+# handle.safe_view → "Clinical dataset: 42 patient record(s). Contains PHI — access restricted."
+```
+
+**`SafeView` dataclass:**
+
+The return type of every summarizer. `str(safe_view)` returns the summary text,
+making it easy to embed directly in prompts or log messages.
+
+```python
+from kest.core.vault.summarization import SafeView
+
+sv = SafeView(
+    summary="5,000 transactions; Total: $1.2M",
+    data_type="tabular",
+    row_count=5000,
+    schema={"id": "int", "amount": "float", "date": "datetime"},
+)
+print(str(sv))   # "5,000 transactions; Total: $1.2M"
+print(sv.schema) # {"id": "int", "amount": "float", "date": "datetime"}
+```
+
 ### 6. Policy Validation
 To prevent faulty configurations, Kest provides static AST syntax validations that can proactively check LLM-generated or static policies before deploying them:
 

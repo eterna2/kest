@@ -37,6 +37,13 @@ from kest.core.vault.errors import (
     HandleNotFoundError,
 )
 from kest.core.vault.handle import OpaqueHandle
+from kest.core.vault.summarization import (
+    AggregationSummarizer,
+    SafeView,
+    SchemaBasedSummarizer,
+    SummarizationProvider,
+    TruncatingSummarizer,
+)
 from kest.core.vault.template import HydrationError, TemplateEngine, TemplateParser
 from kest.core.vault.vault import HandleVault
 
@@ -62,4 +69,10 @@ __all__ = [
     "TemplateParser",
     "TemplateEngine",
     "HydrationError",
+    # Summarization
+    "SafeView",
+    "SummarizationProvider",
+    "SchemaBasedSummarizer",
+    "TruncatingSummarizer",
+    "AggregationSummarizer",
 ]

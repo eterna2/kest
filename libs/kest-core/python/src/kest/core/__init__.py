@@ -105,6 +105,13 @@ from kest.core.vault.server import (  # noqa: E402, F401
     VaultRPCServer,
     VaultSocketServer,
 )
+from kest.core.vault.summarization import (  # noqa: E402, F401
+    AggregationSummarizer,
+    SafeView,
+    SchemaBasedSummarizer,
+    SummarizationProvider,
+    TruncatingSummarizer,
+)
 from kest.core.vault.template import (  # noqa: E402, F401
     HydrationError,
     TemplateEngine,
@@ -288,6 +295,12 @@ __all__ = [
     "TemplateParser",
     "TemplateEngine",
     "HydrationError",
+    # Summarization — safe data views for LLM context (Issue #82)
+    "SafeView",
+    "SummarizationProvider",
+    "SchemaBasedSummarizer",
+    "TruncatingSummarizer",
+    "AggregationSummarizer",
     # FastAPI integration (kest[fastapi]) — available only if extras installed
     "VaultRouter",
     "VaultDependency",
