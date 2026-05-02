@@ -11,7 +11,7 @@
   "dependencies": {
     "fuse.js": "^7.3.0",
     "gray-matter": "^4.0.3",
-    "lucide-react": "1.8.0",
+    "lucide-react": "1.14.0",
     "mermaid": "^11.14.0",
     "next": "16",
     "next-mdx-remote": "^6.0.0",
@@ -29,9 +29,9 @@
     "@types/node": "25.6.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "10.2.0",
-    "eslint-config-next": "16.2.3",
+    "eslint": "10.3.0",
+    "eslint-config-next": "16.2.4",
     "postcss": "^8.5.10",
-    "typescript": "6.0.2"
+    "typescript": "6.0.3"
   }
 }
