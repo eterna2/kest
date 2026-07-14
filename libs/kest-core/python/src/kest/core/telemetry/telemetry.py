@@ -95,9 +95,9 @@ class SQLiteSpanExporter(SpanExporter):
     def export(self, spans):
         """Inserts a batch of spans into the SQLite database."""
         with sqlite3.connect(self.db_path) as conn:
-            for span in spans:
-                conn.execute(
-                    "INSERT OR REPLACE INTO spans (id, trace_id, name, start_time, end_time, attributes) VALUES (?, ?, ?, ?, ?, ?)",
+            conn.executemany(
+                "INSERT OR REPLACE INTO spans (id, trace_id, name, start_time, end_time, attributes) VALUES (?, ?, ?, ?, ?, ?)",
+                (
                     (
                         str(span.context.span_id),
                         str(span.context.trace_id),
@@ -105,8 +105,10 @@ class SQLiteSpanExporter(SpanExporter):
                         span.start_time,
                         span.end_time,
                         json.dumps(dict(span.attributes) if span.attributes else {}),
-                    ),
-                )
+                    )
+                    for span in spans
+                ),
+            )
         return True
 
     def shutdown(self):
