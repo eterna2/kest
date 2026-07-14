@@ -6,6 +6,7 @@ token where the agent acts on alice's behalf. The agent then calls hop1 with
 its own SPIFFE identity + the OBO JWT, which propagates alice's identity
 through the entire hop chain via KestIdentityMiddleware + OTel baggage.
 """
+
 import os
 import traceback
 import httpx
@@ -58,7 +59,9 @@ def _load_cedar_policies(policy_dir: str = "/workspace/app/cedar/policies") -> d
                 with open(os.path.join(policy_dir, fname)) as f:
                     policies[policy_id] = f.read()
     if not policies:
-        policies["fallback"] = 'permit(principal, action, resource) when { context["trust_score"] >= 10 };'
+        policies["fallback"] = (
+            'permit(principal, action, resource) when { context["trust_score"] >= 10 };'
+        )
     return policies
 
 
@@ -92,6 +95,7 @@ app.add_middleware(
     KestIdentityMiddleware,
     jwks_uri=JWKS_URI,
     user_claim="preferred_username",
+    audience="account",
 )
 app.add_middleware(KestMiddleware)
 
@@ -173,7 +177,9 @@ async def call_hop1_as_agent(obo_token: str):
     # Read kest.user from OTel baggage (set by KestIdentityMiddleware from OBO JWT)
     # Spec-compliant key: SPEC-v0.3.0 §8.4
     resolved_user = baggage.get_baggage("kest.user")
-    print(f"[{SERVICE_NAME}] Calling hop1 as agent, delegating for user={resolved_user}.")
+    print(
+        f"[{SERVICE_NAME}] Calling hop1 as agent, delegating for user={resolved_user}."
+    )
     async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
         response = await client.get(
             HOP1_URL,
@@ -237,18 +243,22 @@ async def _delegate_to_gateway_logic(obo_token: str):
       2. Extracts the task token from the response
       3. Calls kest-gateway /execute-task with the task token
     """
-    resolved_user = baggage.get_baggage("kest.user")  # spec-compliant (SPEC-v0.3.0 §8.4)
-    print(f"[{SERVICE_NAME}] /delegate-to-gateway — delegating for user={resolved_user!r}")
+    resolved_user = baggage.get_baggage(
+        "kest.user"
+    )  # spec-compliant (SPEC-v0.3.0 §8.4)
+    print(
+        f"[{SERVICE_NAME}] /delegate-to-gateway — delegating for user={resolved_user!r}"
+    )
 
     # Inject W3C traceparent and baggage so gateway continues the trace
     span_ctx = trace.get_current_span().get_span_context()
     traceparent = ""
     if span_ctx and span_ctx.is_valid:
         traceparent = f"00-{span_ctx.trace_id:032x}-{span_ctx.span_id:016x}-{span_ctx.trace_flags:02x}"
-        
+
     all_baggage = baggage.get_all()
     baggage_header = ",".join(f"{k}={v}" for k, v in all_baggage.items())
-    
+
     base_headers = {}
     if traceparent:
         base_headers["traceparent"] = traceparent
@@ -271,12 +281,14 @@ async def _delegate_to_gateway_logic(obo_token: str):
         auth_data = auth_resp.json()
         task_token = auth_data.get("task_token", "")
         if not task_token:
-            raise HTTPException(status_code=500, detail="kest-gateway did not return a task_token")
+            raise HTTPException(
+                status_code=500, detail="kest-gateway did not return a task_token"
+            )
 
         # Step 2: Submit the narrow task token to /execute-task
         exec_headers = dict(base_headers)
         exec_headers["Content-Type"] = "application/json"
-        
+
         exec_resp = await client.post(
             f"{GATEWAY_URL}/execute-task",
             headers=exec_headers,

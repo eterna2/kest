@@ -20,6 +20,7 @@ This service demonstrates Approach A from docs/GATEWAY_E2E.md:
 Security note: if this gateway is compromised, the attacker can mint arbitrary
 task tokens. Mitigations are documented in docs/GATEWAY_E2E.md §"What If Compromised?".
 """
+
 import os
 import json
 import time
@@ -118,6 +119,7 @@ app.add_middleware(
     KestIdentityMiddleware,
     jwks_uri=JWKS_URI,
     user_claim="preferred_username",
+    audience="account",
 )
 app.add_middleware(KestMiddleware)
 
@@ -176,12 +178,16 @@ def _mint_task_token(
 
     # Build a minimal JWS using the gateway's identity provider
     header = {"alg": "EdDSA", "typ": "JWT", "kid": SERVICE_NAME}
-    header_b64 = base64.urlsafe_b64encode(
-        json.dumps(header, separators=(",", ":")).encode()
-    ).rstrip(b"=").decode()
-    payload_b64 = base64.urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode()
-    ).rstrip(b"=").decode()
+    header_b64 = (
+        base64.urlsafe_b64encode(json.dumps(header, separators=(",", ":")).encode())
+        .rstrip(b"=")
+        .decode()
+    )
+    payload_b64 = (
+        base64.urlsafe_b64encode(json.dumps(payload, separators=(",", ":")).encode())
+        .rstrip(b"=")
+        .decode()
+    )
 
     signing_input = f"{header_b64}.{payload_b64}"
     signature = identity_provider.sign(signing_input.encode())
@@ -203,6 +209,7 @@ def _decode_task_token(token: str) -> dict:
 # ---------------------------------------------------------------------------
 # Endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.post("/authorise")
 async def authorise_handler(request: Request):
@@ -239,18 +246,24 @@ async def _authorise_logic():
       - context["scope"] contains "read:data"
     """
     try:
-        user = str(baggage.get_baggage("kest.user") or "")    # spec §8.4
-        agent = str(baggage.get_baggage("kest.agent") or "")   # spec §8.4
-        scope = str(baggage.get_baggage("kest.scope") or "")   # impl extension (raw OAuth scope)
+        user = str(baggage.get_baggage("kest.user") or "")  # spec §8.4
+        agent = str(baggage.get_baggage("kest.agent") or "")  # spec §8.4
+        scope = str(
+            baggage.get_baggage("kest.scope") or ""
+        )  # impl extension (raw OAuth scope)
 
         print(
             f"[{SERVICE_NAME}] /authorise — user={user!r}, agent={agent!r}, scope={scope!r}"
         )
 
         if not user:
-            raise HTTPException(status_code=403, detail="No delegated user identity in OBO token")
+            raise HTTPException(
+                status_code=403, detail="No delegated user identity in OBO token"
+            )
         if not agent:
-            raise HTTPException(status_code=403, detail="No agent identity in OBO token")
+            raise HTTPException(
+                status_code=403, detail="No agent identity in OBO token"
+            )
 
         # Mint a narrow task token
         task_token = _mint_task_token(
@@ -292,7 +305,9 @@ async def execute_task_handler(request: Request):
     body = await request.json()
     task_token = body.get("task_token", "")
     if not task_token:
-        raise HTTPException(status_code=400, detail="task_token required in request body")
+        raise HTTPException(
+            status_code=400, detail="task_token required in request body"
+        )
 
     # Decode the task token and inject its scope into baggage so
     # task_policy can read context["principal_scope"] == "task:process-data"
@@ -307,10 +322,14 @@ async def execute_task_handler(request: Request):
     from opentelemetry import baggage as otel_baggage
 
     ctx = otel_context.get_current()
-    ctx = otel_baggage.set_baggage("kest.task", task_scope, context=ctx)          # spec key
-    ctx = otel_baggage.set_baggage("kest.scope", task_scope, context=ctx)         # impl extension
-    ctx = otel_baggage.set_baggage("kest.user", delegated_user, context=ctx)     # spec key
-    ctx = otel_baggage.set_baggage("kest.agent", delegated_agent, context=ctx)   # spec key
+    ctx = otel_baggage.set_baggage("kest.task", task_scope, context=ctx)  # spec key
+    ctx = otel_baggage.set_baggage(
+        "kest.scope", task_scope, context=ctx
+    )  # impl extension
+    ctx = otel_baggage.set_baggage("kest.user", delegated_user, context=ctx)  # spec key
+    ctx = otel_baggage.set_baggage(
+        "kest.agent", delegated_agent, context=ctx
+    )  # spec key
     token = otel_context.attach(ctx)
     try:
         return await _execute_task_logic(task_token, delegated_user, delegated_agent)
@@ -322,7 +341,9 @@ async def execute_task_handler(request: Request):
     policy="task_policy",
     origin="internal",
 )
-async def _execute_task_logic(task_token: str, delegated_user: str, delegated_agent: str):
+async def _execute_task_logic(
+    task_token: str, delegated_user: str, delegated_agent: str
+):
     """
     @kest_verified-decorated logic for /execute-task.
 
@@ -380,6 +401,7 @@ async def _execute_task_logic(task_token: str, delegated_user: str, delegated_ag
 # Health
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health")
 async def health():
     return {"status": "ok", "service": SERVICE_NAME}
@@ -387,4 +409,5 @@ async def health():
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8002)

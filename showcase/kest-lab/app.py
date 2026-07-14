@@ -50,6 +50,7 @@ app.add_middleware(
     KestIdentityMiddleware,
     jwks_uri=JWKS_URI,
     user_claim="preferred_username",  # Use username, not UUID, for policy/audit matching
+    audience="account",
 )
 
 
@@ -60,6 +61,7 @@ async def permission_error_handler(request: Request, exc: PermissionError):
     This includes requests with invalid JWTs where kest.user is empty.
     """
     return JSONResponse(status_code=403, content={"detail": str(exc)})
+
 
 # --- Configure Kest ---
 NEXT_HOP = os.getenv("NEXT_HOP_URL", "none")
