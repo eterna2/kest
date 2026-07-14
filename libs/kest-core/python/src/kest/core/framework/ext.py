@@ -149,10 +149,15 @@ class KestIdentityMiddleware:
     """
 
     def __init__(
-        self, app, jwks_uri: str | None = None, user_claim: str = "preferred_username"
+        self,
+        app,
+        jwks_uri: str | None = None,
+        user_claim: str = "preferred_username",
+        audience: str | list[str] | None = None,
     ):
         self.app = app
         self.user_claim = user_claim
+        self.audience = audience
         self._jwks_client = None
         if jwks_uri:
             try:
@@ -191,7 +196,7 @@ class KestIdentityMiddleware:
                     token,
                     signing_key.key,
                     algorithms=["RS256", "ES256"],
-                    options={"verify_aud": False},
+                    audience=self.audience,
                 )
             except Exception as exc:
                 print(f"[Kest.IdentityMiddleware] JWT verification failed: {exc}")
