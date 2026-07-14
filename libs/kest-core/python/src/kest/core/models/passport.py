@@ -92,13 +92,7 @@ class Passport:
         Returns:
             Passport: A new Passport instance containing the union of all entries.
         """
-        seen = set()
-        merged_entries = []
-        for p in passports:
-            for entry in p.entries:
-                if entry not in seen:
-                    seen.add(entry)
-                    merged_entries.append(entry)
+        merged_entries = list(dict.fromkeys(e for p in passports for e in p.entries))
         return Passport(entries=merged_entries)
 
     def add_signature(self, signature: str):
