@@ -1,4 +1,0 @@
-User-Agent: *
-Allow: /
-
-Sitemap: https://eterna2.github.io/kest/preview/dependabot-npm-and-yarn-website-postcss-8512/sitemap.xml
