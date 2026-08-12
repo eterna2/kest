@@ -27,7 +27,13 @@ from typing import Any
 # Allow running from the bench directory or from the project root.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../../"))
 
-from kest.core import KestEntry, sign_entry, LocalEd25519Provider, Passport, PassportVerifier
+from kest.core import (
+    KestEntry,
+    sign_entry,
+    LocalEd25519Provider,
+    Passport,
+    PassportVerifier,
+)
 
 PROVIDER = LocalEd25519Provider()
 THREAD_COUNTS = [1, 2, 4, 8]
