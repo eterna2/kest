@@ -1,18 +1,17 @@
 import asyncio
 import os
 import threading
-import time
 
 import httpx
 import uvicorn
 from fastapi import FastAPI
+from kest.core import CedarLocalEngine, MockIdentityProvider, configure, kest_verified
 
 app = FastAPI()
 
 # ---------------------------------------------------------
 # Set up Kest backend
 # ---------------------------------------------------------
-from kest.core import CedarLocalEngine, MockIdentityProvider, configure, kest_verified
 
 configure(
     identity=MockIdentityProvider("abc"),

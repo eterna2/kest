@@ -55,40 +55,49 @@ deny[msg] {
   # Syntax error without proper assignments
 """
 
+
 @pytest.fixture
 def cedar_validator():
     from kest.core.policies.validators import CedarValidator
+
     return CedarValidator()
+
 
 @pytest.fixture
 def rego_validator():
     from kest.core.policies.validators import RegoValidator
+
     return RegoValidator()
+
 
 @pytest.mark.skipif(not HAS_CEDAR, reason="cedarpy not installed")
 def test_cedar_validator_valid(cedar_validator):
     # Should not raise
     cedar_validator.validate_syntax(VALID_CEDAR)
 
+
 @pytest.mark.skipif(not HAS_CEDAR, reason="cedarpy not installed")
 def test_cedar_validator_invalid(cedar_validator):
     with pytest.raises(ValueError):
         cedar_validator.validate_syntax(INVALID_CEDAR)
 
+
 @pytest.mark.skipif(not HAS_CEDAR, reason="cedarpy not installed")
 def test_cedar_validator_with_schema(cedar_validator):
     cedar_validator.validate_syntax(VALID_CEDAR, schema=VALID_SCHEMA)
-    
+
     with pytest.raises(ValueError):
         cedar_validator.validate_syntax(INVALID_CEDAR, schema=VALID_SCHEMA)
 
     with pytest.raises(ValueError, match="schema"):
         cedar_validator.validate_syntax(VALID_CEDAR, schema=INVALID_SCHEMA)
 
+
 @pytest.mark.skipif(not HAS_REGO, reason="regopy not installed")
 def test_rego_validator_valid(rego_validator):
     # Should not raise
     rego_validator.validate_syntax(VALID_REGO)
+
 
 @pytest.mark.skipif(not HAS_REGO, reason="regopy not installed")
 def test_rego_validator_invalid(rego_validator):
